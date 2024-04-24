@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 arc-swap = "1.6"
-axum = "0.6"
+axum = "0.7"
 beef = "0.5"
 derive_more = "0.99"
 lazy_static = "1.4"

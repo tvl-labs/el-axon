@@ -44,10 +44,13 @@ members = [
     "core/rpc-client",
     "core/run",
     "core/storage",
+    "core/el-node-api",
+    "core/el-prometheus",
+    "core/el-utils",
     "devtools/abi-generator",
     "devtools/axon-tools",
     "devtools/metadata-cli",
-    "protocol",
+    "protocol", "core/el-utils",
 ]
 
 [features]
