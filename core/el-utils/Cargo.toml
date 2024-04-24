@@ -6,13 +6,25 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ark-bn254 = "0.4"
+ark-ff = "0.4"
+eigensdk-client-wallet = "0.0.1-alpha"
+eigensdk-crypto-bls = "0.0.1-alpha"
+eigensdk-crypto-bn254 = "0.0.1-alpha"
+eigensdk-txmgr = "0.0.1-alpha"
+eigensdk-types = "0.0.1-alpha"
+ethers = "2.0"
 ethers-core = "2.0.14"
 ethers-providers = "2.0"
+futures = "0.3"
+num-bigint = "0.4"
 thiserror = "1.0"
 lazy_static = "1.4"
 prometheus = "0.13"
+prometheus-client = "0.22"
 prometheus-static-metric = "0.5"
 serde = { version = "1.0", features = ["derive"] }
+tracing = "0.1"
 url = "2.5"
 
 protocol = { path = "../../protocol", package = "axon-protocol" }

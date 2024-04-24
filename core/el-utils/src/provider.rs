@@ -195,7 +195,7 @@ impl<M: Middleware> Middleware for EigenMiddleware<M> {
         &self,
         block_hash_or_number: T,
         idx: U64,
-    ) -> Result<Option<Transaction>, ProviderError> {
+    ) -> Result<Option<Transaction>, Self::Error> {
         let block_id = block_hash_or_number.into();
         match block_id {
             BlockId::Hash(_) => {

@@ -1,3 +1,6 @@
+mod client;
+mod contract;
+mod error;
 mod metrics;
 mod provider;
 
