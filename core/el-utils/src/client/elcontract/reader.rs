@@ -1,5 +1,5 @@
 use crate::contract::{
-    avs_dictionary::avs_directory, delegation_manager::delegation_manager, i_erc20::ierc20,
+    avs_dictionary::avs_directory, delegation_manager::delegation_manager, erc20_mock::ERC20Mock,
     i_slasher::i_slasher, i_strategy::i_strategy,
 };
 use eigensdk_types::operator::Operator;
@@ -186,7 +186,7 @@ impl ELChainReader {
 
         match underlying_token_addr_result {
             Ok(underlying_token_addr) => {
-                let contract_ierc20 = ierc20::IERC20::new(underlying_token_addr, provider);
+                let contract_ierc20 = ERC20Mock::new(underlying_token_addr, provider);
 
                 return Ok((
                     strategy_addr,

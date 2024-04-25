@@ -127,7 +127,14 @@ pub trait Gossip: Send + Sync {
 
 #[async_trait]
 pub trait Rpc: Send + Sync {
-    async fn call<M, R>(&self, ctx: Context, end: &str, msg: M, pri: Priority) -> ProtocolResult<R>
+    async fn call<M, R>(
+        &self,
+        ctx: Context,
+        end: &str,
+        peer: Option<Bytes>,
+        msg: M,
+        pri: Priority,
+    ) -> ProtocolResult<R>
     where
         M: MessageCodec,
         R: MessageCodec;

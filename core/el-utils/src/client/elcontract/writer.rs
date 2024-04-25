@@ -1,7 +1,7 @@
 use crate::client::elcontract::{error::ElContractsError, reader::ELChainReader};
 use crate::contract::{
-    delegation_manager::delegation_manager, delegation_manager::OperatorDetails, i_erc20::ierc20,
-    strategy_manager::strategy_manager,
+    delegation_manager::delegation_manager, delegation_manager::OperatorDetails,
+    erc20_mock::ERC20Mock, strategy_manager::strategy_manager,
 };
 
 use eigensdk_txmgr::SimpleTxManager;
@@ -138,7 +138,7 @@ impl ELChainWriter {
                 let signer = SignerMiddleware::new(provider.clone(), wallet);
 
                 let contract_underlying_token =
-                    ierc20::IERC20::new(underlying_token_contract, signer.clone().into());
+                    ERC20Mock::new(underlying_token_contract, signer.clone().into());
 
                 let contract_call =
                     contract_underlying_token.approve(self.strategy_manager, amount);

@@ -27,7 +27,13 @@ impl MessageHandler for TakeMyMoney {
 
             let copy: Bytes = self
                 .shop
-                .call(ctx, SHOP_CASH_CHANNEL, Bytes::from("2345"), Priority::High)
+                .call(
+                    ctx,
+                    SHOP_CASH_CHANNEL,
+                    None,
+                    Bytes::from("2345"),
+                    Priority::High,
+                )
                 .await?;
             log::info!("Got my copy {:?}", copy);
 

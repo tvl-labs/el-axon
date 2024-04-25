@@ -357,7 +357,7 @@ where
 
         let resp_msg = self
             .network
-            .call::<MsgPullTxs, BatchSignedTxs>(ctx, RPC_PULL_TXS, pull_msg, Priority::High)
+            .call::<MsgPullTxs, BatchSignedTxs>(ctx, RPC_PULL_TXS, None, pull_msg, Priority::High)
             .await?;
 
         Ok(resp_msg.inner())

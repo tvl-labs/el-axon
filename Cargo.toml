@@ -8,6 +8,8 @@ build = "build.rs"
 
 [dependencies]
 clap = { version = "4.4", features = ["cargo"] }
+ethers-core = "2.0"
+tokio = { version = "1.35", features = ["macros", "rt-multi-thread"] }
 
 # byzantine = { path = "./byzantine" }
 common-version = { path = "./common/version" }
@@ -16,6 +18,7 @@ core-cli = { path = "./core/cli" }
 core-consensus = { path = "./core/consensus" }
 core-executor = { path = "./core/executor" }
 core-run = { path = "./core/run" }
+el-utils = { path = "./core/el-utils" }
 protocol = { path = "./protocol", package = "axon-protocol" }
 el-node-api = { path = "./core/el-node-api", package = "el-node-api" }
 el-prometheus = { path = "./core/el-prometheus", package = "el-prometheus" }
@@ -50,7 +53,7 @@ members = [
     "devtools/abi-generator",
     "devtools/axon-tools",
     "devtools/metadata-cli",
-    "protocol", "core/el-utils",
+    "protocol", "core/el-utils", "core/avs",
 ]
 
 [features]

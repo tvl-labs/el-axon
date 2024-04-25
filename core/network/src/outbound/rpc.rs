@@ -1,5 +1,7 @@
+use std::sync::Arc;
 use std::time::Duration;
 
+use tentacle::secio::PeerId;
 use tentacle::{bytes::Bytes, service::ServiceAsyncControl, SessionId};
 
 use common_apm::tracing::AxonTracer;
@@ -13,17 +15,24 @@ use crate::message::{Headers, NetworkMessage};
 use crate::reactor::MessageRouter;
 use crate::rpc::RpcResponse;
 use crate::traits::NetworkContext;
+use crate::{PeerIdExt, PeerManager};
 
 #[derive(Clone)]
 pub struct NetworkRpc {
-    transmitter:       ServiceAsyncControl,
-    pub(crate) router: MessageRouter,
+    transmitter:             ServiceAsyncControl,
+    pub(crate) peer_manager: Arc<PeerManager>,
+    pub(crate) router:       MessageRouter,
 }
 
 impl NetworkRpc {
-    pub fn new(transmitter: ServiceAsyncControl, router: MessageRouter) -> Self {
+    pub fn new(
+        transmitter: ServiceAsyncControl,
+        peer_manager: Arc<PeerManager>,
+        router: MessageRouter,
+    ) -> Self {
         NetworkRpc {
             transmitter,
+            peer_manager,
             router,
         }
     }
@@ -67,6 +76,7 @@ impl Rpc for NetworkRpc {
         &self,
         mut cx: Context,
         endpoint: &str,
+        peer: Option<Bytes>,
         mut msg: M,
         priority: Priority,
     ) -> ProtocolResult<R>
@@ -74,6 +84,16 @@ impl Rpc for NetworkRpc {
         M: MessageCodec,
         R: MessageCodec,
     {
+        let sid = if let Some(p) = peer {
+            self.peer_manager
+                .peers(vec![PeerId::from_pubkey_bytes(p).unwrap()])
+                .0
+                .first()
+                .cloned()
+                .ok_or(NetworkError::InvalidPublicKey)?
+        } else {
+            cx.session_id()?
+        };
         let endpoint = endpoint.parse::<Endpoint>()?;
         let sid = cx.session_id()?;
         let rpc_map = &self.router.rpc_map;

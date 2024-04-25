@@ -87,12 +87,19 @@ impl Gossip for NetworkServiceHandle {
 
 #[async_trait]
 impl Rpc for NetworkServiceHandle {
-    async fn call<M, R>(&self, cx: Context, end: &str, msg: M, p: Priority) -> ProtocolResult<R>
+    async fn call<M, R>(
+        &self,
+        cx: Context,
+        end: &str,
+        peer: Option<Bytes>,
+        msg: M,
+        p: Priority,
+    ) -> ProtocolResult<R>
     where
         M: MessageCodec,
         R: MessageCodec,
     {
-        self.rpc.call(cx, end, msg, p).await
+        self.rpc.call(cx, end, peer, msg, p).await
     }
 
     async fn response<M>(
@@ -293,7 +300,7 @@ where
         let control: ServiceAsyncControl = service.control().clone();
 
         let gossip = NetworkGossip::new(control.clone(), Arc::clone(&peer_manager));
-        let rpc = NetworkRpc::new(control, message_router);
+        let rpc = NetworkRpc::new(control, Arc::clone(&peer_manager), message_router);
 
         NetworkService {
             config,

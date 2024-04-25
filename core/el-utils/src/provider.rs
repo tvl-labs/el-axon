@@ -17,7 +17,7 @@ use protocol::async_trait;
 macro_rules! auto_metrics {
     ($self: ident, $rpc_name: ident, $request_kind: ident $(,$args: ident)*) => {{
         let instant = std::time::Instant::now();
-        let ret = $self.inner().provider().$rpc_name($($args),*).await?;
+        let ret = $self.0.$rpc_name($($args),*).await.map_err(|e| EigenMiddlewareError::Middleware(e))?;
         crate::metrics::API_REQUEST_RESULT_COUNTER_VEC_STATIC.$request_kind.inc();
         crate::metrics::API_REQUEST_TIME_HISTOGRAM_STATIC
             .$request_kind

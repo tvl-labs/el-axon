@@ -106,7 +106,7 @@ where
         log::debug!("consensus: send rpc pull block {}", number);
         let res = self
             .network
-            .call::<BlockNumber, Block>(ctx, end, number, Priority::High)
+            .call::<BlockNumber, Block>(ctx, end, None, number, Priority::High)
             .await?;
         Ok(res)
     }
@@ -167,7 +167,7 @@ where
     async fn get_block_from_remote(&self, ctx: Context, number: u64) -> ProtocolResult<Block> {
         let res = self
             .network
-            .call::<BlockNumber, Block>(ctx, RPC_SYNC_PULL_BLOCK, number, Priority::High)
+            .call::<BlockNumber, Block>(ctx, RPC_SYNC_PULL_BLOCK, None, number, Priority::High)
             .await;
         match res {
             Ok(data) => {
@@ -201,6 +201,7 @@ where
             .call::<PullTxsRequest, BatchSignedTxs>(
                 ctx,
                 RPC_SYNC_PULL_TXS,
+                None,
                 PullTxsRequest::new(number, hashes.to_vec()),
                 Priority::High,
             )
@@ -213,7 +214,7 @@ where
     async fn get_proof_from_remote(&self, ctx: Context, number: u64) -> ProtocolResult<Proof> {
         let ret = self
             .network
-            .call::<BlockNumber, Proof>(ctx, RPC_SYNC_PULL_PROOF, number, Priority::High)
+            .call::<BlockNumber, Proof>(ctx, RPC_SYNC_PULL_PROOF, None, number, Priority::High)
             .await?;
         Ok(ret)
     }
