@@ -1,9 +1,10 @@
-use crate::client::avs::NEW_BLS_APK_REGISTRATION_EVENT_SIGNATURE;
-use crate::contract::incredible_squaring_task_manager::{
-    IncredibleSquaringTaskManager, TaskRespondedFilter,
+use crate::contract::{
+    incredible_squaring_service_manager::IncredibleSquaringServiceManager,
+    incredible_squaring_task_manager::{IncredibleSquaringTaskManager, TaskRespondedFilter},
+    registry_coordinator::RegistryCoordinator,
 };
 
-use ethers_core::types::{Address, Filter};
+use ethers_core::types::Address;
 use ethers_providers::{
     Http, Middleware, Provider, ProviderError, StreamExt, SubscriptionStream, Ws,
 };
@@ -11,10 +12,6 @@ use futures::Future;
 
 use std::pin::Pin;
 use std::sync::Arc;
-
-type MyStream<'a, T> =
-    Pin<Box<dyn Future<Output = Result<SubscriptionStream<'static, Ws, T>, ProviderError>> + Send>>;
-
 /// AvsRegistry Chain Subscriber struct
 #[derive(Debug, Clone)]
 pub struct AvsRegistryChainSubscriber {
@@ -24,11 +21,23 @@ pub struct AvsRegistryChainSubscriber {
 }
 
 impl AvsRegistryChainSubscriber {
-    pub fn new(
-        provider: Provider<Http>,
-        task_manager_address: Address,
-        service_manager_address: Address,
-    ) -> Self {
+    pub async fn new(provider: Provider<Http>, registry_coordinator_address: Address) -> Self {
+        let service_manager_address =
+            RegistryCoordinator::new(registry_coordinator_address, Arc::new(provider.clone()))
+                .service_manager()
+                .call()
+                .await
+                .unwrap();
+        let service_manager = IncredibleSquaringServiceManager::new(
+            service_manager_address,
+            Arc::new(provider.clone()),
+        );
+        let task_manager_address = service_manager
+            .incredible_squaring_task_manager()
+            .call()
+            .await
+            .unwrap();
+
         AvsRegistryChainSubscriber {
             provider,
             task_manager_address,
@@ -50,6 +59,11 @@ impl AvsRegistryChainSubscriber {
                 task_response,
                 task_response_metadata,
             } = evt;
+
+            println!(
+                "TaskResponded: task_response: {}, task_response_metadata: {}",
+                task_response, task_response_metadata
+            );
         }
     }
 }

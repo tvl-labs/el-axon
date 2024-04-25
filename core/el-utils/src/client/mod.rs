@@ -20,17 +20,9 @@ use serde::Deserialize;
 pub struct ClientBuilder {
     pub eth_http_url:                 String,
     pub eth_ws_url:                   String,
-    pub avs_directory_addr:           Address,
     pub bls_apk_registry_addr:        Address,
-    pub delegation_manager_addr:      Address,
     pub operator_registry_addr:       Address,
     pub registry_coordinator_addr:    Address,
-    pub slasher_addr:                 Address,
-    pub service_manager_addr:         Address,
-    pub stake_registry_addr:          Address,
-    pub strategy_manager_addr:        Address,
-    pub task_manager_address:         Address,
-    pub service_manager_address:      Address,
     pub avs_name:                     String,
     pub from_metrics_ip_port_address: String,
     pub sender:                       Address,
@@ -43,56 +35,50 @@ impl ClientBuilder {
         let eth_http_client = EthClient::new(eth_client.clone(), "http");
         let eth_ws_client = EthClient::new(eth_client.clone(), "ws");
 
-        let avs_registry_chain_reader = AvsRegistryChainReader::new(
-            self.registry_coordinator_addr,
-            self.bls_apk_registry_addr,
-            self.operator_registry_addr,
-            self.stake_registry_addr,
-            eth_client.clone(),
-        );
+        // let avs_registry_chain_reader = AvsRegistryChainReader::new(
+        //     self.registry_coordinator_addr,
+        //     self.bls_apk_registry_addr,
+        //     self.operator_registry_addr,
+        //     self.stake_registry_addr,
+        //     eth_client.clone(),
+        // );
 
-        let avs_registry_chain_subscriber = AvsRegistryChainSubscriber::new(
-            eth_client.clone(),
-            self.task_manager_address,
-            self.service_manager_address,
-        );
+        let avs_registry_chain_subscriber =
+            AvsRegistryChainSubscriber::new(eth_client.clone(), self.registry_coordinator_addr)
+                .await;
 
-        let el_chain_reader = ELChainReader::build(
-            self.delegation_manager_addr,
-            self.avs_directory_addr,
-            eth_client.clone(),
-        )
-        .await
-        .unwrap();
+        // let el_chain_reader = ELChainReader::build(
+        //     self.delegation_manager_addr,
+        //     self.avs_directory_addr,
+        //     eth_client.clone(),
+        // )
+        // .await
+        // .unwrap();
 
-        let avs_registry_chain_writer = AvsRegistryChainWriter::new_avs_registry_chain_writer(
-            self.service_manager_addr,
-            self.registry_coordinator_addr,
-            self.operator_registry_addr,
-            self.stake_registry_addr,
-            self.bls_apk_registry_addr,
-            el_chain_reader.clone(),
-            eth_client.clone(),
-            Self::tx_mgr(eth_client.clone(), self.private_key.clone(), self.sender),
-        )
-        .await;
+        // let avs_registry_chain_writer =
+        // AvsRegistryChainWriter::new_avs_registry_chain_writer(
+        //     self.service_manager_addr,
+        //     self.registry_coordinator_addr,
+        //     self.operator_registry_addr,
+        //     self.stake_registry_addr,
+        //     self.bls_apk_registry_addr,
+        //     el_chain_reader.clone(),
+        //     eth_client.clone(),
+        //     Self::tx_mgr(eth_client.clone(), self.private_key.clone(), self.sender),
+        // )
+        // .await;
 
-        let el_chain_writer = ELChainWriter::new(
-            self.delegation_manager_addr,
-            self.strategy_manager_addr,
-            el_chain_reader.clone(),
-            eth_client.clone(),
-            Self::tx_mgr(eth_client, self.private_key, self.sender),
-        );
+        // let el_chain_writer = ELChainWriter::new(
+        //     self.delegation_manager_addr,
+        //     self.strategy_manager_addr,
+        //     el_chain_reader.clone(),
+        //     eth_client.clone(),
+        //     Self::tx_mgr(eth_client, self.private_key, self.sender),
+        // );
 
         ElClient {
-            avs_registry_chain_reader,
             avs_registry_chain_subscriber,
-            avs_registry_chain_writer,
-            el_chain_reader,
-            el_chain_writer,
             eth_http_client,
-            eth_ws_client,
         }
     }
 
@@ -103,13 +89,13 @@ impl ClientBuilder {
 }
 
 pub struct ElClient {
-    avs_registry_chain_reader:     AvsRegistryChainReader,
+    // avs_registry_chain_reader:     AvsRegistryChainReader,
     avs_registry_chain_subscriber: AvsRegistryChainSubscriber,
-    avs_registry_chain_writer:     AvsRegistryChainWriter,
-    el_chain_reader:               ELChainReader,
-    el_chain_writer:               ELChainWriter,
+    // avs_registry_chain_writer:     AvsRegistryChainWriter,
+    // el_chain_reader:               ELChainReader,
+    // el_chain_writer:               ELChainWriter,
     eth_http_client:               EthClient,
-    eth_ws_client:                 EthClient,
+    // eth_ws_client:                 EthClient,
 }
 
 impl ElClient {
