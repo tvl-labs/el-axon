@@ -48,7 +48,7 @@ impl AvsRegistryChainSubscriber {
     pub async fn run(self) {
         let event = IncredibleSquaringTaskManager::new(
             self.task_manager_address,
-            Arc::new(self.provider.inner()),
+            Arc::new(self.provider.clone()),
         )
         .event_for_name::<TaskRespondedFilter>("TaskResponded")
         .unwrap();
@@ -61,7 +61,7 @@ impl AvsRegistryChainSubscriber {
             } = evt;
 
             println!(
-                "TaskResponded: task_response: {}, task_response_metadata: {}",
+                "TaskResponded: task_response: {:?}, task_response_metadata: {:?}",
                 task_response, task_response_metadata
             );
         }

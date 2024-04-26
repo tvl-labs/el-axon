@@ -31,7 +31,7 @@ pub struct ClientBuilder {
 
 impl ClientBuilder {
     pub async fn build(self) -> ElClient {
-        let eth_client = Provider::try_from(&self.eth_http_url).unwrap();
+        let eth_client = Provider::<Http>::try_from(&self.eth_http_url).unwrap();
         let eth_http_client = EthClient::new(eth_client.clone(), "http");
         let eth_ws_client = EthClient::new(eth_client.clone(), "ws");
 
