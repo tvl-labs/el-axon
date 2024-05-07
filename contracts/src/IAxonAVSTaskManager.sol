@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-import "eigenlayer-middleware/src/libraries/BN254.sol";
+import "@eigenlayer-middleware/src/libraries/BN254.sol";
 
 interface IAxonAVSTaskManager {
     // EVENTS
@@ -13,16 +13,6 @@ interface IAxonAVSTaskManager {
     );
 
     event TaskCompleted(uint32 indexed taskIndex);
-
-    event TaskChallengedSuccessfully(
-        uint32 indexed taskIndex,
-        address indexed challenger
-    );
-
-    event TaskChallengedUnsuccessfully(
-        uint32 indexed taskIndex,
-        address indexed challenger
-    );
 
     // STRUCTS
     struct Task {
@@ -62,7 +52,7 @@ interface IAxonAVSTaskManager {
     ) external;
 
     /// @notice Get the proof by block number
-    function getProof() external view returns(bytes memory);
+    function getProof(uint32 blockNumber) external view returns (bytes memory);
 
     /// @notice Returns the TASK_RESPONSE_WINDOW_BLOCK
     function getTaskResponseWindowBlock() external view returns (uint32);

@@ -168,8 +168,8 @@ contract AxonAVSTaskManager is
         emit TaskResponded(taskResponse, taskResponseMetadata);
     }
 
-    function getProof() external view returns(bytes memory) {
-        return allProofs[uint32(block.number)];
+    function getProof(uint32 blockNumber) external view returns(bytes memory) {
+        return allProofs[blockNumber];
     }
 
     function getTaskResponseWindowBlock() external view returns (uint32) {
