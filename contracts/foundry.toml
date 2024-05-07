@@ -4,10 +4,3 @@ out = "out"
 libs = ["lib"]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
-
-remappings = [
-    "@eigenlayer/=lib/eigenlayer-middleware/lib/eigenlayer-contracts/src",
-    "@eigenlayer-middleware/=lib/eigenlayer-middleware/src",
-    "@eigenlayer-middleware/=lib/eigenlayer-middleware",
-    
-]
