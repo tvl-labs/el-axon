@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.12;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
 import "../src/AxonAVSServiceManager.sol" as aasm;
 import {AxonAVSTaskManager} from "../src/AxonAVSTaskManager.sol";
