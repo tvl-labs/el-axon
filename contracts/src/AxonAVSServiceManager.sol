@@ -35,4 +35,8 @@ contract AxonAVSServiceManager is ServiceManagerBase {
     {
         axonAVSTaskManager = _axonAVSTaskManager;
     }
-}
+
+     function initialize(address initialOwner) public virtual initializer {
+        __ServiceManagerBase_init(initialOwner);
+    }
+ }
