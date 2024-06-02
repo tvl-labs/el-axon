@@ -1,12 +1,15 @@
-mod msg;
+pub mod msg;
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
+use std::time::Duration;
 
+use common_crypto::{BlsPublicKey, BlsSignature, Signature};
 use core_executor::{AxonExecutorReadOnlyAdapter, MetadataHandle};
-use protocol::traits::{Context, Gossip, Network, Priority, Rpc, Storage};
-use protocol::types::{BlockNumber, Bytes, Hasher, Hex, ValidatorExtend};
-use protocol::{tokio::time, trie, ProtocolResult};
+use el_utils::aggregator::Aggregator;
+use protocol::traits::{Context, Gossip, Priority, Rpc, Storage};
+use protocol::types::{BlockNumber, Bytes, Hex, H160};
+use protocol::{tokio, tokio::time, trie, ProtocolResult};
 
 use crate::msg::{AvsSig, RPC_RESP_AVS_SIG};
 
@@ -17,15 +20,24 @@ pub struct Avs<S, DB, N> {
     current_block_number: u64,
     validator_list:       BTreeSet<Bytes>,
     address:              Bytes,
+    aggregator:           Aggregator,
 }
 
 impl<S, DB, N> Avs<S, DB, N>
 where
     S: Storage + 'static,
-    DB: trie::DB + 'static,
+    DB: trie::DB + Send + Sync + 'static,
     N: Rpc + Gossip + 'static,
 {
-    pub async fn new(storage: Arc<S>, trie: Arc<DB>, network: Arc<N>, address: Bytes) -> Self {
+    pub async fn new(
+        storage: Arc<S>,
+        trie: Arc<DB>,
+        network: Arc<N>,
+        address: Bytes,
+        eth_url: String,
+        sign_pk: Hex,
+        task_manager_addr: H160,
+    ) -> Self {
         let current_block_number = storage
             .get_latest_block_header(Context::new())
             .await
@@ -39,13 +51,32 @@ where
             current_block_number,
             validator_list: Default::default(),
             address,
+            aggregator: Aggregator::new(eth_url, task_manager_addr, sign_pk),
         };
 
         ret.update_validator_list().await.unwrap();
         ret
     }
 
-    fn inner_run(self) {}
+    pub async fn run(self) {
+        tokio::spawn(async move {
+            if let Err(e) = self.inner_run().await {
+                log::error!("avs run error: {:?}", e);
+            }
+        });
+    }
+
+    async fn inner_run(mut self) -> ProtocolResult<()> {
+        loop {
+            if self.try_update_block_number().await? {
+                if self.is_leader().await? {
+                    self.collect_sigs().await?;
+                }
+            } else {
+                time::sleep(Duration::from_millis(500)).await;
+            }
+        }
+    }
 
     async fn update_validator_list(&mut self) -> ProtocolResult<()> {
         let ctx = Context::new();
@@ -57,7 +88,7 @@ where
             Default::default(),
         )?;
         let metadata_handler = MetadataHandle::new(backend.get_metadata_root());
-        let mut metadata = metadata_handler.get_metadata_by_block_number(latest_header.number)?;
+        let metadata = metadata_handler.get_metadata_by_block_number(latest_header.number)?;
         self.validator_list = metadata
             .verifier_list
             .iter()
@@ -91,7 +122,7 @@ where
         Ok(self.validator_list.iter().nth(index as usize).unwrap() == &self.address)
     }
 
-    async fn collect_sigs(&self) -> ProtocolResult<()> {
+    async fn collect_sigs(&mut self) -> ProtocolResult<()> {
         let ctx = Context::new();
         let futs = self
             .validator_list
@@ -120,9 +151,27 @@ where
             })
             .collect::<Vec<_>>();
 
-        if res.len() < self.validator_list.len() * 2 / 3 {
+        // if res.len() < self.validator_list.len() * 2 / 3 {}
 
-        }
+        let aggregated_sig = BlsSignature::combine(
+            res.iter()
+                .map(|r| {
+                    (
+                        BlsSignature::try_from(r.sig.as_ref()).unwrap(),
+                        BlsPublicKey::try_from(r.address.as_ref()).unwrap(),
+                    )
+                })
+                .collect(),
+        )
+        .unwrap();
+
+        self.aggregator
+            .send_new_task(
+                aggregated_sig.to_bytes().into(),
+                66,
+                Bytes::from(vec![]).into(),
+            )
+            .await;
 
         Ok(())
     }

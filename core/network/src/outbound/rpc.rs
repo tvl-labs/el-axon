@@ -95,7 +95,6 @@ impl Rpc for NetworkRpc {
             cx.session_id()?
         };
         let endpoint = endpoint.parse::<Endpoint>()?;
-        let sid = cx.session_id()?;
         let rpc_map = &self.router.rpc_map;
         let rid = rpc_map.next_rpc_id();
         let connected_addr = cx.remote_connected_addr();

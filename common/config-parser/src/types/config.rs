@@ -11,7 +11,7 @@ use clap::builder::{StringValueParser, TypedValueParser, ValueParserFactory};
 use serde::Deserialize;
 use tentacle_multiaddr::MultiAddr;
 
-use protocol::types::{Key256Bits, H160};
+use protocol::types::{Hex, Key256Bits, H160};
 
 use crate::parse_file;
 
@@ -55,6 +55,8 @@ pub struct Config {
 
     #[serde(default)]
     pub ibc_contract_address: H160,
+
+    pub avs: ConfigAvs,
 }
 
 impl Config {
@@ -301,6 +303,13 @@ pub struct ConfigJaeger {
     pub service_name:       Option<String>,
     pub tracing_address:    Option<SocketAddr>,
     pub tracing_batch_size: Option<usize>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ConfigAvs {
+    pub sign_private_key:      Hex,
+    pub eth_url:               String,
+    pub task_contract_address: H160,
 }
 
 #[derive(Clone, Debug, Deserialize)]

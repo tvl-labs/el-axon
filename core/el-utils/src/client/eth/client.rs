@@ -9,9 +9,9 @@ pub struct EthClient {
 impl EthClient {
     pub fn new(client: Provider<Http>, client_type: &str) -> Self {
         let client_and_version = format!("{}-{}", client_type, "0.1.0");
-        return EthClient {
+        EthClient {
             client,
             client_and_version,
-        };
+        }
     }
 }

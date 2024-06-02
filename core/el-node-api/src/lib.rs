@@ -26,10 +26,10 @@ async fn node_version() -> impl IntoResponse {
 async fn health() -> StatusCode {
     let sync_state = SYNC_STATUS.read().clone();
 
-    return match sync_state {
+    match sync_state {
         SyncStatus::False => StatusCode::OK,
         _ => StatusCode::PARTIAL_CONTENT,
-    };
+    }
 }
 
 async fn all_service() -> (StatusCode, Json<ServiceStatus>) {

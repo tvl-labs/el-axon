@@ -3,8 +3,11 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use common_apm::metrics::mempool::{MEMPOOL_CO_QUEUE_LEN, MEMPOOL_LEN_GAUGE};
 use common_config_parser::types::spec::{ChainSpec, InitialAccount};
 use common_config_parser::types::{Config, ConfigMempool};
-use common_crypto::{BlsPrivateKey, BlsPublicKey, Secp256k1, Secp256k1PrivateKey, ToPublicKey};
+use common_crypto::{
+    BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey, ToPublicKey,
+};
 
+use core_avs::Avs;
 pub use core_consensus::stop_signal::StopOpt;
 use core_consensus::stop_signal::StopSignal;
 use protocol::tokio::{
@@ -238,20 +241,21 @@ async fn start<K: KeyProvider>(
     let status_agent = get_status_agent(&storage, &current_block, &metadata).await?;
 
     let hardfork_info = storage.hardfork_proposal(Default::default()).await?;
+    let node_info = Secp256k1PrivateKey::try_from(config.net_privkey.as_ref())
+        .map(|privkey| {
+            NodeInfo::new(
+                current_block.header.chain_id,
+                privkey.pub_key(),
+                hardfork_info,
+            )
+        })
+        .map_err(MainError::Crypto)?;
     let overlord_consensus = {
         let consensus_wal_path = config.data_path_for_consensus_wal();
-        let node_info = Secp256k1PrivateKey::try_from(config.net_privkey.as_ref())
-            .map(|privkey| {
-                NodeInfo::new(
-                    current_block.header.chain_id,
-                    privkey.pub_key(),
-                    hardfork_info,
-                )
-            })
-            .map_err(MainError::Crypto)?;
+
         let overlord_consensus = OverlordConsensus::new(
             status_agent.clone(),
-            node_info,
+            node_info.clone(),
             Arc::clone(&crypto),
             Arc::clone(&txs_wal),
             Arc::clone(&consensus_adapter),
@@ -282,6 +286,19 @@ async fn start<K: KeyProvider>(
     network_service.register_rpc()?;
 
     let network_handle = network_service.handle();
+
+    // Run AVS
+    let avs = Avs::new(
+        Arc::clone(&storage),
+        Arc::clone(&trie_db),
+        Arc::new(network_service.handle()),
+        node_info.self_pub_key.to_bytes(),
+        config.avs.eth_url.clone(),
+        config.avs.sign_private_key.clone(),
+        config.avs.task_contract_address,
+    )
+    .await;
+    avs.run().await;
 
     // Run network service at the end of its life cycle
     tokio::spawn(network_service.run());

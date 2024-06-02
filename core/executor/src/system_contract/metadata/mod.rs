@@ -116,7 +116,7 @@ impl<Adapter: ExecutorAdapter + ApplyBackend> SystemContract<Adapter>
 
         let mut store = MetadataStore::new(root).unwrap();
 
-        if let Some(t) = adapter.get_ctx().extra_data.get(0) {
+        if let Some(t) = adapter.get_ctx().extra_data.first() {
             if let Ok(data) = HardforkInfoInner::decode(&t.inner) {
                 store
                     .set_hardfork_info(data.block_number, data.flags)

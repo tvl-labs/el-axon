@@ -1083,7 +1083,7 @@ fn calculate_gas_used_ratio(block: &Block) -> f64 {
 // vector.
 fn calculate_effective_priority_fees_index(
     percentile: &f64,
-    effective_priority_fees: &Vec<U64>,
+    effective_priority_fees: &[U64],
 ) -> usize {
     ((percentile * effective_priority_fees.len() as f64 / 100f64).floor() as usize)
         .saturating_sub(1)

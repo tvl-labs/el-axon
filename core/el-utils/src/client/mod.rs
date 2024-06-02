@@ -2,13 +2,7 @@ pub mod avs;
 pub mod elcontract;
 pub mod eth;
 
-use crate::client::avs::{
-    reader::AvsRegistryChainReader, subscriber::AvsRegistryChainSubscriber,
-    writer::AvsRegistryChainWriter,
-};
-use crate::client::elcontract::{reader::ELChainReader, writer::ELChainWriter};
-use crate::client::eth::client::EthClient;
-use crate::contract::bls_apk_registry::{BLSApkRegistryEvents, InitializedFilter};
+use crate::client::{avs::subscriber::AvsRegistryChainSubscriber, eth::client::EthClient};
 
 use eigensdk_client_wallet::privatekey_wallet::PrivateKeyWallet;
 use eigensdk_txmgr::SimpleTxManager;
@@ -33,7 +27,7 @@ impl ClientBuilder {
     pub async fn build(self) -> ElClient {
         let eth_client = Provider::<Http>::try_from(&self.eth_http_url).unwrap();
         let eth_http_client = EthClient::new(eth_client.clone(), "http");
-        let eth_ws_client = EthClient::new(eth_client.clone(), "ws");
+        let _eth_ws_client = EthClient::new(eth_client.clone(), "ws");
 
         // let avs_registry_chain_reader = AvsRegistryChainReader::new(
         //     self.registry_coordinator_addr,

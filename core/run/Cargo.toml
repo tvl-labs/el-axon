@@ -25,6 +25,7 @@ core-api = { path = "../../core/api" }
 core-consensus = { path = "../../core/consensus" }
 core-db = { path = "../../core/db" }
 core-executor = { path = "../../core/executor" }
+core-avs ={ path = "../../core/avs" }
 core-interoperation = { path = "../../core/interoperation" }
 core-mempool = { path = "../../core/mempool" }
 core-network = { path = "../../core/network" }

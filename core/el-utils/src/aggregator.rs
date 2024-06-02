@@ -1,6 +1,7 @@
 use ethers::types::{Address, Bytes};
 use ethers::{contract::EthEvent, signers::LocalWallet};
 use ethers_providers::{Http, Middleware, Provider};
+use protocol::types::Hex;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -10,18 +11,14 @@ use crate::contract::axon_avs_task_manager::{AxonAVSTaskManager, NewTaskCreatedF
 pub struct Aggregator {
     pub eth_client:        Provider<Http>,
     pub task_manager_addr: Address,
-    private_key:           String,
+    private_key:           Hex,
     tasks:                 BTreeMap<u32, NewTaskCreatedFilter>,
 }
 
 impl Aggregator {
-    pub fn new(
-        eth_client: Provider<Http>,
-        task_manager_addr: Address,
-        private_key: String,
-    ) -> Self {
+    pub fn new(eth_client: String, task_manager_addr: Address, private_key: Hex) -> Self {
         Aggregator {
-            eth_client,
+            eth_client: Provider::<Http>::try_from(eth_client).unwrap(),
             task_manager_addr,
             private_key,
             tasks: BTreeMap::new(),
@@ -50,7 +47,7 @@ impl Aggregator {
         quorum_threshold_percentage: u32,
         quorum_numbers: Bytes,
     ) -> NewTaskCreatedFilter {
-        let wallet = LocalWallet::from_bytes(self.private_key.as_bytes()).unwrap();
+        let wallet = LocalWallet::from_bytes(&self.private_key.as_bytes()).unwrap();
         let task_manager =
             AxonAVSTaskManager::new(self.task_manager_addr, Arc::new(self.eth_client.clone()));
         let tx = task_manager

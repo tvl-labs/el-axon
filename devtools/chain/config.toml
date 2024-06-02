@@ -62,3 +62,8 @@ tracing_batch_size = 50
 
 [prometheus]
 listening_address = "0.0.0.0:8100"
+
+[avs]
+sign_private_key = "0x32bc292ad34023d453e988fb16140561d9dbf5584877c5f62ecf66398ca0b8a7"
+eth_url = ""
+task_contract_address = ""

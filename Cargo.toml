@@ -53,7 +53,9 @@ members = [
     "devtools/abi-generator",
     "devtools/axon-tools",
     "devtools/metadata-cli",
-    "protocol", "core/el-utils", "core/avs",
+    "protocol",
+    "core/el-utils",
+    "core/avs",
 ]
 
 [features]

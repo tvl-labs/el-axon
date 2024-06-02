@@ -89,9 +89,7 @@ impl AvsRegistryChainReader {
         let quorum_count = contract_registry_coordinator.quorum_count().call().await;
 
         match quorum_count {
-            Ok(quorum) => {
-                return Ok(quorum);
-            }
+            Ok(quorum) => Ok(quorum),
 
             Err(_) => Err(AvsRegistryError::GetQuorumCount),
         }
@@ -113,12 +111,8 @@ impl AvsRegistryChainReader {
             .await;
 
         match operator_state_result {
-            Ok(operator_state) => {
-                return Ok(operator_state);
-            }
-            Err(_) => {
-                return Err(AvsRegistryError::GetOperatorState);
-            }
+            Ok(operator_state) => Ok(operator_state),
+            Err(_) => Err(AvsRegistryError::GetOperatorState),
         }
     }
 
@@ -144,11 +138,9 @@ impl AvsRegistryChainReader {
 
         match operator_state_with_registry_coordinator_and_oeprator_id_result {
             Ok(operator_state_with_registry_coordinator_and_oeprator_id) => {
-                return Ok(operator_state_with_registry_coordinator_and_oeprator_id);
+                Ok(operator_state_with_registry_coordinator_and_oeprator_id)
             }
-            Err(_) => {
-                return Err(AvsRegistryError::GetOperatorStateWithRegistryCoordinatorAndOperatorId);
-            }
+            Err(_) => Err(AvsRegistryError::GetOperatorStateWithRegistryCoordinatorAndOperatorId),
         }
     }
 
@@ -175,10 +167,10 @@ impl AvsRegistryChainReader {
                     Ok(operators_stake_in_quorums_at_block) => {
                         Ok(operators_stake_in_quorums_at_block)
                     }
-                    Err(_) => return Err(AvsRegistryError::GetOperatorStakeInQuorumAtBlockNumber),
+                    Err(_) => Err(AvsRegistryError::GetOperatorStakeInQuorumAtBlockNumber),
                 }
             }
-            Err(_) => return Err(AvsRegistryError::GetBlockNumber),
+            Err(_) => Err(AvsRegistryError::GetBlockNumber),
         }
     }
 
@@ -196,9 +188,9 @@ impl AvsRegistryChainReader {
                 let quorums = bitmap_to_quorum_ids(quorum_bitmaps);
 
                 let s = (quorums, operator_stakes);
-                return Ok(s);
+                Ok(s)
             }
-            Err(_) => return Err(AvsRegistryError::GetOperatorStakeInQuorumAtBlockOperatorId),
+            Err(_) => Err(AvsRegistryError::GetOperatorStakeInQuorumAtBlockOperatorId),
         }
     }
 
@@ -225,12 +217,10 @@ impl AvsRegistryChainReader {
                     Ok(operator_stake_in_quorum_of_operaotr_at_block) => {
                         Ok(operator_stake_in_quorum_of_operaotr_at_block)
                     }
-                    Err(_) => {
-                        return Err(AvsRegistryError::GetOperatorStakeInQuorumAtCurrentBlockNumber)
-                    }
+                    Err(_) => Err(AvsRegistryError::GetOperatorStakeInQuorumAtCurrentBlockNumber),
                 }
             }
-            Err(_) => return Err(AvsRegistryError::GetBlockNumber),
+            Err(_) => Err(AvsRegistryError::GetBlockNumber),
         }
     }
 
@@ -272,7 +262,7 @@ impl AvsRegistryChainReader {
                 }
                 Ok(quorum_stakes)
             }
-            Err(_) => return Err(AvsRegistryError::GetCurrentQuorumBitmap),
+            Err(_) => Err(AvsRegistryError::GetCurrentQuorumBitmap),
         }
     }
 
@@ -300,7 +290,7 @@ impl AvsRegistryChainReader {
 
         match check_signature_indices_result {
             Ok(check_signature_indices) => Ok(check_signature_indices),
-            Err(_) => return Err(AvsRegistryError::CheckSignatureIndices),
+            Err(_) => Err(AvsRegistryError::CheckSignatureIndices),
         }
     }
 
@@ -319,10 +309,8 @@ impl AvsRegistryChainReader {
             .await;
 
         match operator_id_result {
-            Ok(operator_id) => {
-                return Ok(operator_id);
-            }
-            Err(_) => return Err(AvsRegistryError::GetOperatorId),
+            Ok(operator_id) => Ok(operator_id),
+            Err(_) => Err(AvsRegistryError::GetOperatorId),
         }
     }
 
@@ -342,7 +330,7 @@ impl AvsRegistryChainReader {
 
         match operator_address_result {
             Ok(operator_address) => Ok(operator_address),
-            Err(_) => return Err(AvsRegistryError::GetOperatorFromId),
+            Err(_) => Err(AvsRegistryError::GetOperatorFromId),
         }
     }
 
@@ -362,7 +350,7 @@ impl AvsRegistryChainReader {
 
         match operator_status_result {
             Ok(operator_status) => Ok(operator_status == 1),
-            Err(_) => return Err(AvsRegistryError::GetOperatorStatus),
+            Err(_) => Err(AvsRegistryError::GetOperatorStatus),
         }
     }
 
@@ -454,7 +442,7 @@ impl AvsRegistryChainReader {
 
                 Ok((operator_addresses, operator_pub_keys))
             }
-            Err(_) => return Err(AvsRegistryError::GetEthLogs),
+            Err(_) => Err(AvsRegistryError::GetEthLogs),
         }
     }
 }

@@ -121,40 +121,36 @@ impl AvsRegistryChainWriter {
                                                 .await;
 
                                                 match el_reader_result {
-                                                    Ok(el_reader) => {
-                                                        return Ok(AvsRegistryChainWriter {
-                                                            service_manager_addr,
-                                                            registry_coordinator_addr,
-                                                            operator_state_retriever_addr,
-                                                            stake_registry_addr,
-                                                            bls_apk_registry_addr,
-                                                            el_reader,
-                                                            client,
-                                                            tx_mgr,
-                                                        });
-                                                    }
+                                                    Ok(el_reader) => Ok(AvsRegistryChainWriter {
+                                                        service_manager_addr,
+                                                        registry_coordinator_addr,
+                                                        operator_state_retriever_addr,
+                                                        stake_registry_addr,
+                                                        bls_apk_registry_addr,
+                                                        el_reader,
+                                                        client,
+                                                        tx_mgr,
+                                                    }),
 
                                                     Err(_) => {
-                                                        return Err(
-                                                            AvsRegistryError::BuildElChainReader,
-                                                        )
+                                                        Err(AvsRegistryError::BuildElChainReader)
                                                     }
                                                 }
                                             }
-                                            Err(_) => return Err(AvsRegistryError::GetAvsRegistry),
+                                            Err(_) => Err(AvsRegistryError::GetAvsRegistry),
                                         }
                                     }
-                                    Err(_) => return Err(AvsRegistryError::GetDelegation),
+                                    Err(_) => Err(AvsRegistryError::GetDelegation),
                                 }
                             }
-                            Err(_) => return Err(AvsRegistryError::GetStakeRegistry),
+                            Err(_) => Err(AvsRegistryError::GetStakeRegistry),
                         }
                     }
 
-                    Err(_) => return Err(AvsRegistryError::GetBlsApkRegistry),
+                    Err(_) => Err(AvsRegistryError::GetBlsApkRegistry),
                 }
             }
-            Err(_) => return Err(AvsRegistryError::GetServiceManager),
+            Err(_) => Err(AvsRegistryError::GetServiceManager),
         }
     }
 
@@ -243,20 +239,18 @@ impl AvsRegistryChainWriter {
                                         tracing::info!(tx_hash = %tx.tx_hash(), avs_service_manager = %self.service_manager_addr,operator = %wallet.address(),quorum_numbers = ?quorum_numbers , "successfully registered operator with AVS registry coordinator");
                                         Ok(tx.tx_hash())
                                     }
-                                    Err(_) => return Err(AvsRegistryError::RegisterOperator),
+                                    Err(_) => Err(AvsRegistryError::RegisterOperator),
                                 }
                             }
                             Err(_) => {
-                                return Err(
-                                    AvsRegistryError::CalculateOperatorAvsRegistrationDigestHash,
-                                );
+                                Err(AvsRegistryError::CalculateOperatorAvsRegistrationDigestHash)
                             }
                         }
                     }
-                    Err(_) => return Err(AvsRegistryError::PUbKeyG2),
+                    Err(_) => Err(AvsRegistryError::PUbKeyG2),
                 }
             }
-            Err(_) => return Err(AvsRegistryError::PubKeyRegistrationMessageHash),
+            Err(_) => Err(AvsRegistryError::PubKeyRegistrationMessageHash),
         }
     }
 
@@ -283,9 +277,9 @@ impl AvsRegistryChainWriter {
             Ok(tx) => {
                 // tracing info
                 tracing::info!(tx_hash = ?tx, quorum_numbers = %quorum_number,"succesfully updated stakes for entire operator set" );
-                return Ok(tx.tx_hash());
+                Ok(tx.tx_hash())
             }
-            Err(_) => return Err(AvsRegistryError::UpdateOperatorForQuorum),
+            Err(_) => Err(AvsRegistryError::UpdateOperatorForQuorum),
         }
     }
 
@@ -312,9 +306,7 @@ impl AvsRegistryChainWriter {
                 tracing::info!(tx_hash = ?tx,"ssuccesfully updated stakes of operator subset for all quorums" );
                 Ok(tx.tx_hash())
             }
-            Err(_) => {
-                return Err(AvsRegistryError::UpdateStakeForAllQuorums);
-            }
+            Err(_) => Err(AvsRegistryError::UpdateStakeForAllQuorums),
         }
     }
 
@@ -339,9 +331,9 @@ impl AvsRegistryChainWriter {
         match tx_result {
             Ok(tx) => {
                 tracing::info!(tx_hash = ?tx,"succesfully deregistered operator with the AVS's registry coordinator" );
-                return Ok(tx.tx_hash());
+                Ok(tx.tx_hash())
             }
-            Err(_) => return Err(AvsRegistryError::DeregisterOperator),
+            Err(_) => Err(AvsRegistryError::DeregisterOperator),
         }
     }
 }

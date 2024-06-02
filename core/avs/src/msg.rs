@@ -5,7 +5,6 @@ use rlp_derive::{RlpDecodable, RlpEncodable};
 
 use common_crypto::{BlsPrivateKey, HashValue, PrivateKey, Signature};
 use core_storage::StorageError;
-use protocol::codec::ProtocolCodec;
 use protocol::traits::{Context, MessageHandler, Priority, Rpc, Storage, TrustFeedback};
 use protocol::types::{BlockNumber, Bytes};
 use protocol::{async_trait, ProtocolError};
@@ -24,6 +23,17 @@ pub struct AvsMessageHandler<R, S> {
     storage:     Arc<S>,
     private_key: BlsPrivateKey,
     address:     Bytes,
+}
+
+impl<R: Rpc + 'static, S: Storage + 'static> AvsMessageHandler<R, S> {
+    pub fn new(rpc: Arc<R>, storage: Arc<S>, private_key: BlsPrivateKey, address: Bytes) -> Self {
+        AvsMessageHandler {
+            rpc,
+            storage,
+            private_key,
+            address,
+        }
+    }
 }
 
 #[async_trait]

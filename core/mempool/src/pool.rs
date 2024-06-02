@@ -333,7 +333,7 @@ impl BuiltInContractTxBucket {
             .insert(stx.transaction.hash, data.clone());
         self.tx_buckets
             .entry(data)
-            .or_insert_with(BTreeMap::new)
+            .or_default()
             .insert(stx.transaction.hash, stx)
             .is_none()
     }

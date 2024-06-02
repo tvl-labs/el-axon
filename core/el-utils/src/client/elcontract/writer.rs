@@ -70,7 +70,7 @@ impl ELChainWriter {
                 info!(tx_hash = %tx.tx_hash(), "tx successfully included");
                 Ok(tx.tx_hash())
             }
-            Err(_) => return Err(ElContractsError::RegisterAsOperator),
+            Err(_) => Err(ElContractsError::RegisterAsOperator),
         }
     }
 
@@ -110,10 +110,10 @@ impl ELChainWriter {
 
                 match metadata_tx_result {
                     Ok(metadata_tx) => Ok(metadata_tx.tx_hash()),
-                    Err(_) => return Err(ElContractsError::UpdateMetadataUri),
+                    Err(_) => Err(ElContractsError::UpdateMetadataUri),
                 }
             }
-            Err(_) => return Err(ElContractsError::ModifyOperatorDetails),
+            Err(_) => Err(ElContractsError::ModifyOperatorDetails),
         }
     }
 
@@ -165,15 +165,13 @@ impl ELChainWriter {
                                 );
                                 Ok(tx.tx_hash())
                             }
-                            Err(_) => {
-                                return Err(ElContractsError::GetStrategyAndUnderlyingERC20Token)
-                            }
+                            Err(_) => Err(ElContractsError::GetStrategyAndUnderlyingERC20Token),
                         }
                     }
-                    Err(_) => return Err(ElContractsError::DepositIntoStrategy),
+                    Err(_) => Err(ElContractsError::DepositIntoStrategy),
                 }
             }
-            Err(_) => return Err(ElContractsError::ApproveCallToUnderlyingToken),
+            Err(_) => Err(ElContractsError::ApproveCallToUnderlyingToken),
         }
     }
 }

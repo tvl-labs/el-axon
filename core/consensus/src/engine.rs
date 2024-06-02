@@ -167,7 +167,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
             .into());
         }
 
-        if let Some(t) = proposal.extra_data.get(0) {
+        if let Some(t) = proposal.extra_data.first() {
             match HardforkInfoInner::decode(&t.inner) {
                 Ok(data) => {
                     if !self

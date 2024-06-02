@@ -5,7 +5,7 @@ use crate::contract::{
 };
 
 use ethers_core::types::Address;
-use ethers_providers::{Http, Middleware, Provider, StreamExt};
+use ethers_providers::{Http, Provider, StreamExt};
 
 use std::sync::Arc;
 /// AvsRegistry Chain Subscriber struct

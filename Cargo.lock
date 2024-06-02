@@ -466,22 +466,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
-name = "avs"
-version = "0.1.0"
-dependencies = [
- "axon-protocol",
- "common-crypto",
- "core-executor",
- "core-rpc-client",
- "core-storage",
- "futures",
- "futures-util",
- "log",
- "rlp",
- "rlp-derive",
-]
-
-[[package]]
 name = "axon"
 version = "0.3.1-beta"
 dependencies = [
@@ -1949,6 +1933,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-avs"
+version = "0.1.0"
+dependencies = [
+ "axon-protocol",
+ "common-crypto",
+ "core-executor",
+ "core-rpc-client",
+ "core-storage",
+ "el-utils",
+ "futures",
+ "futures-util",
+ "log",
+ "rlp",
+ "rlp-derive",
+]
+
+[[package]]
 name = "core-cli"
 version = "0.1.1"
 dependencies = [
@@ -2177,6 +2178,7 @@ dependencies = [
  "common-logger",
  "common-memory-tracker",
  "core-api",
+ "core-avs",
  "core-consensus",
  "core-db",
  "core-executor",

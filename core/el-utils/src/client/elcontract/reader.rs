@@ -58,10 +58,10 @@ impl ELChainReader {
                         strategy_manager: strategy_manager_addr,
                         client,
                     }),
-                    Err(_) => return Err(ElContractsError::GetStrategyManager),
+                    Err(_) => Err(ElContractsError::GetStrategyManager),
                 }
             }
-            Err(_) => return Err(ElContractsError::GetSlasher),
+            Err(_) => Err(ElContractsError::GetSlasher),
         }
     }
 
@@ -91,7 +91,7 @@ impl ELChainReader {
 
         match delegation_approval_digest_hash_result {
             Ok(delegation_approval_digest_hash) => Ok(delegation_approval_digest_hash),
-            Err(_) => return Err(ElContractsError::GetDelegationApprovalDigestHash),
+            Err(_) => Err(ElContractsError::GetDelegationApprovalDigestHash),
         }
     }
 
@@ -112,7 +112,7 @@ impl ELChainReader {
 
         match operator_avs_registration_digest_hash_result {
             Ok(operator_avs_registration_digest_hash) => Ok(operator_avs_registration_digest_hash),
-            Err(_) => return Err(ElContractsError::GetOperatorAvsRegistrationDigestHash),
+            Err(_) => Err(ElContractsError::GetOperatorAvsRegistrationDigestHash),
         }
     }
 
@@ -133,7 +133,7 @@ impl ELChainReader {
 
         match operator_shares_in_strategy_result {
             Ok(operator_shares_in_strategy) => Ok(operator_shares_in_strategy),
-            Err(_) => return Err(ElContractsError::GetOperatorShares),
+            Err(_) => Err(ElContractsError::GetOperatorShares),
         }
     }
 
@@ -149,7 +149,7 @@ impl ELChainReader {
 
         match operator_is_frozen_result {
             Ok(operator_is_frozen) => Ok(operator_is_frozen),
-            Err(_) => return Err(ElContractsError::IsFrozen),
+            Err(_) => Err(ElContractsError::IsFrozen),
         }
     }
 
@@ -171,7 +171,7 @@ impl ELChainReader {
             Ok(service_manager_can_slash_operator_until_block) => {
                 Ok(service_manager_can_slash_operator_until_block)
             }
-            Err(_) => return Err(ElContractsError::ServiceManagerCanSlashOperatorExpiry),
+            Err(_) => Err(ElContractsError::ServiceManagerCanSlashOperatorExpiry),
         }
     }
 
@@ -188,13 +188,13 @@ impl ELChainReader {
             Ok(underlying_token_addr) => {
                 let contract_ierc20 = ERC20Mock::new(underlying_token_addr, provider);
 
-                return Ok((
+                Ok((
                     strategy_addr,
                     underlying_token_addr,
                     contract_ierc20.address(),
-                ));
+                ))
             }
-            Err(_) => return Err(ElContractsError::GetUnderlyingToken),
+            Err(_) => Err(ElContractsError::GetUnderlyingToken),
         }
     }
 
@@ -213,18 +213,14 @@ impl ELChainReader {
             .await;
 
         match operator_details_result {
-            Ok(operator_details) => {
-                return Ok(Operator::new(
-                    operator,
-                    operator_details.earnings_receiver,
-                    operator_details.delegation_approver,
-                    operator_details.staker_opt_out_window_blocks,
-                    None,
-                ));
-            }
-            Err(_) => {
-                return Err(ElContractsError::GetOperatorDetails);
-            }
+            Ok(operator_details) => Ok(Operator::new(
+                operator,
+                operator_details.earnings_receiver,
+                operator_details.delegation_approver,
+                operator_details.staker_opt_out_window_blocks,
+                None,
+            )),
+            Err(_) => Err(ElContractsError::GetOperatorDetails),
         }
     }
 
@@ -244,7 +240,7 @@ impl ELChainReader {
 
         match is_operator_result {
             Ok(is_operator) => Ok(is_operator),
-            Err(_) => return Err(ElContractsError::IsOperator),
+            Err(_) => Err(ElContractsError::IsOperator),
         }
     }
 }

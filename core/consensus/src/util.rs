@@ -173,6 +173,10 @@ impl OverlordCrypto {
             .map_err(|e| ConsensusError::CryptoErr(Box::new(e)))?;
         Ok(())
     }
+
+    pub fn private_key(&self) -> BlsPrivateKey {
+        self.private_key.clone()
+    }
 }
 
 #[derive(Clone, Debug)]
