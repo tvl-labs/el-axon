@@ -56,6 +56,11 @@ impl AvsRegistryChainSubscriber {
                 "TaskResponded: task_response: {:?}, task_response_metadata: {:?}",
                 task_response, task_response_metadata
             );
+
+            println!(
+                "TaskResponded: task_response: {:?}, task_response_metadata: {:?}",
+                task_response, task_response_metadata
+            );
         }
     }
 }
