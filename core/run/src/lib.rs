@@ -288,17 +288,19 @@ async fn start<K: KeyProvider>(
     let network_handle = network_service.handle();
 
     // Run AVS
-    let avs = Avs::new(
+    Avs::new(
         Arc::clone(&storage),
         Arc::clone(&trie_db),
-        Arc::new(network_service.handle()),
         node_info.self_pub_key.to_bytes(),
-        config.avs.eth_url.clone(),
+        config.avs.http_url.clone(),
+        config.avs.ws_url.clone(),
         config.avs.sign_private_key.clone(),
-        config.avs.task_contract_address,
+        config.avs.signer_address.0,
+        config.avs.task_contract_address.0,
     )
+    .await
+    .run()
     .await;
-    avs.run().await;
 
     // Run network service at the end of its life cycle
     tokio::spawn(network_service.run());

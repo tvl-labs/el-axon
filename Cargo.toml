@@ -56,6 +56,7 @@ members = [
     "protocol",
     "core/el-utils",
     "core/avs",
+    "avs-optional",
 ]
 
 [features]

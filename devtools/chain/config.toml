@@ -64,6 +64,8 @@ tracing_batch_size = 50
 listening_address = "0.0.0.0:8100"
 
 [avs]
-sign_private_key = "0x32bc292ad34023d453e988fb16140561d9dbf5584877c5f62ecf66398ca0b8a7"
-eth_url = ""
-task_contract_address = ""
+sign_private_key = "0x2a871d0798f97d79848a013d4936a73bf4cc922c825d33c1cf7073dff6d409c6"
+signer_address = "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720"
+http_url = "http://127.0.0.1:8545"
+ws_url = "ws://127.0.0.1:8545"
+task_contract_address = "0x9E545E3C0baAB3E08CdfD552C960A1050f373042"

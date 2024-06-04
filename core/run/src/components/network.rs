@@ -2,8 +2,6 @@
 
 use std::sync::Arc;
 
-use common_crypto::BlsPrivateKey;
-use core_avs::msg::{AvsMessageHandler, RPC_RESP_AVS_SIG};
 use core_consensus::message::{
     ChokeMessageHandler, ProposalMessageHandler, PullBlockRpcHandler, PullProofRpcHandler,
     PullTxsRpcHandler, QCMessageHandler, RemoteHeightMessageHandler, VoteMessageHandler,
@@ -13,8 +11,6 @@ use core_db::RocksAdapter;
 use core_mempool::{NewTxsHandler, PullTxsHandler};
 use core_network::{KeyProvider, NetworkService, PeerId, PeerIdExt};
 use core_storage::ImplStorage;
-use protocol::traits::Storage;
-use protocol::types::Bytes;
 use protocol::{
     constants::endpoints::{
         BROADCAST_HEIGHT, END_GOSSIP_AGGREGATED_VOTE, END_GOSSIP_NEW_TXS, END_GOSSIP_SIGNED_CHOKE,
@@ -50,13 +46,6 @@ pub(crate) trait NetworkServiceExt {
         storage: &Arc<ImplStorage<RocksAdapter>>,
     ) -> ProtocolResult<()>;
 
-    fn register_avs_endpoint(
-        &mut self,
-        storage: Arc<impl Storage + 'static>,
-        private_key: BlsPrivateKey,
-        address: Bytes,
-    ) -> ProtocolResult<()>;
-
     fn register_rpc(&mut self) -> ProtocolResult<()>;
 }
 
@@ -86,19 +75,6 @@ where
         self.register_endpoint_handler(
             RPC_PULL_TXS,
             PullTxsHandler::new(Arc::new(self.handle()), Arc::clone(mempool)),
-        )?;
-        Ok(())
-    }
-
-    fn register_avs_endpoint(
-        &mut self,
-        storage: Arc<impl Storage + 'static>,
-        private_key: BlsPrivateKey,
-        address: Bytes,
-    ) -> ProtocolResult<()> {
-        self.register_endpoint_handler(
-            RPC_RESP_AVS_SIG,
-            AvsMessageHandler::new(Arc::new(self.handle()), storage, private_key, address),
         )?;
         Ok(())
     }
@@ -165,7 +141,6 @@ where
         self.register_rpc_response(RPC_RESP_SYNC_PULL_BLOCK)?;
         self.register_rpc_response(RPC_RESP_SYNC_PULL_PROOF)?;
         self.register_rpc_response(RPC_RESP_SYNC_PULL_TXS)?;
-        self.register_rpc_response(RPC_RESP_AVS_SIG)?;
         Ok(())
     }
 }

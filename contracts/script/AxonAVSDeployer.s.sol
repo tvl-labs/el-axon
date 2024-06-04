@@ -39,7 +39,7 @@ contract AxonAVSDeployer is Script, Utils {
     uint32 public constant TASK_DURATION_BLOCKS = 0;
     // TODO: right now hardcoding these (this address is anvil's default address 9)
     address public constant AGGREGATOR_ADDR =
-        0xa0Ee7A142d267C1f36714E4a8F75612F20a79720;
+        0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
     address public constant TASK_GENERATOR_ADDR =
         0xa0Ee7A142d267C1f36714E4a8F75612F20a79720;
 

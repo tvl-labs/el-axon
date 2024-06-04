@@ -3,6 +3,7 @@ use crate::client::avs::util::{
     convert_bn254_to_ark, convert_to_bn254_g1_point, convert_to_bn254_g2_point,
 };
 use crate::client::elcontract::reader::ELChainReader;
+use crate::contract::registry_coordinator::registry_coordinator::G2Point;
 use crate::contract::{
     registry_coordinator::{
         registry_coordinator, G1Point, PubkeyRegistrationParams, SignatureWithSaltAndExpiry,
@@ -196,9 +197,18 @@ impl AvsRegistryChainWriter {
                         let g2_pubkey_bn254 = convert_to_bn254_g2_point(g2_projective);
 
                         let pub_key_reg_params = PubkeyRegistrationParams {
-                            pubkey_registration_signature: signed_msg,
-                            pubkey_g1:                     g1_pubkey_bn254,
-                            pubkey_g2:                     g2_pubkey_bn254,
+                            pubkey_registration_signature: G1Point {
+                                x: signed_msg.0,
+                                y: signed_msg.1,
+                            },
+                            pubkey_g1:                     G1Point {
+                                x: g1_pubkey_bn254.0,
+                                y: g1_pubkey_bn254.1,
+                            },
+                            pubkey_g2:                     G2Point {
+                                x: g2_pubkey_bn254.0,
+                                y: g2_pubkey_bn254.1,
+                            },
                         };
 
                         let msg_to_sign_result = self

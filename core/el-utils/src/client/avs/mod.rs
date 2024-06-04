@@ -1,7 +1,7 @@
 mod error;
 pub mod reader;
 pub mod subscriber;
-mod util;
+pub mod util;
 pub mod writer;
 
 use ethers::types::H256;
