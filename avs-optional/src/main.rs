@@ -1,17 +1,22 @@
 use std::str::FromStr;
 
-use alloy_primitives::Address;
+use alloy_primitives::{address, Address};
 use ark_bn254::{Fq, Fr, G1Affine, G2Affine};
 use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::{BigInt, BigInteger, PrimeField};
 use eigen_client_avsregistry::reader::AvsRegistryChainReader;
 use eigen_client_avsregistry::subscriber::AvsRegistryChainSubscriber;
+use eigen_client_avsregistry::writer::AvsRegistryChainWriter;
+use eigen_client_elcontracts::reader::ELChainReader;
+use eigen_client_elcontracts::writer::ELChainWriter;
+use eigen_crypto_bls::attestation::KeyPair;
 use eigen_services_avsregistry::chaincaller::AvsRegistryServiceChainCaller;
 use eigen_services_operatorsinfo::operatorsinfo_inmemory::OperatorInfoServiceInMemory;
 use el_utils::aggregator::Aggregator;
 use el_utils::contract::axon_avs_task_manager::{
     G1Point, G2Point, NewTaskCreatedFilter, NonSignerStakesAndSignature,
 };
+use el_utils::contract::registry_coordinator::ServiceManagerCall;
 use ethers::abi::{AbiEncode, RawLog};
 use ethers::contract::EthLogDecode;
 use ethers::types::{H160, H256, U256};
@@ -23,8 +28,16 @@ use rust_bls_bn254::sign;
 
 const SIGNER_KEY: &str = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 const SIGNER_ADDR: &str = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
-const TASK_MANAGER_ADDR: &str = "0x9E545E3C0baAB3E08CdfD552C960A1050f373042";
-const COORDINATOR_ADDR: &str = "0xa82fF9aFd8f496c3d6ac40E2a0F282E47488CFc9";
+
+const AVS_DIRECTORY_ADDR: Address = address!("5FC8d32690cc91D4c39d9d3abcBD16989F875707");
+const SERVICE_MANAGER_ADDR: Address = address!("84eA74d481Ee0A5332c457a4d796187F6Ba67fEB");
+const TASK_MANAGER_ADDR: Address = address!("9E545E3C0baAB3E08CdfD552C960A1050f373042");
+const STRATEGY_MANAGER_ADDR: Address = address!("Dc64a140Aa3E981100a9becA4E685f962f0cF6C9");
+const COORDINATOR_ADDR: Address = address!("a82fF9aFd8f496c3d6ac40E2a0F282E47488CFc9");
+const OPERATOR_RETRIEVER_ADDR: Address = address!("95401dc811bb5740090279Ba06cfA8fcF6113778");
+const SLASHER_ADDR: Address = address!("0165878A594ca255338adfa4d48449f69242Eb8F");
+const DELEGATION_MANAGER_ADDR: Address = address!("Cf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9");
+
 const HTTP_URL: &str = "http://127.0.0.1:8545";
 const WS_URL: &str = "ws://127.0.0.1:8545";
 
@@ -32,11 +45,10 @@ const WS_URL: &str = "ws://127.0.0.1:8545";
 async fn main() {
     let signer_key = Hex::from_str(SIGNER_KEY).unwrap();
     let signer_addr = Address::from_str(SIGNER_ADDR).unwrap();
-    let task_manager_addr = Address::from_str(TASK_MANAGER_ADDR).unwrap();
     let aggregator = Aggregator::new(
         HTTP_URL.to_string(),
         WS_URL.to_string(),
-        H160(task_manager_addr.into_array()),
+        H160(TASK_MANAGER_ADDR.into_array()),
         signer_key,
         H160(signer_addr.into_array()),
     )
@@ -136,15 +148,46 @@ impl EthConvert {
 
 async fn new_avs_registry_caller() -> AvsRegistryServiceChainCaller {
     let chain_reader = AvsRegistryChainReader::new(
-        Address::parse_checksummed(COORDINATOR_ADDR, None).unwrap(),
-        Address::default(),
+        COORDINATOR_ADDR,
+        OPERATOR_RETRIEVER_ADDR,
         HTTP_URL.to_string(),
     )
     .await
     .unwrap();
+
     let chain_subscriber = AvsRegistryChainSubscriber::new(WS_URL.to_string());
     AvsRegistryServiceChainCaller::new(
         chain_reader.clone(),
         OperatorInfoServiceInMemory::new(chain_subscriber, chain_reader, WS_URL.to_string()).await,
     )
+}
+
+async fn register_operator() {
+    let el_reader = ELChainReader::new(
+        SLASHER_ADDR,
+        DELEGATION_MANAGER_ADDR,
+        AVS_DIRECTORY_ADDR,
+        HTTP_URL.to_string(),
+    );
+    let el_writer = AvsRegistryChainWriter::new(
+        SERVICE_MANAGER_ADDR,
+        COORDINATOR_ADDR,
+        OPERATOR_RETRIEVER_ADDR,
+        Default::default(),
+        Default::default(),
+        el_reader,
+        HTTP_URL.to_string(),
+        SIGNER_KEY.to_string(),
+    )
+    .await;
+    el_writer
+        .register_operator_in_quorum_with_avs_registry_coordinator(
+            KeyPair::from_string(SIGNER_KEY.to_string()).unwrap(),
+            alloy_primitives::B256::repeat_byte(2),
+            alloy_primitives::U256::from(1718697416),
+            vec![1u8].into(),
+            HTTP_URL.to_string(),
+        )
+        .await
+        .unwrap();
 }

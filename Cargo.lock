@@ -905,6 +905,8 @@ dependencies = [
  "axon-protocol",
  "eigen-chainio-utils",
  "eigen-client-avsregistry",
+ "eigen-client-elcontracts",
+ "eigen-crypto-bls",
  "eigen-services-avsregistry",
  "eigen-services-operatorsinfo",
  "el-utils",
