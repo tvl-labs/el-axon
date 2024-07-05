@@ -7,12 +7,13 @@ use crate::contract::{
     stake_registry::stake_registry,
 };
 
-use eigensdk_crypto_bls::attestation::{G1Point, G2Point};
-use eigensdk_crypto_bn254::utils::u256_to_bigint256;
-use eigensdk_types::operator::{bitmap_to_quorum_ids, OperatorPubKeys};
+use alloy_primitives::U256;
+use eigen_crypto_bls::attestation::{G1Point, G2Point};
+use eigen_crypto_bn254::utils::u256_to_bigint256;
+use eigen_types::operator::{bitmap_to_quorum_ids, OperatorPubKeys};
 use ethers::providers::Middleware;
 use ethers_core::types::{
-    Address, BlockNumber, Bytes, Filter, FilterBlockOption, Topic, ValueOrArray, H256, U256,
+    Address, BlockNumber, Bytes, Filter, FilterBlockOption, Topic, ValueOrArray, H256,
 };
 use ethers_providers::{Http, Provider};
 use num_bigint::BigInt;
@@ -240,7 +241,7 @@ impl AvsRegistryChainReader {
 
         match quorum_bitmap_result {
             Ok(quorum_bitmap) => {
-                let quorums = bitmap_to_quorum_ids(quorum_bitmap);
+                let quorums = bitmap_to_quorum_ids(U256::from_limbs(quorum_bitmap.0));
 
                 let mut quorum_stakes: HashMap<u8, BigInt> = HashMap::new();
                 let stake_registry = stake_registry::StakeRegistry::new(

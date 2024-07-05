@@ -129,42 +129,42 @@ contract AxonAVSTaskManager is
 
         /* CHECKING SIGNATURES & WHETHER THRESHOLD IS MET OR NOT */
         // calculate message which operators signed
-        // bytes32 message = keccak256(abi.encode(taskResponse));
+        bytes32 message = keccak256(abi.encode(taskResponse));
 
         // check the BLS signature
-        // (
-        //     QuorumStakeTotals memory quorumStakeTotals,
-        //     bytes32 hashOfNonSigners
-        // ) = checkSignatures(
-        //         message,
-        //         quorumNumbers,
-        //         taskCreatedBlock,
-        //         nonSignerStakesAndSignature
-        //     );
+        (
+            QuorumStakeTotals memory quorumStakeTotals,
+            bytes32 hashOfNonSigners
+        ) = checkSignatures(
+                message,
+                quorumNumbers,
+                taskCreatedBlock,
+                nonSignerStakesAndSignature
+            );
 
-        // // check that signatories own at least a threshold percentage of each quourm
-        // for (uint i = 0; i < quorumNumbers.length; i++) {
-        //     // we don't check that the quorumThresholdPercentages are not >100 because a greater value would trivially fail the check, implying
-        //     // signed stake > total stake
-        //     require(
-        //         quorumStakeTotals.signedStakeForQuorum[i] *
-        //             _THRESHOLD_DENOMINATOR >=
-        //             quorumStakeTotals.totalStakeForQuorum[i] *
-        //                 uint8(quorumThresholdPercentage),
-        //         "Signatories do not own at least threshold percentage of a quorum"
-        //     );
-        // }
+        // check that signatories own at least a threshold percentage of each quourm
+        for (uint i = 0; i < quorumNumbers.length; i++) {
+            // we don't check that the quorumThresholdPercentages are not >100 because a greater value would trivially fail the check, implying
+            // signed stake > total stake
+            require(
+                quorumStakeTotals.signedStakeForQuorum[i] *
+                    _THRESHOLD_DENOMINATOR >=
+                    quorumStakeTotals.totalStakeForQuorum[i] *
+                        uint8(quorumThresholdPercentage),
+                "Signatories do not own at least threshold percentage of a quorum"
+            );
+        }
 
-        bytes23[] memory nonSigners;
-        bytes32 hashOfNonSigners = keccak256(abi.encodePacked(taskCreatedBlock, nonSigners));
+        // bytes23[] memory nonSigners;
+        // bytes32 hashOfNonSigners = keccak256(abi.encodePacked(taskCreatedBlock, nonSigners));
         TaskResponseMetadata memory taskResponseMetadata = TaskResponseMetadata(
             uint32(block.number),
             hashOfNonSigners
         );
-        // // updating the storage with task response
-        // allTaskResponses[taskResponse.referenceTaskIndex] = keccak256(
-        //     abi.encode(taskResponse, taskResponseMetadata)
-        // );
+        // updating the storage with task response
+        allTaskResponses[taskResponse.referenceTaskIndex] = keccak256(
+            abi.encode(taskResponse, taskResponseMetadata)
+        );
 
         // emitting event
         emit TaskResponded(taskResponse, taskResponseMetadata);

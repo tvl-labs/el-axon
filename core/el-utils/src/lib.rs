@@ -1,5 +1,6 @@
 pub mod aggregator;
-pub mod client;
+pub mod bn254;
+// pub mod client;
 pub mod contract;
 pub mod error;
 pub mod metrics;

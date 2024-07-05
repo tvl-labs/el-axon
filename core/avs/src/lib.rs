@@ -68,7 +68,7 @@ where
                         .send_new_task(
                             Bytes::from(proof.as_bytes().to_vec()).into(),
                             67,
-                            Bytes::new().into(),
+                            vec![1u8].into(),
                         )
                         .await;
                 }

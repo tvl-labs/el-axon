@@ -2,7 +2,7 @@ use crate::contract::{
     avs_dictionary::avs_directory, delegation_manager::delegation_manager, erc20_mock::ERC20Mock,
     i_slasher::i_slasher, i_strategy::i_strategy,
 };
-use eigensdk_types::operator::Operator;
+use eigen_types::operator::Operator;
 use ethers_core::types::{Address, U256};
 use ethers_providers::{Http, Provider};
 use std::sync::Arc;
