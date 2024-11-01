@@ -1090,9 +1090,9 @@ dependencies = [
 
 [[package]]
 name = "ckb-librocksdb-sys"
-version = "8.5.3"
+version = "8.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94a2fc3c22ed6a4155a98dc5579e8ebe18ee4db11a685519253109e85e31399b"
+checksum = "2e68e0993f54ba0d21152419a0668caa92adc928b5a9b01e45871ec055a31ce2"
 dependencies = [
  "bindgen",
  "cc",
@@ -1212,9 +1212,9 @@ dependencies = [
 
 [[package]]
 name = "ckb-rocksdb"
-version = "0.21.0"
+version = "0.21.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca430fc9e9e4dadcf1923618e9742cb82bfc8f1837cb4158379f05bacc44d1fe"
+checksum = "050f7c70a451b9606a5d4e1cf696fec2517e65c3bfcbefadb6b114cc0fa7673b"
 dependencies = [
  "ckb-librocksdb-sys",
  "libc",
