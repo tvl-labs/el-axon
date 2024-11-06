@@ -10,8 +10,8 @@ use protocol::constants::{
 };
 use protocol::traits::{APIAdapter, Context};
 use protocol::types::{
-    Block, BlockNumber, Bytes, EthAccountProof, Hash, Header, Hex, Proposal, Receipt,
-    SignedTransaction, TxResp, UnverifiedTransaction, H160, H256, U256, U64,
+    Block, BlockNumber, EthAccountProof, Hash, Header, Hex, Proposal, Receipt, SignedTransaction,
+    TxResp, UnverifiedTransaction, H160, H256, U256, U64,
 };
 use protocol::{
     async_trait, codec::ProtocolCodec, lazy::PROTOCOL_VERSION, tokio::time::sleep, ProtocolResult,
@@ -59,7 +59,6 @@ impl<Adapter: APIAdapter> Web3RpcImpl<Adapter> {
     async fn call_evm(
         &self,
         req: Web3CallRequest,
-        data: Bytes,
         number: Option<u64>,
         estimate: bool,
     ) -> ProtocolResult<TxResp> {
@@ -83,7 +82,7 @@ impl<Adapter: APIAdapter> Web3RpcImpl<Adapter> {
                 req.gas_price,
                 req.gas,
                 req.value.unwrap_or_default(),
-                data.to_vec(),
+                req.data_bytes().to_vec(),
                 estimate,
                 mock_header.state_root,
                 Proposal::new_without_state_root(&mock_header),
@@ -432,13 +431,8 @@ impl<Adapter: APIAdapter + 'static> Web3RpcServer for Web3RpcImpl<Adapter> {
 
         let number = self.get_block_number_by_id(block_id).await?;
 
-        let data_bytes = req
-            .data
-            .as_ref()
-            .map(|hex| hex.as_bytes())
-            .unwrap_or_default();
         let resp = self
-            .call_evm(req, data_bytes, number, false)
+            .call_evm(req, number, false)
             .await
             .map_err(|e| RpcError::Internal(e.to_string()))?;
 
@@ -476,13 +470,8 @@ impl<Adapter: APIAdapter + 'static> Web3RpcServer for Web3RpcImpl<Adapter> {
             Some(BlockId::Num(n)) => Some(n.low_u64()),
             _ => None,
         };
-        let data_bytes = req
-            .data
-            .as_ref()
-            .map(|hex| hex.as_bytes())
-            .unwrap_or_default();
         let resp = self
-            .call_evm(req, data_bytes, num, true)
+            .call_evm(req, num, true)
             .await
             .map_err(|e| RpcError::Internal(e.to_string()))?;
 
