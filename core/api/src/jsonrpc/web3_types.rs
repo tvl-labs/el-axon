@@ -313,14 +313,26 @@ pub struct Web3CallRequest {
     pub max_fee_per_gas:          Option<U64>,
     pub gas:                      Option<U64>,
     pub value:                    Option<U256>,
-    #[serde(rename = "input")]
     pub data:                     Option<Hex>,
+    pub input:                    Option<Hex>,
     pub nonce:                    Option<U256>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub access_list:              Option<AccessList>,
     pub chain_id:                 Option<U64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_priority_fee_per_gas: Option<U256>,
+}
+
+impl Web3CallRequest {
+    pub(crate) fn data_bytes(&self) -> Bytes {
+        let data_opt = if self.data.is_some() {
+            self.data.as_ref()
+        } else {
+            self.input.as_ref()
+        };
+
+        data_opt.map(|h| h.as_bytes()).unwrap_or_default()
+    }
 }
 
 #[derive(Default, Clone, Debug, PartialEq, Eq, Hash)]
