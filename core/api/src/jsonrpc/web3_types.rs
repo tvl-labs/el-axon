@@ -787,7 +787,9 @@ pub struct Web3Header {
     pub gas_used:          U64,
     pub logs_bloom:        Option<Bloom>,
     pub miner:             H160,
-    pub nonce:             U256,
+    pub nonce:             H64,
+    pub mix_hash:          H256,
+    pub hash:              H256,
     pub number:            U256,
     pub parent_hash:       H256,
     pub receipts_root:     H256,
@@ -814,7 +816,9 @@ impl From<Header> for Web3Header {
             gas_limit:         h.gas_limit,
             gas_used:          h.gas_used,
             timestamp:         h.timestamp.into(),
-            nonce:             U256::default(),
+            nonce:             H64::default(),
+            mix_hash:          H256::default(),
+            hash:              h.hash(),
         }
     }
 }

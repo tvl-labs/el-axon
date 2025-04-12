@@ -134,7 +134,7 @@ where
                 let msg = SubscriptionMessage::from_json(&web3_header).unwrap();
 
                 for hub in self.header_hubs.iter_mut() {
-                    let _ignore = hub.sink.send(msg.clone());
+                    let _ignore = hub.sink.send(msg.clone()).await;
                 }
             }
 
@@ -142,7 +142,7 @@ where
             let msg = SubscriptionMessage::from_json(&latest_web3_header).unwrap();
 
             for hub in self.header_hubs.iter_mut() {
-                let _ignore = hub.sink.send(msg.clone());
+                let _ignore = hub.sink.send(msg.clone()).await;
             }
         }
 
@@ -153,7 +153,7 @@ where
 
             for hub in self.sync_hubs.iter_mut() {
                 // unbound sender can ignore it's return
-                let _ignore = hub.sink.send(msg.clone());
+                let _ignore = hub.sink.send(msg.clone()).await;
             }
         }
 
@@ -198,7 +198,7 @@ where
                         for log in logs.drain(..) {
                             let msg = SubscriptionMessage::from_json(&log).unwrap();
                             // unbound sender can ignore it's return
-                            let _ignore = hub.sink.send(msg);
+                            let _ignore = hub.sink.send(msg).await;
                         }
                     }
                     index += log_len;
