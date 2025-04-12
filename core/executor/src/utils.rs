@@ -1,3 +1,4 @@
+use protocol::codec::hex_encode;
 use protocol::types::{Hasher, H160, H256, U256};
 
 use crate::FeeAllocate;
@@ -54,7 +55,7 @@ pub fn decode_revert_msg(input: &[u8]) -> String {
     }
 
     let decode_reason = |i: &[u8]| -> String {
-        let reason = hex::encode(i);
+        let reason = hex_encode(i);
         EXEC_REVERT.to_string() + &reason
     };
 

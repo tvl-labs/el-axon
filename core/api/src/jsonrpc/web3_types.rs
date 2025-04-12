@@ -314,6 +314,7 @@ pub struct Web3CallRequest {
     pub gas:                      Option<U64>,
     pub value:                    Option<U256>,
     pub data:                     Option<Hex>,
+    #[serde(alias = "data")]
     pub input:                    Option<Hex>,
     pub nonce:                    Option<U256>,
     #[serde(skip_serializing_if = "Option::is_none")]
