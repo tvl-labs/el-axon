@@ -1,7 +1,7 @@
 pub use ethereum::Log;
 pub use ethereum_types::BloomInput;
 
-use crate::types::{Bloom, ExitReason, ExitSucceed, Hash, MerkleRoot, H160, U64};
+use crate::types::{Address, Bloom, ExitReason, ExitSucceed, Hash, MerkleRoot, U64};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Receipt {
@@ -15,7 +15,7 @@ pub struct Receipt {
     pub logs:         Vec<Log>,
     pub log_index:    u32,
     pub code_address: Option<Hash>,
-    pub sender:       H160,
+    pub sender:       Address,
     pub ret:          ExitReason,
     pub removed:      bool,
 }

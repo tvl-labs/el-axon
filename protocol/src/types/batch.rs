@@ -7,12 +7,13 @@ macro_rules! batch_msg_type {
 
         impl crate::traits::MessageCodec for $name {
             fn encode_msg(&mut self) -> crate::ProtocolResult<Bytes> {
-                let bytes = rlp::encode_list(&self.0);
-                Ok(bytes.freeze())
+                let mut buf = Vec::new();
+                alloy_rlp::encode_list(&self.0, &mut buf);
+                Ok(buf.freeze())
             }
 
             fn decode_msg(bytes: Bytes) -> crate::ProtocolResult<Self> {
-                let inner: Vec<$ty> = rlp::Rlp::new(bytes.as_ref())
+                let inner: Vec<$ty> = alloy_rlp::Rlp::new(bytes.as_ref())
                     .as_list()
                     .map_err(|e| crate::codec::error::CodecError::Rlp(e.to_string()))?;
                 Ok(Self(inner))

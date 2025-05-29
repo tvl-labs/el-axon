@@ -6,15 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-hasher = "0.1"
-rlp = "0.5"
-static_merkle_tree = "1.1"
+hasher.workspace = true
+static_merkle_tree.workspace = true
 
-protocol = { path = "../../protocol", package = "axon-protocol", default-features = false }
+protocol = { workspace = true, default-features = false }
 
 [dev-dependencies]
-criterion = "0.5"
-rand = "0.7"
+criterion.workspace = true
+rand.workspace = true
 
 [[bench]]
 harness = false

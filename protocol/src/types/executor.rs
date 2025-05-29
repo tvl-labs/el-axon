@@ -2,11 +2,11 @@ pub use ethereum::{AccessList, AccessListItem, Account};
 pub use evm::{backend::Log, Config, ExitError, ExitFatal, ExitReason, ExitRevert, ExitSucceed};
 pub use hasher::HasherKeccak;
 
-use rlp_derive::{RlpDecodable, RlpEncodable};
+use alloy_rlp::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
 
 use crate::types::{
-    Bloom, ExtraData, Hash, Hasher, Header, MerkleRoot, Proposal, H160, H256, U256, U64,
+    Address, Bloom, ExtraData, Hash, Hasher, Header, MerkleRoot, Proposal, H256, U256, U64,
 };
 
 use super::Hex;
@@ -51,10 +51,10 @@ impl Default for TxResp {
 #[derive(RlpEncodable, RlpDecodable, Default, Clone, Debug, PartialEq, Eq)]
 pub struct ExecutorContext {
     pub block_number:           U256,
-    pub block_coinbase:         H160,
+    pub block_coinbase:         Address,
     pub block_timestamp:        U256,
     pub chain_id:               U256,
-    pub origin:                 H160,
+    pub origin:                 Address,
     pub gas_price:              U256,
     pub block_gas_limit:        U64,
     pub block_base_fee_per_gas: U64,
@@ -96,7 +96,7 @@ impl From<&Header> for ExecutorContext {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EthAccountProof {
-    pub address:       H160,
+    pub address:       Address,
     pub balance:       U256,
     pub code_hash:     H256,
     pub nonce:         U256,

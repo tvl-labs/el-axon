@@ -1,13 +1,13 @@
+use alloy_rlp::{RlpDecodable, RlpEncodable};
 use derive_more::Display;
 use faster_hex::withpfx_lowercase;
-use rlp_derive::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "hex-serialize")]
 use crate::codec::serialize_uint;
 use crate::types::{
-    logs_bloom, Bloom, BloomInput, Bytes, ExecResp, Hash, Hasher, Log, MerkleRoot, Receipt,
-    SignedTransaction, VecDisplayHelper, H160, U64,
+    logs_bloom, Address, Bloom, BloomInput, Bytes, ExecResp, Hash, Hasher, Log, MerkleRoot,
+    Receipt, SignedTransaction, U64,
 };
 use crate::{codec::ProtocolCodec, types::TypesError};
 
@@ -40,7 +40,7 @@ impl TryFrom<u8> for BlockVersion {
 
 #[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, Eq, Display)]
 #[display(
-    fmt = "Proposal {{ \
+    "Proposal {{ \
         version: {:?}, prev_hash: {:#x}, proposer: {:#x}, prev_state_root: {:#x}, \
         transactions_root: {:#x}, signed_txs_hash: {:#x}, timestamp: {}, number: {}, \
         gas_limit: {}, extra_data: {}, base_fee_per_gas: {}, proof: {}, \
@@ -65,7 +65,7 @@ impl TryFrom<u8> for BlockVersion {
 pub struct Proposal {
     pub version:                  BlockVersion,
     pub prev_hash:                Hash,
-    pub proposer:                 H160,
+    pub proposer:                 Address,
     pub prev_state_root:          MerkleRoot,
     pub transactions_root:        MerkleRoot,
     pub signed_txs_hash:          Hash,
@@ -147,7 +147,7 @@ pub struct PackedTxHashes {
     Eq,
     Display,
 )]
-#[display(fmt = "Block {{ header: {}, tx_hashes: {:?} }}", header, tx_hashes)]
+#[display("Block {{ header: {}, tx_hashes: {:?} }}", header, tx_hashes)]
 pub struct Block {
     pub header:    Header,
     pub tx_hashes: Vec<Hash>,
@@ -158,7 +158,7 @@ impl Block {
         let logs = exec_resp
             .tx_resp
             .iter()
-            .map(|r| Bloom::from(BloomInput::Raw(rlp::encode_list(&r.logs).as_ref())))
+            .map(|r| Bloom::from(BloomInput::Raw(alloy_rlp::encode_list(&r.logs).as_ref())))
             .collect::<Vec<_>>();
         let header = Header {
             version:                  proposal.version,
@@ -169,7 +169,7 @@ impl Block {
             signed_txs_hash:          proposal.signed_txs_hash,
             receipts_root:            exec_resp.receipt_root,
             log_bloom:                Bloom::from(BloomInput::Raw(
-                rlp::encode_list(&logs).as_ref(),
+                alloy_rlp::encode_list(&logs).as_ref(),
             )),
             timestamp:                proposal.timestamp,
             number:                   proposal.number,
@@ -240,7 +240,7 @@ impl Block {
     Display,
 )]
 #[display(
-    fmt = "Header {{ \
+    "Header {{ \
         version: {:?}, prev_hash: {:#x}, proposer: {:#x}, state_root: {:#x}, \
         transactions_root: {:#x}, signed_txs_hash: {:#x}, receipts_root: {:#x}, \
         log_bloom: {:#x}, timestamp: {}, number: {}, gas_used: {}, \
@@ -268,7 +268,7 @@ impl Block {
 pub struct Header {
     pub version:                  BlockVersion,
     pub prev_hash:                Hash,
-    pub proposer:                 H160,
+    pub proposer:                 Address,
     pub state_root:               MerkleRoot,
     pub transactions_root:        MerkleRoot,
     pub signed_txs_hash:          Hash,
@@ -314,7 +314,7 @@ impl Header {
     Eq,
     Display,
 )]
-#[display(fmt = "0x{:x}", inner)]
+#[display("0x{:x}", inner)]
 pub struct ExtraData {
     #[cfg_attr(
         feature = "hex-serialize",
@@ -336,7 +336,7 @@ pub struct ExtraData {
     Display,
 )]
 #[display(
-    fmt = "Proof {{ \
+    "Proof {{ \
         number: {}, round: {}, block_hash: {:#x}, \
         signature: 0x{:x}, bitmap: 0x{:x} \
     }}",

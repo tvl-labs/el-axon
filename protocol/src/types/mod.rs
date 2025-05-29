@@ -33,62 +33,62 @@ use crate::{ProtocolError, ProtocolErrorKind};
 
 #[derive(Debug, Display, From)]
 pub enum TypesError {
-    #[display(fmt = "Expect {}, get {}.", expect, real)]
+    #[display("Expect {}, get {}.", expect, real)]
     LengthMismatch { expect: usize, real: usize },
 
     #[display(
-        fmt = "Eip1559Transaction hash mismatch origin {:#x}, computed {:#x}",
+        "Eip1559Transaction hash mismatch origin {:#x}, computed {:#x}",
         origin,
         calc
     )]
     TxHashMismatch { origin: H256, calc: H256 },
 
-    #[display(fmt = "{:?}", _0)]
+    #[display("{:?}", _0)]
     FromHex(faster_hex::Error),
 
-    #[display(fmt = "{:?} is an invalid address", _0)]
+    #[display("{:?} is an invalid address", _0)]
     InvalidAddress(String),
 
-    #[display(fmt = "Hex should start with 0x")]
+    #[display("Hex should start with 0x")]
     HexPrefix,
 
-    #[display(fmt = "Invalid public key")]
+    #[display("Invalid public key")]
     InvalidPublicKey,
 
-    #[display(fmt = "Invalid check sum")]
+    #[display("Invalid check sum")]
     InvalidCheckSum,
 
-    #[display(fmt = "Unsigned")]
+    #[display("Unsigned")]
     Unsigned,
 
-    #[display(fmt = "Crypto error {:?}", _0)]
+    #[display("Crypto error {:?}", _0)]
     Crypto(CryptoError),
 
-    #[display(fmt = "Missing signature")]
+    #[display("Missing signature")]
     MissingSignature,
 
-    #[display(fmt = "Invalid crosschain direction")]
+    #[display("Invalid crosschain direction")]
     InvalidDirection,
 
-    #[display(fmt = "Signature R is empty")]
+    #[display("Signature R is empty")]
     SignatureRIsEmpty,
 
-    #[display(fmt = "Invalid signature R type")]
+    #[display("Invalid signature R type")]
     InvalidSignatureRType,
 
-    #[display(fmt = "Invalid address source type")]
+    #[display("Invalid address source type")]
     InvalidAddressSourceType,
 
-    #[display(fmt = "Missing interoperation sender")]
+    #[display("Missing interoperation sender")]
     MissingInteroperationSender,
 
-    #[display(fmt = "InvalidBlockVersion {}", _0)]
+    #[display("InvalidBlockVersion {}", _0)]
     InvalidBlockVersion(u8),
 
-    #[display(fmt = "Decode interoperation signature R error {:?}", _0)]
-    DecodeInteroperationSigR(rlp::DecoderError),
+    #[display("Decode interoperation signature R error {:?}", _0)]
+    DecodeInteroperationSigR(alloy_rlp::Error),
 
-    #[display(fmt = "Prepay gas is too large")]
+    #[display("Prepay gas is too large")]
     PrepayGasIsTooLarge,
 }
 

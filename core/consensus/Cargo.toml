@@ -5,34 +5,31 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arc-swap = "1.6"
+arc-swap.workspace = true
+futures.workspace = true
+json.workspace = true
+lazy_static.workspace = true
+log.workspace = true
+overlord.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
-futures = { version = "0.3", features = ["async-await"] }
-json = "0.12"
-lazy_static = "1.4"
-log = "0.4"
-overlord = "0.4"
-parking_lot = "0.12"
-rlp = "0.5"
-rlp-derive = "0.1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-common-apm = { path = "../../common/apm" }
-common-apm-derive = { path = "../../common/apm-derive" }
-common-crypto = { path = "../../common/crypto" }
-common-logger = { path = "../../common/logger" }
-common-merkle = { path = "../../common/merkle" }
-core-executor = { path = "../../core/executor" }
-core-mempool = { path = "../../core/mempool" }
-core-network = { path = "../../core/network" }
-core-storage = { path = "../../core/storage" }
-protocol = { path = "../../protocol", package = "axon-protocol" }
+common-apm.workspace = true
+common-apm-derive.workspace = true
+common-crypto.workspace = true
+common-logger.workspace = true
+common-merkle.workspace = true
+core-executor.workspace = true
+core-mempool.workspace = true
+core-network.workspace = true
+core-storage.workspace = true
+protocol.workspace = true
 
 [dev-dependencies]
-bit-vec = "0.6"
-criterion = "0.5"
-num-traits = "0.2"
+bit-vec.workspace = true
+criterion.workspace = true
+num-traits.workspace = true
 
 [features]
 default = []

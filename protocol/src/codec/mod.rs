@@ -6,11 +6,10 @@ pub mod transaction;
 
 pub use transaction::truncate_slice;
 
-use ethers_core::utils::parse_checksummed;
 use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 use serde::{Deserialize as _, Deserializer, Serializer};
 
-use crate::types::{Address, Bytes, DBBytes, Hex, Key256Bits, TypesError, H160, U256};
+use crate::types::{Bytes, DBBytes, Hex, Key256Bits, TypesError, U256};
 use crate::ProtocolResult;
 
 static CHARS: &[u8] = b"0123456789abcdef";
@@ -40,18 +39,6 @@ impl ProtocolCodec for DBBytes {
     fn decode<B: AsRef<[u8]>>(bytes: B) -> ProtocolResult<Self> {
         let inner = Bytes::copy_from_slice(bytes.as_ref());
         Ok(Self(inner))
-    }
-}
-
-impl Encodable for Address {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(1).append(&self.0);
-    }
-}
-
-impl Decodable for Address {
-    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
-        Ok(Address(r.val_at(0)?))
     }
 }
 
@@ -93,12 +80,11 @@ pub fn hex_decode(src: &str) -> ProtocolResult<Vec<u8>> {
 pub fn serialize_uint<S, U>(val: &U, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
-    U: Into<U256> + Copy,
+    U: TryInto<U256> + Copy,
 {
-    let val: U256 = (*val).into();
+    let val: U256 = (*val).try_into().unwrap();
     let mut slice = [0u8; 2 + 64];
-    let mut bytes = [0u8; 32];
-    val.to_big_endian(&mut bytes);
+    let bytes: [u8; 32] = val.to_be_bytes();
     let non_zero = bytes.iter().take_while(|b| **b == 0).count();
     let bytes = &bytes[non_zero..];
 
@@ -137,17 +123,6 @@ where
 {
     String::deserialize(deserializer)
         .and_then(|s| decode_256bits_key(&s).map_err(serde::de::Error::custom))
-}
-
-pub fn deserialize_address<'de, D>(deserializer: D) -> Result<H160, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    parse_checksummed(&s, None).map_err(|err| {
-        let msg = format!("failed to parse the mixed-case checksum address \"{s}\", since {err}.");
-        serde::de::Error::custom(msg)
-    })
 }
 
 fn to_hex_raw<'a>(v: &'a mut [u8], bytes: &[u8], skip_leading_zero: bool) -> &'a str {

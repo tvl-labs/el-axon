@@ -1,6 +1,6 @@
+use alloy_rlp::{RlpDecodable, RlpEncodable};
 use ckb_types::{packed, prelude::*};
 use derive_more::Display;
-use rlp_derive::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
 
 use crate::types::{Bytes, H256};
@@ -13,6 +13,7 @@ pub struct VMResp {
 
 #[derive(RlpEncodable, RlpDecodable, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CellWithData {
+    #[rlp(trailing)]
     pub type_script: Option<Script>,
     pub lock_script: Script,
     pub data:        Bytes,
@@ -62,7 +63,7 @@ pub struct CellDepWithPubKey {
 #[derive(
     RlpEncodable, RlpDecodable, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Display,
 )]
-#[display(fmt = "OutPoint {{ tx_hash: {:#x}, index: {} }}", tx_hash, index)]
+#[display("OutPoint {{ tx_hash: {:#x}, index: {} }}", tx_hash, index)]
 pub struct OutPoint {
     pub tx_hash: H256,
     pub index:   u32,
@@ -71,7 +72,7 @@ pub struct OutPoint {
 impl From<&packed::OutPoint> for OutPoint {
     fn from(out_point: &packed::OutPoint) -> Self {
         OutPoint {
-            tx_hash: H256(out_point.tx_hash().unpack().0),
+            tx_hash: H256::new(out_point.tx_hash().unpack().0),
             index:   out_point.index().unpack(),
         }
     }
@@ -79,8 +80,11 @@ impl From<&packed::OutPoint> for OutPoint {
 
 #[derive(RlpEncodable, RlpDecodable, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct Witness {
+    #[rlp(trailing)]
     pub lock:        Option<Bytes>,
+    #[rlp(trailing)]
     pub input_type:  Option<Bytes>,
+    #[rlp(trailing)]
     pub output_type: Option<Bytes>,
 }
 

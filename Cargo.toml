@@ -6,18 +6,6 @@ edition = "2021"
 repository = "https://github.com/axonweb3/axon"
 build = "build.rs"
 
-[dependencies]
-clap = { version = "4.4", features = ["cargo"] }
-
-# byzantine = { path = "./byzantine" }
-common-version = { path = "./common/version" }
-core-api = { path = "./core/api" }
-core-cli = { path = "./core/cli" }
-core-consensus = { path = "./core/consensus" }
-core-executor = { path = "./core/executor" }
-core-run = { path = "./core/run" }
-protocol = { path = "./protocol", package = "axon-protocol" }
-
 [workspace]
 members = [
     "common/apm",
@@ -40,10 +28,170 @@ members = [
     "core/run",
     "core/storage",
     "devtools/abi-generator",
-    "devtools/axon-tools",
     "devtools/metadata-cli",
     "protocol",
 ]
+
+[workspace.dependencies]
+alloy = { version = "1.0", features = ["full"] }
+alloy-rlp = { version = "0.3", features = ["derive"] }
+anyhow = "1.0.98"
+arc-swap = "1.7"
+async-trait = "0.1"
+axum = "0.8"
+az = "1.2"
+backtrace = "0.3"
+beef = "0.5"
+bincode = "1.3"
+bit-vec = "0.6"
+bloom-filters = "0.1"
+blst = { version = "0.3", features = ["portable"] }
+bn = { package = "substrate-bn", version = "0.6" }
+bytemuck = "1.13"
+bytes = { version = "1.10", features = ["serde"] }
+chrono = "0.4"
+ckb-chain-spec = "0.200"
+ckb-error = "0.200"
+ckb-hash = "0.200"
+ckb-jsonrpc-types = "0.200"
+ckb-script = "0.200"
+ckb-sdk = "4.0"
+ckb-traits = "0.200"
+ckb-types = "0.200"
+ckb-vm = { version = "0.24", features = ["asm"] }
+creep = "0.2"
+crossbeam-queue = "0.3"
+clap = { version = "4.5", features = ["cargo"] }
+criterion = "0.6"
+dashmap = { version = "5.5", features = ["rayon"] }
+derive_more = { version = "2.0", features = ["full"] }
+ed25519-dalek = "1.0"
+either = "1.15"
+env_logger = "0.11"
+ethereum = { version = "0.15", features = ["with-codec", "with-serde"] }
+ethereum-types = { version = "0.15", features = [
+    "arbitrary",
+    "codec",
+    "rlp",
+    "serialize",
+    "std",
+] }
+ethers = "2.0"
+ethers-core = "2.0"
+evm = { version = "0.37", features = ["tracing", "with-serde"] }
+faketime = "0.2"
+faster-hex = "0.8"
+futures = "0.3"
+fut-ret = "0.2"
+hashbrown = "0.15"
+hasher = "0.1"
+hex = "0.4"
+hyper = "1.6"
+ipnetwork = "0.20"
+jemalloc-ctl = { version = "0.5", package = "tikv-jemalloc-ctl" }
+jemallocator = { version = "0.5", features = [
+    "profiling",
+    "stats",
+    "unprefixed_malloc_on_supported_platforms",
+], package = "tikv-jemallocator" }
+json = "0.12"
+jsonrpc-core = "18.0"
+jsonrpsee = { version = "0.20", features = ["macros", "server"] }
+lazy_static = "1.4"
+libc = "0.2"
+log = "0.4"
+log4rs = { version = "1.3", features = [
+    "all_components",
+    "file_appender",
+    "yaml_format",
+] }
+lru = "0.14"
+minstant = "0.1"
+molecule = "0.7"
+num-traits = "0.2"
+once_cell = "1.21"
+ophelia = "0.3"
+ophelia-blst = "0.3"
+ophelia-secp256k1 = "0.3"
+overlord = "0.4"
+parking_lot = "0.12"
+pprof = { version = "0.11", features = ["prost-codec"] }
+proc-macro2 = "1.0"
+prometheus = "0.13"
+prometheus-static-metric = "0.5"
+prost = "0.11"
+quote = "1.0"
+rand = "0.8"
+reqwest = "0.12"
+revm = "2.3"
+ripemd = "0.1"
+rlp = { version = "0.6", features = ["derive"] }
+rocksdb = { version = "0.22", package = "ckb-rocksdb" }
+rug = "1.19"
+rustracing = { git = "http://github.com/KaoImin/rustracing", branch = "main" }
+rustracing_jaeger = { git = "http://github.com/KaoImin/rustracing_jaeger", branch = "main" }
+semver = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1.0"
+serde_json = "1.0"
+serde_with = "3.4"
+sha2 = "0.10"
+snap = "1.1"
+socket2 = "0.4"
+static_merkle_tree = "1.1"
+stringreader = "0.1"
+strum = "0.27"
+strum_macros = "0.27"
+syn = { version = "1.0", features = ["full"] }
+tempfile = "3.20"
+tentacle = { version = "0.5.0-alpha.1", features = [
+    "parking_lot",
+    "secio-async-trait",
+] }
+tentacle-multiaddr = "0.3"
+tentacle-secio = "0.6"
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+thiserror = "1.0"
+tokio = { version = "1.45", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+toml = "0.8"
+tower = "0.4"
+tower-http = { version = "0.4", features = ["cors"] }
+trackable = "1.2"
+trie = { package = "cita_trie", version = "5.0" }
+zeroize = "1.8.0"
+
+common-apm = { path = "./common/apm" }
+common-apm-derive = { path = "./common/apm-derive" }
+common-config-parser = { path = "./common/config-parser" }
+common-crypto = { path = "./common/crypto" }
+common-hasher = { path = "./common/hasher" }
+common-logger = { path = "./common/logger" }
+common-memory-tracker = { path = "./common/memory-tracker" }
+common-merkle = { path = "./common/merkle" }
+common-version = { path = "./common/version" }
+core-api = { path = "./core/api" }
+core-cli = { path = "./core/cli" }
+core-consensus = { path = "./core/consensus" }
+core-db = { path = "./core/db" }
+core-executor = { path = "./core/executor" }
+core-interoperation = { path = "./core/interoperation" }
+core-mempool = { path = "./core/mempool" }
+core-network = { path = "./core/network" }
+core-rpc-client = { path = "./core/rpc-client" }
+core-run = { path = "./core/run" }
+core-storage = { path = "./core/storage" }
+protocol = { path = "./protocol", package = "axon-protocol" }
+
+[dependencies]
+clap.workspace = true
+common-version.workspace = true
+core-api.workspace = true
+core-cli.workspace = true
+core-consensus.workspace = true
+core-executor.workspace = true
+core-run.workspace = true
+protocol.workspace = true
 
 [features]
 default = []

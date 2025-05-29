@@ -5,27 +5,25 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ckb-types = "0.111"
-crossbeam-queue = "0.3"
-dashmap = { version = "5.5", features = ["rayon"] }
-futures = { version = "0.3", features = ["async-await"] }
-log = "0.4"
-parking_lot = "0.12"
-rlp = "0.5"
-rlp-derive = "0.1"
+ckb-types.workspace = true
+crossbeam-queue.workspace = true
+dashmap.workspace = true
+futures.workspace = true
+log.workspace = true
+parking_lot.workspace = true
 
-common-apm = { path = "../../common/apm" }
-common-apm-derive = { path = "../../common/apm-derive" }
-common-config-parser = { path = "../../common/config-parser" }
-common-crypto = { path = "../../common/crypto" }
-core-executor = { path = "../../core/executor" }
-core-interoperation = { path = "../../core/interoperation" }
-core-network = { path = "../../core/network" }
-protocol = { path = "../../protocol", package = "axon-protocol" }
+common-apm.workspace = true
+common-apm-derive.workspace = true
+common-config-parser.workspace = true
+common-crypto.workspace = true
+core-executor.workspace = true
+core-interoperation.workspace = true
+core-network.workspace = true
+protocol.workspace = true
 
 [dev-dependencies]
-criterion = { version = "0.5", features = ["async_tokio"] }
-parking_lot = "0.12"
+criterion.workspace = true
+parking_lot.workspace = true
 
 [[bench]]
 harness = false

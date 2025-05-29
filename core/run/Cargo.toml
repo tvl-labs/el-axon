@@ -5,41 +5,40 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-backtrace = "0.3"
-ethers-core = "2.0"
-futures = "0.3"
-log = "0.4"
-rlp = "0.5"
-serde = "1.0"
-serde_derive = "1.0"
-serde_json = "1.0"
-toml = "0.8"
+backtrace.workspace = true
+ethers-core.workspace = true
+futures.workspace = true
+log.workspace = true
+serde.workspace = true
+serde_derive.workspace = true
+serde_json.workspace = true
+toml.workspace = true
 
-common-apm = { path = "../../common/apm" }
-common-apm-derive = { path = "../../common/apm-derive" }
-common-config-parser = { path = "../../common/config-parser" }
-common-crypto = { path = "../../common/crypto" }
-common-logger = { path = "../../common/logger" }
-common-memory-tracker = { path = "../../common/memory-tracker", optional = true }
-core-api = { path = "../../core/api" }
-core-consensus = { path = "../../core/consensus" }
-core-db = { path = "../../core/db" }
-core-executor = { path = "../../core/executor" }
-core-interoperation = { path = "../../core/interoperation" }
-core-mempool = { path = "../../core/mempool" }
-core-network = { path = "../../core/network" }
-core-rpc-client = { path = "../../core/rpc-client" }
-core-storage = { path = "../../core/storage" }
-protocol = { path = "../../protocol", package = "axon-protocol" }
+common-apm.workspace = true
+common-apm-derive.workspace = true
+common-config-parser.workspace = true
+common-crypto.workspace = true
+common-logger.workspace = true
+common-memory-tracker = { workspace = true, optional = true }
+core-api.workspace = true
+core-consensus.workspace = true
+core-db.workspace = true
+core-executor.workspace = true
+core-interoperation.workspace = true
+core-mempool.workspace = true
+core-network.workspace = true
+core-rpc-client.workspace = true
+core-storage.workspace = true
+protocol.workspace = true
 
 [target.'cfg(all(not(target_env = "msvc"), not(target_os="macos")))'.dependencies]
-jemalloc-ctl = { version = "0.5", package = "tikv-jemalloc-ctl", optional = true }
-jemallocator = { version = "0.5", features = ["profiling", "stats", "unprefixed_malloc_on_supported_platforms"], package = "tikv-jemallocator", optional = true }
+jemalloc-ctl = { workspace = true, optional = true }
+jemallocator = { workspace = true, optional = true }
 
 [dev-dependencies]
-clap = "4.4"
-hasher = "0.1"
-tempfile = "3.6"
+clap.workspace = true
+hasher.workspace = true
+tempfile.workspace = true
 
 [features]
 jemalloc = ["dep:jemallocator", "dep:jemalloc-ctl", "dep:common-memory-tracker"]

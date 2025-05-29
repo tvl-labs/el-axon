@@ -1,5 +1,5 @@
-pub use ethereum_types::{
-    BigEndianHash, Bloom, Public, Secret, Signature, H128, H160, H256, H512, H520, H64, U128, U256,
+pub use alloy::primitives::{
+    Address, Bloom, Signature, B128 as H128, B256 as H256, B512 as H512, B64 as H64, U128, U256,
     U512, U64,
 };
 use zeroize::Zeroizing;
@@ -7,17 +7,17 @@ use zeroize::Zeroizing;
 use std::cmp::Ordering;
 use std::{fmt, str::FromStr};
 
+use alloy_rlp::{RlpDecodable, RlpEncodable};
 use derive_more::Display;
 use faster_hex::withpfx_lowercase;
 use ophelia::{PublicKey, UncompressedPublicKey};
 use overlord::DurationConfig;
-use rlp_derive::{RlpDecodable, RlpEncodable};
 use serde::{de, ser, Deserialize, Serialize};
 
 use common_crypto::Secp256k1PublicKey;
 use common_hasher::keccak256;
 
-use crate::codec::{deserialize_address, hex_decode, hex_encode, serialize_uint};
+use crate::codec::{hex_decode, hex_encode, serialize_uint};
 use crate::types::{BlockNumber, Bytes, BytesMut, TypesError};
 use crate::{ProtocolError, ProtocolResult};
 
@@ -27,20 +27,20 @@ pub type MerkleRoot = Hash;
 const ADDRESS_LEN: usize = 20;
 const HEX_PREFIX: &str = "0x";
 
-pub const NIL_DATA: H256 = H256([
+pub const NIL_DATA: H256 = H256::new([
     0xc5, 0xd2, 0x46, 0x01, 0x86, 0xf7, 0x23, 0x3c, 0x92, 0x7e, 0x7d, 0xb2, 0xdc, 0xc7, 0x03, 0xc0,
     0xe5, 0x00, 0xb6, 0x53, 0xca, 0x82, 0x27, 0x3b, 0x7b, 0xfa, 0xd8, 0x04, 0x5d, 0x85, 0xa4, 0x70,
 ]);
 
 // Same value as `hash(rlp(null))`.
 // Also be same value as the `root_hash` of an empty `TrieMerkle`.
-pub const RLP_NULL: H256 = H256([
+pub const RLP_NULL: H256 = H256::new([
     0x56, 0xe8, 0x1f, 0x17, 0x1b, 0xcc, 0x55, 0xa6, 0xff, 0x83, 0x45, 0xe6, 0x92, 0xc0, 0xf8, 0x6e,
     0x5b, 0x48, 0xe0, 0x1b, 0x99, 0x6c, 0xad, 0xc0, 0x01, 0x62, 0x2f, 0xb5, 0xe3, 0x63, 0xb4, 0x21,
 ]);
 
 // Same value as `hash(rlp([]))`.
-pub const RLP_EMPTY_LIST: H256 = H256([
+pub const RLP_EMPTY_LIST: H256 = H256::new([
     0x1d, 0xcc, 0x4d, 0xe8, 0xde, 0xc7, 0x5d, 0x7a, 0xab, 0x85, 0xb5, 0x67, 0xb6, 0xcc, 0xd4, 0x1a,
     0xd3, 0x12, 0x45, 0x1b, 0x94, 0x8a, 0x74, 0x13, 0xf0, 0xa1, 0x42, 0xfd, 0x40, 0xd4, 0x93, 0x47,
 ]);
@@ -61,7 +61,7 @@ impl<'a, T: fmt::Display> fmt::Display for VecDisplayHelper<'a, T> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Display)]
-#[display(fmt = "0x{:x}", _0)]
+#[display("0x{:x}", _0)]
 pub struct DBBytes(pub Bytes);
 
 impl AsRef<[u8]> for DBBytes {
@@ -84,12 +84,12 @@ impl Hasher {
             return NIL_DATA;
         }
 
-        H256(keccak256(bytes))
+        H256::new(keccak256(bytes))
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Display)]
-#[display(fmt = "0x{:x}", _0)]
+#[display("0x{:x}", _0)]
 pub struct Hex(Bytes);
 
 impl Hex {
@@ -178,115 +178,6 @@ impl<'de> Deserialize<'de> for Hex {
 /// This ensures that sensitive data is securely erased from memory when it is
 /// no longer needed.
 pub type Key256Bits = Zeroizing<[u8; 32]>;
-
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Address(pub H160);
-
-impl Default for Address {
-    fn default() -> Self {
-        Address::from_hex("0x0000000000000000000000000000000000000000")
-            .expect("Address must consist of 20 bytes")
-    }
-}
-
-impl Serialize for Address {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::ser::Serializer,
-    {
-        serializer.serialize_str(&self.eip55())
-    }
-}
-
-impl<'de> Deserialize<'de> for Address {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        Ok(Address(deserialize_address(deserializer)?))
-    }
-}
-
-impl Address {
-    pub fn from_pubkey_bytes<B: AsRef<[u8]>>(bytes: B) -> ProtocolResult<Self> {
-        let compressed_pubkey_len = <Secp256k1PublicKey as PublicKey>::LENGTH;
-        let uncompressed_pubkey_len = <Secp256k1PublicKey as UncompressedPublicKey>::LENGTH;
-
-        let slice = bytes.as_ref();
-        if slice.len() != compressed_pubkey_len && slice.len() != uncompressed_pubkey_len {
-            return Err(TypesError::InvalidPublicKey.into());
-        }
-
-        // Drop first byte
-        let hash = {
-            if slice.len() == compressed_pubkey_len {
-                let pubkey = Secp256k1PublicKey::try_from(slice)
-                    .map_err(|_| TypesError::InvalidPublicKey)?;
-                Hasher::digest(&(pubkey.to_uncompressed_bytes())[1..])
-            } else {
-                Hasher::digest(&slice[1..])
-            }
-        };
-
-        Ok(Self::from_hash(hash))
-    }
-
-    pub fn from_pubkey(pubkey: &Secp256k1PublicKey) -> Self {
-        let hash = Hasher::digest(&(pubkey.to_uncompressed_bytes())[1..]);
-        Self::from_hash(hash)
-    }
-
-    pub fn from_hash(hash: Hash) -> Self {
-        Self(H160::from_slice(&hash.as_bytes()[12..]))
-    }
-
-    pub fn from_bytes(bytes: Bytes) -> ProtocolResult<Self> {
-        ensure_len(bytes.len(), ADDRESS_LEN)?;
-        Ok(Self(H160::from_slice(&bytes.as_ref()[0..20])))
-    }
-
-    pub fn as_slice(&self) -> &[u8] {
-        self.0.as_bytes()
-    }
-
-    pub fn from_hex(s: &str) -> ProtocolResult<Self> {
-        let s = clean_0x(s)?;
-        let bytes = Bytes::from(hex_decode(s)?);
-        Self::from_bytes(bytes)
-    }
-
-    pub fn eip55(&self) -> String {
-        self.to_string()
-    }
-}
-
-impl FromStr for Address {
-    type Err = ProtocolError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if checksum(s) != s {
-            return Err(TypesError::InvalidCheckSum.into());
-        }
-
-        Address::from_hex(&s.to_lowercase())
-    }
-}
-
-impl fmt::Debug for Address {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let eip55 = checksum(&hex_encode(self.0));
-        eip55.fmt(f)?;
-        Ok(())
-    }
-}
-
-impl fmt::Display for Address {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let eip55 = checksum(&hex_encode(self.0));
-        eip55.fmt(f)?;
-        Ok(())
-    }
-}
 
 #[derive(
     RlpEncodable, RlpDecodable, Serialize, Deserialize, Default, Clone, Debug, Copy, PartialEq, Eq,
@@ -472,7 +363,7 @@ impl From<Metadata> for DurationConfig {
 
 #[derive(RlpEncodable, RlpDecodable, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProposeCount {
-    pub address: H160,
+    pub address: Address,
     #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
     pub count:   u64,
 }
@@ -483,8 +374,8 @@ impl ProposeCount {
     }
 }
 
-impl From<(H160, u64)> for ProposeCount {
-    fn from(value: (H160, u64)) -> Self {
+impl From<(Address, u64)> for ProposeCount {
+    fn from(value: (Address, u64)) -> Self {
         ProposeCount {
             address: value.0,
             count:   value.1,
@@ -503,7 +394,7 @@ pub struct ConsensusValidator {
     RlpEncodable, RlpDecodable, Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Display,
 )]
 #[display(
-    fmt = "Validator {{ \
+    "Validator {{ \
         bls_pub_key: {}, pub_key: {}, propose_weight: {}, vote_weight: {} \
     }}",
     bls_pub_key,
@@ -522,7 +413,7 @@ pub struct Validator {
 
 #[derive(RlpEncodable, RlpDecodable, Serialize, Deserialize, Clone, PartialEq, Eq, Display)]
 #[display(
-    fmt = "ValidatorExtend {{ \
+    "ValidatorExtend {{ \
         bls_pub_key: {}, pub_key: {}, address: {:#x}, propose_weight: {}, vote_weight: {} \
     }}",
     bls_pub_key,
@@ -534,7 +425,7 @@ pub struct Validator {
 pub struct ValidatorExtend {
     pub bls_pub_key:    Hex,
     pub pub_key:        Hex,
-    pub address:        H160,
+    pub address:        Address,
     #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
     pub propose_weight: u32,
     #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
@@ -543,8 +434,7 @@ pub struct ValidatorExtend {
 
 impl From<Validator> for ValidatorExtend {
     fn from(value: Validator) -> Self {
-        let address =
-            Address::from_pubkey_bytes(value.pub_key.as_ref()).expect("invalid public key");
+        let address = Address::from_raw_public_key(value.pub_key.as_ref());
         ValidatorExtend {
             bls_pub_key:    value.bls_pub_key,
             address:        address.0,

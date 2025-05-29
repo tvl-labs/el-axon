@@ -6,27 +6,25 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arc-swap = "1.5"
-ckb-chain-spec = "0.111"
-ckb-error = "0.111"
-ckb-script = "0.111"
-ckb-traits = "0.111"
-ckb-types = "0.111"
-ckb-vm = { version = "=0.24.6", features = ["asm"] }
-lazy_static = "1.4"
-log = "0.4"
+arc-swap.workspace = true
+ckb-chain-spec.workspace = true
+ckb-error.workspace = true
+ckb-script.workspace = true
+ckb-traits.workspace = true
+ckb-types.workspace = true
+ckb-vm.workspace = true
+lazy_static.workspace = true
+log.workspace = true
 
-protocol = { path = "../../protocol", package = "axon-protocol", default-features = false }
+protocol.workspace = true
 
 [dev-dependencies]
-cardano-serialization-lib = "7.0"
-cardano-message-signing = { git = "https://github.com/ashuralyk/message-signing", branch = "rust" }
-ckb-jsonrpc-types = "0.111"
-ed25519-dalek = "1.0"
-ethers-core = "2.0"
-serde_json = "1.0"
+ckb-jsonrpc-types.workspace = true
+ed25519-dalek.workspace = true
+ethers-core.workspace = true
+serde_json.workspace = true
 
-core-rpc-client = { path = "../../core/rpc-client" }
-core-executor = { path = "../../core/executor" }
-core-storage = { path = "../../core/storage" }
-core-db = { path = "../../core/db" }
+core-rpc-client.workspace = true
+core-executor.workspace = true
+core-storage.workspace = true
+core-db.workspace = true

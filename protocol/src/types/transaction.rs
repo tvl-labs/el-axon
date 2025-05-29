@@ -1,15 +1,19 @@
-pub use ethereum::{
-    AccessList, AccessListItem, EIP1559TransactionMessage as TransactionMessage, TransactionAction,
-    TransactionRecoveryId, TransactionSignature,
+use alloy::consensus::SignableTransaction;
+pub use alloy::consensus::{
+    Transaction, TxEip1559 as Eip1559Transaction, TxEip2930 as Eip2930Transaction,
+    TxLegacy as LegacyTransaction,
 };
-use rlp::{Encodable, RlpStream};
+pub use alloy::primitives::TxKind;
+pub use alloy::rpc::types::{AccessList, AccessListItem};
+
+use alloy::consensus::crypto::secp256k1::{public_key_to_address, recover_signer};
 use serde::{Deserialize, Serialize};
 
 use common_crypto::secp256k1_recover;
 
 use crate::types::{
-    Bloom, Bytes, BytesMut, CellDepWithPubKey, ExitReason, Hash, Hasher, Public, TxResp,
-    TypesError, H160, H256, H520, U256, U64,
+    Address, Bloom, Bytes, BytesMut, CellDepWithPubKey, ExitReason, Hash, Hasher, TxResp,
+    TypesError, H256, H512, U256, U64,
 };
 use crate::ProtocolResult;
 
@@ -53,37 +57,37 @@ impl UnsignedTransaction {
 
     pub fn data(&self) -> &[u8] {
         match self {
-            UnsignedTransaction::Legacy(tx) => tx.data.as_ref(),
-            UnsignedTransaction::Eip2930(tx) => tx.data.as_ref(),
-            UnsignedTransaction::Eip1559(tx) => tx.data.as_ref(),
+            UnsignedTransaction::Legacy(tx) => tx.input.as_ref(),
+            UnsignedTransaction::Eip2930(tx) => tx.input.as_ref(),
+            UnsignedTransaction::Eip1559(tx) => tx.input.as_ref(),
         }
     }
 
-    pub fn set_action(&mut self, action: TransactionAction) {
+    pub fn set_action(&mut self, action: TxKind) {
         match self {
-            UnsignedTransaction::Legacy(tx) => tx.action = action,
-            UnsignedTransaction::Eip2930(tx) => tx.action = action,
-            UnsignedTransaction::Eip1559(tx) => tx.action = action,
+            UnsignedTransaction::Legacy(tx) => tx.kind = action,
+            UnsignedTransaction::Eip2930(tx) => tx.kind = action,
+            UnsignedTransaction::Eip1559(tx) => tx.kind = action,
         }
     }
 
     pub fn set_data(&mut self, data: Bytes) {
         match self {
-            UnsignedTransaction::Legacy(tx) => tx.data = data,
-            UnsignedTransaction::Eip2930(tx) => tx.data = data,
-            UnsignedTransaction::Eip1559(tx) => tx.data = data,
+            UnsignedTransaction::Legacy(tx) => tx.input = data.into(),
+            UnsignedTransaction::Eip2930(tx) => tx.input = data.into(),
+            UnsignedTransaction::Eip1559(tx) => tx.input = data.into(),
         }
     }
 
-    pub fn gas_price(&self) -> U64 {
+    pub fn gas_price(&self) -> u128 {
         match self {
             UnsignedTransaction::Legacy(tx) => tx.gas_price,
             UnsignedTransaction::Eip2930(tx) => tx.gas_price,
-            UnsignedTransaction::Eip1559(tx) => tx.gas_price.max(tx.max_priority_fee_per_gas),
+            UnsignedTransaction::Eip1559(tx) => tx.max_fee_per_gas.max(tx.max_priority_fee_per_gas),
         }
     }
 
-    pub fn max_priority_fee_per_gas(&self) -> &U64 {
+    pub fn max_priority_fee_per_gas(&self) -> &u128 {
         match self {
             UnsignedTransaction::Legacy(tx) => &tx.gas_price,
             UnsignedTransaction::Eip2930(tx) => &tx.gas_price,
@@ -106,23 +110,28 @@ impl UnsignedTransaction {
         }
     }
 
-    pub fn encode(
-        &self,
-        chain_id: Option<u64>,
-        signature: Option<SignatureComponents>,
-    ) -> BytesMut {
+    pub fn encode_for_signing(&self) -> Bytes {
+        let mut buf = Vec::new();
+        match self {
+            UnsignedTransaction::Legacy(tx) => tx.encode_for_signing(&mut buf),
+            UnsignedTransaction::Eip2930(tx) => tx.encode_for_signing(&mut buf),
+            UnsignedTransaction::Eip1559(tx) => tx.encode_for_signing(&mut buf),
+        }
+        buf.into()
+    }
+
+    pub fn encode(&self, signature: Option<SignatureComponents>) -> BytesMut {
         UnverifiedTransaction {
             unsigned: self.clone(),
-            chain_id,
             signature,
             hash: Default::default(),
         }
         .rlp_bytes()
     }
 
-    pub fn to(&self) -> Option<H160> {
+    pub fn to(&self) -> Option<Address> {
         match self {
-            UnsignedTransaction::Legacy(tx) => tx.get_to(),
+            UnsignedTransaction::Legacy(tx) => tx.kind().into_to(),
             UnsignedTransaction::Eip2930(tx) => tx.get_to(),
             UnsignedTransaction::Eip1559(tx) => tx.get_to(),
         }
@@ -152,7 +161,7 @@ impl UnsignedTransaction {
         }
     }
 
-    pub fn action(&self) -> &TransactionAction {
+    pub fn action(&self) -> &TxKind {
         match self {
             UnsignedTransaction::Legacy(tx) => &tx.action,
             UnsignedTransaction::Eip2930(tx) => &tx.action,
@@ -169,123 +178,10 @@ impl UnsignedTransaction {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct LegacyTransaction {
-    /// According to [EIP-2681](https://eips.ethereum.org/EIPS/eip-2681),
-    /// limit account nonce to 2^64-1.
-    pub nonce:     U64,
-    pub gas_price: U64,
-    pub gas_limit: U64,
-    pub action:    TransactionAction,
-    pub value:     U256,
-    pub data:      Bytes,
-}
-
-impl std::hash::Hash for LegacyTransaction {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.nonce.hash(state);
-        self.gas_price.hash(state);
-        self.gas_limit.hash(state);
-        self.value.hash(state);
-        self.data.hash(state);
-        if let TransactionAction::Call(addr) = self.action {
-            addr.hash(state);
-        }
-    }
-}
-
-impl LegacyTransaction {
-    pub fn get_to(&self) -> Option<H160> {
-        match self.action {
-            TransactionAction::Call(to) => Some(to),
-            TransactionAction::Create => None,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Eip2930Transaction {
-    /// According to [EIP-2681](https://eips.ethereum.org/EIPS/eip-2681),
-    /// limit account nonce to 2^64-1.
-    pub nonce:       U64,
-    pub gas_price:   U64,
-    pub gas_limit:   U64,
-    pub action:      TransactionAction,
-    pub value:       U256,
-    pub data:        Bytes,
-    pub access_list: AccessList,
-}
-
-impl std::hash::Hash for Eip2930Transaction {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.nonce.hash(state);
-        self.gas_price.hash(state);
-        self.gas_limit.hash(state);
-        self.value.hash(state);
-        self.data.hash(state);
-        if let TransactionAction::Call(addr) = self.action {
-            addr.hash(state);
-        }
-
-        for access in self.access_list.iter() {
-            access.address.hash(state);
-        }
-    }
-}
-
-impl Eip2930Transaction {
-    pub fn get_to(&self) -> Option<H160> {
-        match self.action {
-            TransactionAction::Call(to) => Some(to),
-            TransactionAction::Create => None,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct Eip1559Transaction {
-    pub nonce:                    U64,
-    pub max_priority_fee_per_gas: U64,
-    pub gas_price:                U64,
-    pub gas_limit:                U64,
-    pub action:                   TransactionAction,
-    pub value:                    U256,
-    pub data:                     Bytes,
-    pub access_list:              AccessList,
-}
-
-impl std::hash::Hash for Eip1559Transaction {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.nonce.hash(state);
-        self.max_priority_fee_per_gas.hash(state);
-        self.gas_price.hash(state);
-        self.gas_limit.hash(state);
-        self.value.hash(state);
-        self.data.hash(state);
-        if let TransactionAction::Call(addr) = self.action {
-            addr.hash(state);
-        }
-
-        for access in self.access_list.iter() {
-            access.address.hash(state);
-        }
-    }
-}
-
-impl Eip1559Transaction {
-    pub fn get_to(&self) -> Option<H160> {
-        match self.action {
-            TransactionAction::Call(to) => Some(to),
-            TransactionAction::Create => None,
-        }
-    }
-}
-
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct UnverifiedTransaction {
     pub unsigned:  UnsignedTransaction,
     pub signature: Option<SignatureComponents>,
-    pub chain_id:  Option<u64>,
     pub hash:      H256,
 }
 
@@ -298,7 +194,7 @@ impl UnverifiedTransaction {
     }
 
     pub fn get_hash(&self) -> H256 {
-        Hasher::digest(&self.unsigned.encode(self.chain_id, self.signature.clone()))
+        Hasher::digest(&self.unsigned.encode(self.signature.clone()))
     }
 
     pub fn check_hash(&self) -> ProtocolResult<()> {
@@ -314,23 +210,14 @@ impl UnverifiedTransaction {
         Ok(())
     }
 
-    /// The `with_chain_id` argument is only used for tests
-    pub fn signature_hash(&self, with_chain_id: bool) -> Hash {
-        if !with_chain_id {
-            if let Some(legacy_tx) = self.unsigned.get_legacy() {
-                let mut s = RlpStream::new();
-                legacy_tx.rlp_encode(&mut s, None, None);
-                return Hasher::digest(s.out());
-            }
-        }
-
-        Hasher::digest(self.unsigned.encode(self.chain_id, None))
+    pub fn signature_hash(&self) -> Hash {
+        Hasher::digest(self.unsigned.encode_for_signing())
     }
 
-    pub fn recover_public(&self, with_chain_id: bool) -> ProtocolResult<Public> {
-        Ok(Public::from_slice(
+    pub fn recover_public(&self) -> ProtocolResult<H512> {
+        Ok(H512::from_slice(
             &secp256k1_recover(
-                self.signature_hash(with_chain_id).as_bytes(),
+                self.signature_hash().as_bytes(),
                 self.signature
                     .as_ref()
                     .ok_or(TypesError::MissingSignature)?
@@ -404,10 +291,10 @@ impl SignatureComponents {
         }
     }
 
-    pub(crate) fn extract_interoperation_tx_sender(&self) -> ProtocolResult<H160> {
+    pub(crate) fn extract_interoperation_tx_sender(&self) -> ProtocolResult<Address> {
         // Only call CKB-VM mode is supported now
         if self.r[0] == 0 {
-            let r = rlp::decode::<CellDepWithPubKey>(&self.r[1..])
+            let r = alloy_rlp::decode_exact::<CellDepWithPubKey>(&self.r[1..])
                 .map_err(TypesError::DecodeInteroperationSigR)?;
 
             return Ok(Hasher::digest(&r.pub_key).into());
@@ -425,8 +312,8 @@ impl SignatureComponents {
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct SignedTransaction {
     pub transaction: UnverifiedTransaction,
-    pub sender:      H160,
-    pub public:      Option<Public>,
+    pub sender:      Address,
+    pub public:      Option<H512>,
 }
 
 impl SignedTransaction {
@@ -435,19 +322,16 @@ impl SignedTransaction {
             return Err(TypesError::Unsigned.into());
         }
 
-        let hash = utx.signature_hash(true);
+        let hash = utx.signature_hash();
         let sig = utx.signature.as_ref().unwrap();
 
         if sig.is_eth_sig() {
-            let public = Public::from_slice(
-                &secp256k1_recover(hash.as_bytes(), sig.as_bytes().as_ref())
-                    .map_err(TypesError::Crypto)?
-                    .serialize_uncompressed()[1..65],
-            );
+            let public = utx.recover_public()?;
+            let signer = Hasher::digest(&public).into();
 
             return Ok(SignedTransaction {
                 transaction: utx.calc_hash(),
-                sender:      public_to_address(&public),
+                sender:      signer,
                 public:      Some(public),
             });
         }
@@ -455,7 +339,7 @@ impl SignedTransaction {
         // Otherwise it is an interoperation transaction
         Ok(SignedTransaction {
             sender:      sig.extract_interoperation_tx_sender()?,
-            public:      Some(Public::zero()),
+            public:      Some(H512::zero()),
             transaction: utx.calc_hash(),
         })
     }
@@ -464,7 +348,7 @@ impl SignedTransaction {
         self.transaction.unsigned.type_()
     }
 
-    pub fn get_to(&self) -> Option<H160> {
+    pub fn get_to(&self) -> Option<Address> {
         self.transaction.unsigned.to()
     }
 
@@ -514,17 +398,4 @@ impl SignedTransaction {
             _ => legacy_receipt, // legacy (0x00) or undefined type
         }
     }
-}
-
-pub fn public_to_address(public: &Public) -> H160 {
-    let hash = Hasher::digest(public);
-    let mut ret = H160::zero();
-    ret.as_bytes_mut().copy_from_slice(&hash[12..]);
-    ret
-}
-
-pub fn recover_intact_pub_key(public: &Public) -> H520 {
-    let mut inner = vec![4u8];
-    inner.extend_from_slice(public.as_bytes());
-    H520::from_slice(&inner[0..65])
 }

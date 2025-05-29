@@ -1,7 +1,7 @@
 use crate::types::{
-    Account, Block, BlockNumber, Bytes, CkbRelatedInfo, EthAccountProof, HardforkInfo,
-    HardforkInfoInner, Hash, Header, Metadata, Proposal, Receipt, SignedTransaction, TxResp, H160,
-    H256, U256, U64,
+    Account, Address, Block, BlockNumber, Bytes, CkbRelatedInfo, EthAccountProof, HardforkInfo,
+    HardforkInfoInner, Hash, Header, Metadata, Proposal, Receipt, SignedTransaction, TxResp, H256,
+    U256, U64,
 };
 use crate::{async_trait, traits::Context, ProtocolResult};
 
@@ -64,21 +64,21 @@ pub trait APIAdapter: Send + Sync {
     async fn get_account(
         &self,
         ctx: Context,
-        address: H160,
+        address: Address,
         number: Option<BlockNumber>,
     ) -> ProtocolResult<Account>;
 
     async fn get_pending_tx_count(
         &self,
         ctx: Context,
-        address: H160,
+        address: Address,
     ) -> ProtocolResult<(U256, Option<BlockNumber>)>;
 
     async fn evm_call(
         &self,
         ctx: Context,
-        from: Option<H160>,
-        to: Option<H160>,
+        from: Option<Address>,
+        to: Option<Address>,
         gas_price: Option<U64>,
         gas_limit: Option<U64>,
         value: U256,
@@ -95,7 +95,7 @@ pub trait APIAdapter: Send + Sync {
     async fn get_storage_at(
         &self,
         ctx: Context,
-        address: H160,
+        address: Address,
         position: U256,
         state_root: Hash,
     ) -> ProtocolResult<Bytes>;
@@ -119,7 +119,7 @@ pub trait APIAdapter: Send + Sync {
     async fn get_proof(
         &self,
         _ctx: Context,
-        address: H160,
+        address: Address,
         storage_position: Vec<U256>,
         state_root: Hash,
     ) -> ProtocolResult<EthAccountProof>;

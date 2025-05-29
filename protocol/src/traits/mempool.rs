@@ -1,5 +1,5 @@
 use crate::types::{
-    BlockNumber, Hash, MerkleRoot, PackedTxHashes, SignedTransaction, H160, U256, U64,
+    Address, BlockNumber, Hash, MerkleRoot, PackedTxHashes, SignedTransaction, U256, U64,
 };
 use crate::{async_trait, traits::Context, ProtocolResult};
 
@@ -40,7 +40,7 @@ pub trait MemPool: Send + Sync {
     async fn get_tx_count_by_address(
         &self,
         ctx: Context,
-        address: H160,
+        address: Address,
     ) -> ProtocolResult<(usize, Option<BlockNumber>)>;
 
     fn get_tx_from_mem(&self, ctx: Context, tx_hash: &Hash) -> Option<SignedTransaction>;

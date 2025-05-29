@@ -5,51 +5,44 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arc-swap = "1.6"
-az = "1.2"
-bn = { package = "substrate-bn", version = "0.6" }
-ckb-traits = "0.111"
-ckb-types = "0.111"
-common-apm = { path = "../../common/apm" }
-common-config-parser = { path = "../../common/config-parser" }
-common-crypto = { path = "../../common/crypto" }
-common-merkle = { path = "../../common/merkle" }
-core-db = { path = "../db" }
-core-interoperation = { path = "../interoperation" }
-ethers = "2.0"
-evm = { version = "0.37", features = ["tracing"] }
-futures = "0.3"
-hasher = "0.1"
-lazy_static = "1.4"
-log = "0.4"
-lru = "0.12"
-molecule = "0.7"
-parking_lot = "0.12"
-protocol = { path = "../../protocol", package = "axon-protocol", default-features = false }
-ripemd = "0.1"
-rlp = "0.5"
-rlp-derive = "0.1"
-rocksdb = { version = "0.21", package = "ckb-rocksdb" }
-rug = "1.19"
-sha2 = "0.10"
-thiserror = "1.0"
+arc-swap.workspace = true
+az.workspace = true
+bn.workspace = true
+ckb-traits.workspace = true
+ckb-types.workspace = true
+common-apm.workspace = true
+common-config-parser.workspace = true
+common-crypto.workspace = true
+common-merkle.workspace = true
+core-db.workspace = true
+core-interoperation.workspace = true
+ethers.workspace = true
+evm.workspace = true
+futures.workspace = true
+hasher.workspace = true
+lazy_static.workspace = true
+log.workspace = true
+lru.workspace = true
+molecule.workspace = true
+parking_lot.workspace = true
+protocol.workspace = true
+ripemd.workspace = true
+rug.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
-bytemuck = "1.13"
-ckb-jsonrpc-types = "0.111"
-common-crypto = { path = "../../common/crypto" }
-core-rpc-client = { path = "../rpc-client" }
-core-storage = { path = "../storage" }
-criterion = "0.5"
-env_logger = "0.10"
-ethabi = "18.0"
-ethabi-contract = { git = "https://github.com/rust-ethereum/ethabi.git", rev = "7edf185" }
-ethabi-derive = { git = "https://github.com/rust-ethereum/ethabi.git", rev = "7edf185" }
-hashbrown = "0.13"
-revm = "2.3"
-rlp = "0.5"
-serde_json = "1.0"
-tempfile = "3.3"
+bytemuck.workspace = true
+ckb-jsonrpc-types.workspace = true
+common-crypto.workspace = true
+core-rpc-client.workspace = true
+core-storage.workspace = true
+criterion.workspace = true
+env_logger.workspace = true
+hashbrown.workspace = true
+revm.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
 
 [[bench]]
 harness = false

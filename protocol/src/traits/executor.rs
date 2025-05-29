@@ -1,8 +1,8 @@
 pub use evm::backend::{ApplyBackend, Backend, MemoryBackend};
 
 use crate::types::{
-    Account, Bytes, ExecResp, ExecutorContext, Log, MerkleRoot, SignedTransaction, TxResp,
-    ValidatorExtend, H160, U256, U64,
+    Account, Address, Bytes, ExecResp, ExecutorContext, Log, MerkleRoot, SignedTransaction, TxResp,
+    ValidatorExtend, U256, U64,
 };
 
 pub trait ExecutorReadOnlyAdapter: Backend {
@@ -10,15 +10,15 @@ pub trait ExecutorReadOnlyAdapter: Backend {
 
     fn get_ctx(&self) -> ExecutorContext;
 
-    fn get_account(&self, address: &H160) -> Account;
+    fn get_account(&self, address: &Address) -> Account;
 }
 
 pub trait ExecutorAdapter: ExecutorReadOnlyAdapter + ApplyBackend {
-    fn set_origin(&mut self, origin: H160);
+    fn set_origin(&mut self, origin: Address);
 
     fn set_gas_price(&mut self, gas_price: U64);
 
-    fn save_account(&mut self, address: &H160, account: &Account);
+    fn save_account(&mut self, address: &Address, account: &Account);
 
     fn commit(&mut self) -> MerkleRoot;
 
@@ -30,8 +30,8 @@ pub trait Executor: Send + Sync {
         &self,
         backend: &B,
         gas_limit: u64,
-        from: Option<H160>,
-        to: Option<H160>,
+        from: Option<Address>,
+        to: Option<Address>,
         value: U256,
         data: Vec<u8>,
         estimate: bool,
@@ -55,13 +55,13 @@ impl<'a> ExecutorReadOnlyAdapter for MemoryBackend<'a> {
         unreachable!()
     }
 
-    fn get_account(&self, _address: &H160) -> Account {
+    fn get_account(&self, _address: &Address) -> Account {
         unreachable!()
     }
 }
 
 impl<'a> ExecutorAdapter for MemoryBackend<'a> {
-    fn set_origin(&mut self, _origin: H160) {
+    fn set_origin(&mut self, _origin: Address) {
         unreachable!()
     }
 
@@ -77,7 +77,7 @@ impl<'a> ExecutorAdapter for MemoryBackend<'a> {
         unreachable!()
     }
 
-    fn save_account(&mut self, _address: &H160, _account: &Account) {
+    fn save_account(&mut self, _address: &Address, _account: &Account) {
         unreachable!()
     }
 }

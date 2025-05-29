@@ -14,27 +14,27 @@ pub enum Priority {
 
 #[derive(Debug, Display, Clone)]
 pub enum TrustFeedback {
-    #[display(fmt = "fatal {}", _0)]
+    #[display("fatal {}", _0)]
     Fatal(String),
-    #[display(fmt = "worse {}", _0)]
+    #[display("worse {}", _0)]
     Worse(String),
-    #[display(fmt = "bad {}", _0)]
+    #[display("bad {}", _0)]
     Bad(String),
-    #[display(fmt = "neutral")]
+    #[display("neutral")]
     Neutral,
-    #[display(fmt = "good")]
+    #[display("good")]
     Good,
 }
 
 #[derive(Debug, Display, Clone)]
 pub enum PeerTag {
-    #[display(fmt = "consensus")]
+    #[display("consensus")]
     Consensus,
-    #[display(fmt = "always allow")]
+    #[display("always allow")]
     AlwaysAllow,
-    #[display(fmt = "banned, until {}", until)]
+    #[display("banned, until {}", until)]
     Ban { until: u64 }, // timestamp
-    #[display(fmt = "{}", _0)]
+    #[display("{}", _0)]
     Custom(String), // TODO: Hide custom constructor
 }
 
