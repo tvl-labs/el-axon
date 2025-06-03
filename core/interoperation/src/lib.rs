@@ -56,7 +56,7 @@ impl Interoperation for InteroperationImpl {
             DefaultMachineBuilder::new(AsmCoreMachine::new(ISA, VERSION1, max_cycles)).build(),
         );
         let _ = vm
-            .load_program(&program, args)
+            .load_program(&program, args.iter().map(|arg| Ok(arg.clone())))
             .map_err(InteroperationError::CkbVM)?;
 
         Ok(VMResp {
@@ -68,28 +68,28 @@ impl Interoperation for InteroperationImpl {
 
 #[derive(Debug, Display)]
 pub enum InteroperationError {
-    #[display(fmt = "Transaction missing signature")]
+    #[display("Transaction missing signature")]
     MissingSignature,
 
-    #[display(fmt = "Cannot get program of out point {}", _0)]
+    #[display("Cannot get program of out point {}", _0)]
     GetProgram(OutPoint),
 
-    #[display(fmt = "CKB VM verify script failed {:?}", _0)]
+    #[display("CKB VM verify script failed {:?}", _0)]
     Ckb(ckb_error::Error),
 
-    #[display(fmt = "CKB VM call failed {:?}", _0)]
+    #[display("CKB VM call failed {:?}", _0)]
     CkbVM(VMError),
 
-    #[display(fmt = "Unsupported blockchain id {}", _0)]
+    #[display("Unsupported blockchain id {}", _0)]
     GetBlockchainCodeHash(u8),
 
-    #[display(fmt = "Get unknown cell by out point {}", _0)]
+    #[display("Get unknown cell by out point {}", _0)]
     GetUnknownCell(OutPoint),
 
-    #[display(fmt = "Invalid dep group {:?}", _0)]
+    #[display("Invalid dep group {:?}", _0)]
     InvalidDepGroup(String),
 
-    #[display(fmt = "Invalid dummy input")]
+    #[display("Invalid dummy input")]
     InvalidDummyInput,
 }
 

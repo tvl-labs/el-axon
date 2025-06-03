@@ -13,6 +13,7 @@ ckb-script.workspace = true
 ckb-traits.workspace = true
 ckb-types.workspace = true
 ckb-vm.workspace = true
+derive_more.workspace = true
 lazy_static.workspace = true
 log.workspace = true
 

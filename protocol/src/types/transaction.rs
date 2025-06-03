@@ -228,7 +228,7 @@ impl UnverifiedTransaction {
             return Hasher::digest(buf.freeze());
         }
 
-        Hasher::digest(self.unsigned.encode(self.signature.clone()))
+        Hasher::digest(self.unsigned.encode(None))
     }
 
     pub fn recover_public(&self, with_chain_id: bool) -> ProtocolResult<H512> {
@@ -355,15 +355,9 @@ impl SignedTransaction {
         let sig = utx.signature.as_ref().unwrap();
 
         if sig.is_eth_sig() {
-            println!("sig: {:?}", hex_encode(sig.as_bytes()));
-            println!("utx_hash: {:?}", utx.hash);
-
             let pubkey = secp256k1_recover(hash.as_slice(), sig.as_bytes().as_ref())
                 .map_err(TypesError::Crypto)?
                 .serialize_uncompressed();
-
-            println!("public: {:?}", hex_encode(&pubkey));
-
             let public = Public::from_slice(&pubkey[1..65]);
 
             return Ok(SignedTransaction {

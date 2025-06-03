@@ -18,7 +18,7 @@ criterion.workspace = true
 overlord.workspace = true
 rand7.workspace = true
 
-protocol = { workspace = true, default-features = false }
+protocol.workspace = true
 
 [[bench]]
 harness = false

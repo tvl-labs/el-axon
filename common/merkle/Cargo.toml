@@ -10,7 +10,7 @@ alloy-rlp.workspace = true
 hasher.workspace = true
 static_merkle_tree.workspace = true
 
-protocol = { workspace = true, default-features = false }
+protocol.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
