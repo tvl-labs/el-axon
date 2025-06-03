@@ -17,13 +17,13 @@ pub const MAX_ENDPOINT_LENGTH: usize = 120;
 
 #[derive(Debug, Display, PartialEq, Eq)]
 pub enum EndpointScheme {
-    #[display(fmt = "{}", GOSSIP_SCHEME)]
+    #[display("{}", GOSSIP_SCHEME)]
     Gossip,
 
-    #[display(fmt = "{}", RPC_CALL_SCHEME)]
+    #[display("{}", RPC_CALL_SCHEME)]
     RpcCall,
 
-    #[display(fmt = "{}", RPC_RESPONSE_SCHEME)]
+    #[display("{}", RPC_RESPONSE_SCHEME)]
     RpcResponse,
 }
 
@@ -35,7 +35,7 @@ pub enum EndpointScheme {
 // NOTE: Endpoint only care about first three url comps. So
 // as its PartialEq, Eq and Hash implement.
 #[derive(Debug, Clone, Display)]
-#[display(fmt = "{}", _0)]
+#[display("{}", _0)]
 pub struct Endpoint(String);
 
 impl Endpoint {
@@ -124,7 +124,7 @@ impl FromStr for Endpoint {
 }
 
 #[derive(Debug, PartialEq, Eq, From, Display, Hash, Clone, Copy)]
-#[display(fmt = "{}", _0)]
+#[display("{}", _0)]
 pub struct RpcId(u64);
 
 impl RpcId {
@@ -134,7 +134,7 @@ impl RpcId {
 }
 
 #[derive(Debug, Clone, From, Display)]
-#[display(fmt = "{}/{}", end, rid)]
+#[display("{}/{}", end, rid)]
 pub struct RpcEndpoint {
     end: Endpoint,
     rid: RpcId,

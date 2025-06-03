@@ -20,11 +20,11 @@ use super::rpc_map::RpcMap;
 use super::Reactor;
 
 #[derive(Debug, Display)]
-#[display(fmt = "connection isnt encrypted, no peer id")]
+#[display("connection isnt encrypted, no peer id")]
 pub struct NoEncryption {}
 
 #[derive(Debug, Display, Clone)]
-#[display(fmt = "remote peer {:?} addr {}", peer_id, connected_addr)]
+#[display("remote peer {:?} addr {}", peer_id, connected_addr)]
 pub struct RemotePeer {
     pub session_id:     SessionId,
     pub peer_id:        PeerId,

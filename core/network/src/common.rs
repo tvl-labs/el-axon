@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use tentacle::multiaddr::Multiaddr;
 
 #[derive(Debug, Display, PartialEq, Eq, Serialize, Deserialize, Clone, Hash)]
-#[display(fmt = "{}:{}", host, port)]
+#[display("{}:{}", host, port)]
 pub struct ConnectedAddr {
     pub host: String,
     pub port: u16,

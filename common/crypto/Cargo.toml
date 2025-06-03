@@ -13,9 +13,10 @@ ophelia-blst.workspace = true
 ophelia-secp256k1.workspace = true
 
 [dev-dependencies]
+bcs.workspace = true
 criterion.workspace = true
 overlord.workspace = true
-rand.workspace = true
+rand7.workspace = true
 
 protocol = { workspace = true, default-features = false }
 

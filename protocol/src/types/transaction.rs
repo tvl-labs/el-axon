@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 pub use alloy::consensus::{
     Transaction, TxEip1559 as Eip1559Transaction, TxEip2930 as Eip2930Transaction,
     TxLegacy as LegacyTransaction,
@@ -5,11 +7,13 @@ pub use alloy::consensus::{
 pub use alloy::primitives::TxKind;
 pub use alloy::rpc::types::{AccessList, AccessListItem};
 
-use alloy::consensus::{Receipt, SignableTransaction};
+use alloy::consensus::Receipt;
+use alloy_rlp::Encodable;
 use serde::{Deserialize, Serialize};
 
 use common_crypto::secp256k1_recover;
 
+use crate::codec::hex_encode;
 use crate::codec::transaction::rlp_encode_legacy_tx;
 use crate::types::{
     Address, Bytes, BytesMut, CellDepWithPubKey, Hash, Hasher, Public, TxResp, TypesError, H256,
@@ -122,14 +126,16 @@ impl UnsignedTransaction {
         }
     }
 
-    pub fn encode_for_signing(&self) -> Bytes {
-        let mut buf = Vec::new();
-        match self {
-            UnsignedTransaction::Legacy(tx) => tx.encode_for_signing(&mut buf),
-            UnsignedTransaction::Eip2930(tx) => tx.encode_for_signing(&mut buf),
-            UnsignedTransaction::Eip1559(tx) => tx.encode_for_signing(&mut buf),
-        }
-        buf.into()
+    pub fn encode(&self, signature: Option<SignatureComponents>) -> Bytes {
+        let mut buf = BytesMut::new();
+        let utx = UnverifiedTransaction {
+            unsigned: self.clone(),
+            signature,
+            hash: Default::default(),
+        };
+        Encodable::encode(&utx, &mut buf);
+
+        buf.freeze()
     }
 
     pub fn to(&self) -> Option<Address> {
@@ -197,7 +203,8 @@ impl UnverifiedTransaction {
     }
 
     pub fn get_hash(&self) -> H256 {
-        Hasher::digest(&self.unsigned.encode_for_signing())
+        let buf = self.unsigned.encode(self.signature.clone());
+        Hasher::digest(&buf)
     }
 
     pub fn check_hash(&self) -> ProtocolResult<()> {
@@ -217,11 +224,11 @@ impl UnverifiedTransaction {
         if !with_chain_id {
             let legacy_tx = self.unsigned.get_legacy().unwrap();
             let mut buf = BytesMut::new();
-            rlp_encode_legacy_tx(&legacy_tx, None, &mut buf);
+            rlp_encode_legacy_tx(&legacy_tx, None, &mut buf, false);
             return Hasher::digest(buf.freeze());
         }
 
-        Hasher::digest(self.unsigned.encode_for_signing())
+        Hasher::digest(self.unsigned.encode(self.signature.clone()))
     }
 
     pub fn recover_public(&self, with_chain_id: bool) -> ProtocolResult<H512> {
@@ -240,11 +247,23 @@ impl UnverifiedTransaction {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug, Hash, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Default, Clone, Hash, PartialEq, Eq)]
 pub struct SignatureComponents {
     pub r:          Bytes,
     pub s:          Bytes,
     pub standard_v: u8,
+}
+
+impl Debug for SignatureComponents {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "SignatureComponents {{ r: {}, s: {}, standard_v: {} }}",
+            hex_encode(&self.r),
+            hex_encode(&self.s),
+            self.standard_v
+        )
+    }
 }
 
 /// This is only use for test.
@@ -332,14 +351,24 @@ impl SignedTransaction {
             return Err(TypesError::Unsigned.into());
         }
 
+        let hash = utx.signature_hash(true);
         let sig = utx.signature.as_ref().unwrap();
+
         if sig.is_eth_sig() {
-            let public = utx.recover_public(true)?;
-            let signer = Address::from_slice(&Hasher::digest(&public).0[12..]);
+            println!("sig: {:?}", hex_encode(sig.as_bytes()));
+            println!("utx_hash: {:?}", utx.hash);
+
+            let pubkey = secp256k1_recover(hash.as_slice(), sig.as_bytes().as_ref())
+                .map_err(TypesError::Crypto)?
+                .serialize_uncompressed();
+
+            println!("public: {:?}", hex_encode(&pubkey));
+
+            let public = Public::from_slice(&pubkey[1..65]);
 
             return Ok(SignedTransaction {
                 transaction: utx.calc_hash(),
-                sender:      signer,
+                sender:      public_to_address(&public),
                 public:      Some(public),
             });
         }

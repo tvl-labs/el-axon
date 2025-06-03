@@ -9,9 +9,10 @@ use protocol::types::{Bytes, Hasher, H256};
 fn criterion_aggregated_sig(c: &mut Criterion) {
     // MacOS M1 Pro 16GB: 185.68 µs
     c.bench_function("4 aggregated sig", |b| {
-        let vote_msg =
-            HashValue::try_from(Hasher::digest(Bytes::from(rlp::encode(&mock_vote()))).as_bytes())
-                .unwrap();
+        let vote_msg = HashValue::try_from(
+            Hasher::digest(Bytes::from(bcs::to_bytes(&mock_vote()).unwrap())).as_slice(),
+        )
+        .unwrap();
 
         let mut priv_pub_keys = Vec::new();
         let mut signatures = Vec::new();
@@ -28,9 +29,10 @@ fn criterion_aggregated_sig(c: &mut Criterion) {
     });
     // MacOS M1 Pro 16GB: 364.47 µs
     c.bench_function("8 aggregated sig", |b| {
-        let vote_msg =
-            HashValue::try_from(Hasher::digest(Bytes::from(rlp::encode(&mock_vote()))).as_bytes())
-                .unwrap();
+        let vote_msg = HashValue::try_from(
+            Hasher::digest(Bytes::from(bcs::to_bytes(&mock_vote()).unwrap())).as_slice(),
+        )
+        .unwrap();
 
         let mut priv_pub_keys = Vec::new();
         let mut signatures = Vec::new();
@@ -48,9 +50,10 @@ fn criterion_aggregated_sig(c: &mut Criterion) {
     });
     // MacOS M1 Pro 16GB: 727.03 µs
     c.bench_function("16 aggregated sig", |b| {
-        let vote_msg =
-            HashValue::try_from(Hasher::digest(Bytes::from(rlp::encode(&mock_vote()))).as_bytes())
-                .unwrap();
+        let vote_msg = HashValue::try_from(
+            Hasher::digest(Bytes::from(bcs::to_bytes(&mock_vote()).unwrap())).as_slice(),
+        )
+        .unwrap();
 
         let mut priv_pub_keys = Vec::new();
         let mut signatures = Vec::new();
@@ -68,9 +71,10 @@ fn criterion_aggregated_sig(c: &mut Criterion) {
     });
     // MacOS M1 Pro 16GB: 1.45 ms
     c.bench_function("32 aggregated sig", |b| {
-        let vote_msg =
-            HashValue::try_from(Hasher::digest(Bytes::from(rlp::encode(&mock_vote()))).as_bytes())
-                .unwrap();
+        let vote_msg = HashValue::try_from(
+            Hasher::digest(Bytes::from(bcs::to_bytes(&mock_vote()).unwrap())).as_slice(),
+        )
+        .unwrap();
 
         let mut priv_pub_keys = Vec::new();
         let mut signatures = Vec::new();
@@ -88,9 +92,10 @@ fn criterion_aggregated_sig(c: &mut Criterion) {
     });
     // MacOS M1 Pro 16GB: 2.90 ms
     c.bench_function("64 aggregated sig", |b| {
-        let vote_msg =
-            HashValue::try_from(Hasher::digest(Bytes::from(rlp::encode(&mock_vote()))).as_bytes())
-                .unwrap();
+        let vote_msg = HashValue::try_from(
+            Hasher::digest(Bytes::from(bcs::to_bytes(&mock_vote()).unwrap())).as_slice(),
+        )
+        .unwrap();
 
         let mut priv_pub_keys = Vec::new();
         let mut signatures = Vec::new();
@@ -111,9 +116,10 @@ fn criterion_aggregated_sig(c: &mut Criterion) {
 fn criterion_aggregated_sig_verify(c: &mut Criterion) {
     // MacOS M1 Pro 16GB: 804.36 µs
     c.bench_function("4 aggregated sig verify", |b| {
-        let vote_msg =
-            HashValue::try_from(Hasher::digest(Bytes::from(rlp::encode(&mock_vote()))).as_bytes())
-                .unwrap();
+        let vote_msg = HashValue::try_from(
+            Hasher::digest(Bytes::from(bcs::to_bytes(&mock_vote()).unwrap())).as_slice(),
+        )
+        .unwrap();
 
         let mut priv_pub_keys = Vec::new();
         let mut signatures = Vec::new();
@@ -142,9 +148,10 @@ fn criterion_aggregated_sig_verify(c: &mut Criterion) {
     });
     c.bench_function("8 aggregated sig verify", |b| {
         // MacOS M1 Pro 16GB: 803.95 µs
-        let vote_msg =
-            HashValue::try_from(Hasher::digest(Bytes::from(rlp::encode(&mock_vote()))).as_bytes())
-                .unwrap();
+        let vote_msg = HashValue::try_from(
+            Hasher::digest(Bytes::from(bcs::to_bytes(&mock_vote()).unwrap())).as_slice(),
+        )
+        .unwrap();
 
         let mut priv_pub_keys = Vec::new();
         let mut signatures = Vec::new();
@@ -173,9 +180,10 @@ fn criterion_aggregated_sig_verify(c: &mut Criterion) {
     });
     // MacOS M1 Pro 16GB: 811.12 µs
     c.bench_function("16 aggregated sig verify", |b| {
-        let vote_msg =
-            HashValue::try_from(Hasher::digest(Bytes::from(rlp::encode(&mock_vote()))).as_bytes())
-                .unwrap();
+        let vote_msg = HashValue::try_from(
+            Hasher::digest(Bytes::from(bcs::to_bytes(&mock_vote()).unwrap())).as_slice(),
+        )
+        .unwrap();
 
         let mut priv_pub_keys = Vec::new();
         let mut signatures = Vec::new();
@@ -204,9 +212,10 @@ fn criterion_aggregated_sig_verify(c: &mut Criterion) {
     });
     // MacOS M1 Pro 16GB: 800.65 µs
     c.bench_function("32 aggregated sig verify", |b| {
-        let vote_msg =
-            HashValue::try_from(Hasher::digest(Bytes::from(rlp::encode(&mock_vote()))).as_bytes())
-                .unwrap();
+        let vote_msg = HashValue::try_from(
+            Hasher::digest(Bytes::from(bcs::to_bytes(&mock_vote()).unwrap())).as_slice(),
+        )
+        .unwrap();
 
         let mut priv_pub_keys = Vec::new();
         let mut signatures = Vec::new();
@@ -235,9 +244,10 @@ fn criterion_aggregated_sig_verify(c: &mut Criterion) {
     });
     // MacOS M1 Pro 16GB: 853.88 µs
     c.bench_function("64 aggregated sig verify", |b| {
-        let vote_msg =
-            HashValue::try_from(Hasher::digest(Bytes::from(rlp::encode(&mock_vote()))).as_bytes())
-                .unwrap();
+        let vote_msg = HashValue::try_from(
+            Hasher::digest(Bytes::from(bcs::to_bytes(&mock_vote()).unwrap())).as_slice(),
+        )
+        .unwrap();
 
         let mut priv_pub_keys = Vec::new();
         let mut signatures = Vec::new();
@@ -275,7 +285,7 @@ fn mock_vote() -> Vote {
         height:     0u64,
         round:      0u64,
         vote_type:  VoteType::Prevote,
-        block_hash: Bytes::from(mock_block_hash().as_bytes().to_vec()),
+        block_hash: Bytes::from(mock_block_hash().as_slice().to_vec()),
     }
 }
 
@@ -286,7 +296,7 @@ fn gen_key_pair_sigs(
     hash: &HashValue,
 ) {
     for _i in 0..size {
-        let bls_priv_key = BlsPrivateKey::generate(&mut rand::rngs::OsRng);
+        let bls_priv_key = BlsPrivateKey::generate(&mut rand7::rngs::OsRng);
         let bls_pub_key = bls_priv_key.pub_key(&String::new());
 
         let sig = bls_priv_key.sign_message(hash);

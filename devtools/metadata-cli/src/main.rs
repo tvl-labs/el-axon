@@ -37,8 +37,7 @@ pub struct Validator {
 
 impl From<Validator> for axon_types::metadata::Validator {
     fn from(value: Validator) -> Self {
-        let address =
-            axon_protocol::types::Address::from_pubkey_bytes(value.pub_key.as_slice()).unwrap();
+        let address = axon_protocol::types::Address::from_raw_public_key(value.pub_key.as_slice());
         Self::new_builder()
             .bls_pub_key(Byte48::from_slice(value.bls_pub_key.as_slice()).unwrap())
             .pub_key(Byte33::from_slice(value.pub_key.as_slice()).unwrap())

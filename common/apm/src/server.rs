@@ -1,10 +1,13 @@
 use axum::Router;
 use std::net::SocketAddr;
+use tokio::net::TcpListener;
 
 pub async fn run_prometheus_server(prometheus_listening_address: SocketAddr) {
     let router = Router::new().route("/metrics", axum::routing::get(get_metrics));
-    axum::Server::bind(&prometheus_listening_address)
-        .serve(router.into_make_service())
+    let listener = TcpListener::bind(prometheus_listening_address)
+        .await
+        .unwrap();
+    axum::serve(listener, router.into_make_service())
         .await
         .unwrap();
 }

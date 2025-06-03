@@ -1,11 +1,7 @@
-use std::error::Error;
-
 use alloy_rlp::{encode_list, Decodable, Encodable, Header};
-use bytes::BufMut;
-use overlord::Codec;
 
-use crate::types::{Address, BlockVersion, Bytes, ExtraData, Proof, Proposal, H256, U64};
-use crate::{codec::error::CodecError, constants::BASE_FEE_PER_GAS, lazy::CHAIN_ID, ProtocolError};
+use crate::types::{Address, BlockVersion, BufMut, ExtraData, Proof, Proposal, H256, U64};
+use crate::{constants::BASE_FEE_PER_GAS, lazy::CHAIN_ID};
 
 impl Encodable for BlockVersion {
     fn encode(&self, out: &mut dyn BufMut) {
@@ -65,18 +61,6 @@ impl Decodable for Proposal {
             call_system_script_count: u32::decode(&mut payload)?,
             tx_hashes:                Vec::<H256>::decode(&mut payload)?,
         })
-    }
-}
-
-impl Codec for Proposal {
-    fn encode(&self) -> Result<Bytes, Box<dyn Error + Send>> {
-        Ok(alloy_rlp::encode(self).into())
-    }
-
-    fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
-        let ret = <Self as Decodable>::decode(&mut data.as_ref())
-            .map_err(|e| ProtocolError::from(CodecError::Rlp(e)))?;
-        Ok(ret)
     }
 }
 

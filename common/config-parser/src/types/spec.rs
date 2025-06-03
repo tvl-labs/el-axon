@@ -10,10 +10,10 @@ use strum_macros::EnumIter;
 
 use common_crypto::Secp256k1RecoverablePrivateKey;
 use protocol::{
-    codec::{decode_256bits_key, deserialize_address},
+    codec::decode_256bits_key,
     types::{
-        HardforkInfoInner, Header, Key256Bits, SpecMetadata, H160, H256, RLP_EMPTY_LIST, RLP_NULL,
-        U256, U64,
+        Address, HardforkInfoInner, Header, Key256Bits, SpecMetadata, H256, RLP_EMPTY_LIST,
+        RLP_NULL, U256, U64,
     },
 };
 
@@ -43,8 +43,7 @@ pub struct Genesis {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct InitialAccount {
-    #[serde(deserialize_with = "deserialize_address")]
-    pub address: H160,
+    pub address: Address,
     pub balance: U256,
 }
 
@@ -241,14 +240,14 @@ impl From<HardforkInput> for HardforkInfoInner {
         let convert_fn = |hardforks: Vec<HardforkName>| -> H256 {
             let r = hardforks.into_iter().fold(0, |acc, s| acc | s as u64);
 
-            H256::from_low_u64_be(r.to_be())
+            H256::left_padding_from(&r.to_be_bytes())
         };
 
         let flags = if value.hardforks.is_empty() {
-            H256::from_low_u64_be(HardforkName::all().to_be())
+            H256::left_padding_from(&HardforkName::all().to_be_bytes())
         } else if value.hardforks.len() == 1 {
             if value.hardforks[0] == HardforkName::None {
-                H256::zero()
+                H256::ZERO
             } else {
                 convert_fn(value.hardforks)
             }

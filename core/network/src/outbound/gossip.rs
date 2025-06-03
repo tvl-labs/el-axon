@@ -207,7 +207,7 @@ struct RandomGossip {
 impl RandomGossip {
     fn random() -> Self {
         Self {
-            index: rand::thread_rng().gen_range(0, 3),
+            index: rand::thread_rng().gen_range(0..3),
         }
     }
 

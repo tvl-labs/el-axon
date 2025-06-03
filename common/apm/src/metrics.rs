@@ -22,7 +22,7 @@ use std::time::Duration;
 
 #[derive(Debug, Display)]
 enum Error {
-    #[display(fmt = "promtheus {}", _0)]
+    #[display("promtheus {}", _0)]
     Prometheus(prometheus::Error),
 }
 

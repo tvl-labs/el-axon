@@ -14,152 +14,144 @@ use crate::common::ConnectedAddr;
 
 #[derive(Debug, Display)]
 pub enum ErrorKind {
-    #[display(fmt = "{} offline", _0)]
+    #[display("{} offline", _0)]
     Offline(&'static str),
 
-    #[display(fmt = "protocol {} missing", _0)]
+    #[display("protocol {} missing", _0)]
     MissingProtocol(&'static str),
 
-    #[display(fmt = "kind: bad protocl logic code")]
+    #[display("kind: bad protocl logic code")]
     BadProtocolHandle {
         proto_id: ProtocolId,
         cause:    Box<dyn Error + Send>,
     },
 
-    #[display(fmt = "kind: given string isn't an id: {}", _0)]
+    #[display("kind: given string isn't an id: {}", _0)]
     NotIdString(ParseIntError),
 
-    #[display(fmt = "kind: unable to encode or decode: {}", _0)]
+    #[display("kind: unable to encode or decode: {}", _0)]
     BadMessage(Box<dyn Error + Send>),
 
-    #[display(fmt = "kind: unknown rid {} from session {}", rid, sid)]
+    #[display("kind: unknown rid {} from session {}", rid, sid)]
     UnknownRpc { sid: SessionId, rid: u64 },
 
-    #[display(fmt = "kind: unexpected rpc sender, wrong type")]
+    #[display("kind: unexpected rpc sender, wrong type")]
     UnexpectedRpcSender,
 
-    #[display(fmt = "kind: more than one arc rpc sender, cannot unwrap it")]
+    #[display("kind: more than one arc rpc sender, cannot unwrap it")]
     MoreArcRpcSender,
 
-    #[display(fmt = "kind: session id not found in context")]
+    #[display("kind: session id not found in context")]
     NoSessionId,
 
-    #[display(fmt = "kind: remote peer id not found in context")]
+    #[display("kind: remote peer id not found in context")]
     NoRemotePeerId,
 
-    #[display(fmt = "kind: rpc id not found in context")]
+    #[display("kind: rpc id not found in context")]
     NoRpcId,
 
-    #[display(fmt = "kind: rpc future dropped {:?}", _0)]
+    #[display("kind: rpc future dropped {:?}", _0)]
     RpcDropped(Option<ConnectedAddr>),
 
-    #[display(fmt = "kind: rpc timeout {:?}", _0)]
+    #[display("kind: rpc timeout {:?}", _0)]
     RpcTimeout(Option<ConnectedAddr>),
 
-    #[display(fmt = "kind: not reactor register for {}", _0)]
+    #[display("kind: not reactor register for {}", _0)]
     NoReactor(String),
 
-    #[display(
-        fmt = "kind: cannot create chain address from bytes {:#x} {}",
-        pubkey,
-        cause
-    )]
+    #[display("kind: cannot create chain address from bytes {:#x} {}", pubkey, cause)]
     NoChainAddress {
         pubkey: Bytes,
         cause:  Box<dyn Error + Send>,
     },
 
-    #[display(fmt = "kind: public key {:?} not match {:?}", pubkey, id)]
+    #[display("kind: public key {:?} not match {:?}", pubkey, id)]
     PublicKeyNotMatchId { pubkey: PublicKey, id: PeerId },
 
-    #[display(fmt = "kind: untaggable {}", _0)]
+    #[display("kind: untaggable {}", _0)]
     Untaggable(String),
 
-    #[display(fmt = "kind: PeerStore Eviction Failed")]
+    #[display("kind: PeerStore Eviction Failed")]
     PeerStoreEvictionFailed,
 
-    #[display(fmt = "kind: PeerStore Serde Failed")]
+    #[display("kind: PeerStore Serde Failed")]
     PeerStoreSerde,
 
-    #[display(fmt = "kind: internal {}", _0)]
+    #[display("kind: internal {}", _0)]
     Internal(String),
 }
 
 impl Error for ErrorKind {}
 
 #[derive(Debug, Display)]
-#[display(fmt = "peer id not found in {}", _0)]
+#[display("peer id not found in {}", _0)]
 pub struct PeerIdNotFound(pub(crate) Multiaddr);
 
 impl Error for PeerIdNotFound {}
 
 #[derive(Debug, Display)]
 pub enum NetworkError {
-    #[display(fmt = "io error: {}", _0)]
+    #[display("io error: {}", _0)]
     IoError(std::io::Error),
 
-    #[display(fmt = "temporary unavailable, try again later")]
+    #[display("temporary unavailable, try again later")]
     Busy,
 
-    #[display(fmt = "send incompletely, blocked {:?}, other {:?}", blocked, other)]
+    #[display("send incompletely, blocked {:?}, other {:?}", blocked, other)]
     Send {
         blocked: Option<Vec<SessionId>>,
         other:   Option<Box<dyn Error + Send>>,
     },
 
-    #[display(
-        fmt = "send incompletely, unconnected {:?}, other {:?}",
-        unconnected,
-        other
-    )]
+    #[display("send incompletely, unconnected {:?}, other {:?}", unconnected, other)]
     MultiCast {
         unconnected: Option<Vec<PeerId>>,
         other:       Option<Box<dyn Error + Send>>,
     },
 
-    #[display(fmt = "shutdown")]
+    #[display("shutdown")]
     Shutdown,
 
-    #[display(fmt = "unexected error: {}", _0)]
+    #[display("unexected error: {}", _0)]
     UnexpectedError(Box<dyn Error + Send>),
 
-    #[display(fmt = "cannot decode public key bytes")]
+    #[display("cannot decode public key bytes")]
     InvalidPublicKey,
 
-    #[display(fmt = "cannot decode private key bytes")]
+    #[display("cannot decode private key bytes")]
     InvalidPrivateKey,
 
-    #[display(fmt = "cannot decode peer id")]
+    #[display("cannot decode peer id")]
     InvalidPeerId,
 
-    #[display(fmt = "unsupported peer address {}", _0)]
+    #[display("unsupported peer address {}", _0)]
     UnexpectedPeerAddr(String),
 
-    #[display(fmt = "unknown endpoint scheme {}", _0)]
+    #[display("unknown endpoint scheme {}", _0)]
     UnexpectedScheme(String),
 
-    #[display(fmt = "cannot serde encode or decode: {}", _0)]
+    #[display("cannot serde encode or decode: {}", _0)]
     SerdeError(Box<dyn Error + Send>),
 
-    #[display(fmt = "malformat or exceed maximum length, /[scheme]/[name]/[method] etc")]
+    #[display("malformat or exceed maximum length, /[scheme]/[name]/[method] etc")]
     NotEndpoint,
 
-    #[display(fmt = "{:?} account addrs aren't connecting, try connect them", miss)]
+    #[display("{:?} account addrs aren't connecting, try connect them", miss)]
     PartialRouteMessage { miss: Vec<Address> },
 
-    #[display(fmt = "remote response {}", _0)]
+    #[display("remote response {}", _0)]
     RemoteResponse(String),
 
-    #[display(fmt = "trust max history should be longer than {} secs", _0)]
+    #[display("trust max history should be longer than {} secs", _0)]
     SmallTrustMaxHistory(u64),
 
-    #[display(fmt = "transport {}", _0)]
+    #[display("transport {}", _0)]
     Transport(tentacle::error::TransportErrorKind),
 
-    #[display(fmt = "inbound connection limit is equal or smaller than max connections")]
+    #[display("inbound connection limit is equal or smaller than max connections")]
     InboundLimitEqualOrSmallerThanMaxConn,
 
-    #[display(fmt = "internal error: {}", _0)]
+    #[display("internal error: {}", _0)]
     Internal(Box<dyn Error + Send>),
 }
 

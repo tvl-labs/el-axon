@@ -11,7 +11,7 @@ use clap::builder::{StringValueParser, TypedValueParser, ValueParserFactory};
 use serde::Deserialize;
 use tentacle_multiaddr::MultiAddr;
 
-use protocol::types::{Key256Bits, H160};
+use protocol::types::{Address, Key256Bits};
 
 use crate::parse_file;
 
@@ -54,7 +54,7 @@ pub struct Config {
     pub prometheus: Option<ConfigPrometheus>,
 
     #[serde(default)]
-    pub ibc_contract_address: H160,
+    pub ibc_contract_address: Address,
 }
 
 impl Config {

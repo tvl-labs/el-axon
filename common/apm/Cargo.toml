@@ -17,6 +17,7 @@ prometheus.workspace = true
 prometheus-static-metric.workspace = true
 rustracing.workspace = true
 rustracing_jaeger.workspace = true
+tokio.workspace = true
 trackable.workspace = true
 
 common-apm-derive.workspace = true
