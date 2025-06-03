@@ -6,8 +6,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "hex-serialize")]
 use crate::codec::serialize_uint;
 use crate::types::{
-    logs_bloom, Address, Bloom, BloomInput, Bytes, ExecResp, Hash, Hasher, Log, MerkleRoot,
-    Receipt, SignedTransaction, U64,
+    Address, Bloom, Bytes, ExecResp, Hash, Hasher, Log, MerkleRoot, Receipt, SignedTransaction, U64,
 };
 use crate::{codec::ProtocolCodec, types::TypesError};
 
@@ -158,7 +157,7 @@ impl Block {
         let logs = exec_resp
             .tx_resp
             .iter()
-            .map(|r| Bloom::from(BloomInput::Raw(alloy_rlp::encode_list(&r.logs).as_ref())))
+            .map(|r| r.bloom())
             .collect::<Vec<_>>();
         let header = Header {
             version:                  proposal.version,
@@ -168,12 +167,10 @@ impl Block {
             transactions_root:        proposal.transactions_root,
             signed_txs_hash:          proposal.signed_txs_hash,
             receipts_root:            exec_resp.receipt_root,
-            log_bloom:                Bloom::from(BloomInput::Raw(
-                alloy_rlp::encode_list(&logs).as_ref(),
-            )),
+            log_bloom:                logs,
             timestamp:                proposal.timestamp,
             number:                   proposal.number,
-            gas_used:                 exec_resp.gas_used.into(),
+            gas_used:                 U64::from_limbs([exec_resp.gas_used; 1]),
             gas_limit:                proposal.gas_limit,
             extra_data:               proposal.extra_data,
             base_fee_per_gas:         proposal.base_fee_per_gas,
@@ -210,7 +207,7 @@ impl Block {
                     tx_index: idx as u32,
                     state_root: self.header.state_root,
                     used_gas: U64::from(res.gas_used),
-                    logs_bloom: logs_bloom(res.logs.iter()),
+                    logs_bloom: res.bloom(),
                     logs: res.logs.clone(),
                     log_index,
                     code_address: res.code_address,
@@ -243,7 +240,7 @@ impl Block {
     "Header {{ \
         version: {:?}, prev_hash: {:#x}, proposer: {:#x}, state_root: {:#x}, \
         transactions_root: {:#x}, signed_txs_hash: {:#x}, receipts_root: {:#x}, \
-        log_bloom: {:#x}, timestamp: {}, number: {}, gas_used: {}, \
+        log_bloom: {:?}, timestamp: {}, number: {}, gas_used: {}, \
         gas_limit: {}, extra_data: {}, base_fee_per_gas: {}, proof: {}, \
         call_system_script_count: {}, chain_id: {} \
     }}",
@@ -273,7 +270,7 @@ pub struct Header {
     pub transactions_root:        MerkleRoot,
     pub signed_txs_hash:          Hash,
     pub receipts_root:            MerkleRoot,
-    pub log_bloom:                Bloom,
+    pub log_bloom:                Vec<Bloom>,
     #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
     pub timestamp:                u64,
     #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
@@ -380,8 +377,8 @@ impl RichBlock {
 #[cfg(test)]
 mod tests {
     use crate::types::{
-        primitive::default_max_contract_limit, Block, BlockVersion, ConsensusConfig, Header, Hex,
-        Metadata, MetadataVersion, ProposeCount, RichBlock, ValidatorExtend, H160,
+        primitive::default_max_contract_limit, Address, Block, BlockVersion, ConsensusConfig,
+        Header, Hex, Metadata, MetadataVersion, ProposeCount, RichBlock, ValidatorExtend,
     };
     use std::{
         str::FromStr,
@@ -444,12 +441,12 @@ mod tests {
             verifier_list: vec![ValidatorExtend {
                 bls_pub_key: Hex::from_str("0x04102947214862a503c73904deb5818298a186d68c7907bb609583192a7de6331493835e5b8281f4d9ee705537c0e765580e06f86ddce5867812fceb42eecefd209f0eddd0389d6b7b0100f00fb119ef9ab23826c6ea09aadcc76fa6cea6a32724").unwrap(),
                 pub_key: Hex::from_str("0x02ef0cb0d7bc6c18b4bea1f5908d9106522b35ab3c399369605d4242525bda7e60").unwrap(),
-                address: H160::default(),
+                address: Address::default(),
                 propose_weight: 1,
                 vote_weight: 1,
             }],
             propose_counter: vec![ProposeCount {
-                address: H160::default(),
+                address: Address::default(),
                 count: 0,
             }],
             consensus_config: ConsensusConfig {

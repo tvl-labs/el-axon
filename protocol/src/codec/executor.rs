@@ -1,39 +1,68 @@
-use rlp::{Decodable, DecoderError, Encodable, Prototype, Rlp, RlpStream};
+use alloy_rlp::{encode_list, Decodable, Encodable, Header};
 
-use crate::types::TxResp;
+use crate::types::{BufMut, Log, TxResp, H256, U256};
 
 impl Encodable for TxResp {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(7)
-            .append(&bincode::serialize(&self.exit_reason).unwrap())
-            .append(&self.ret)
-            .append(&self.gas_used)
-            .append(&self.remain_gas)
-            .append(&self.fee_cost)
-            .append_list(&self.logs)
-            .append(&self.code_address)
-            .append(&self.removed);
+    fn encode(&self, out: &mut dyn BufMut) {
+        let raw_exit_reason = bincode::serialize(&self.exit_reason).unwrap();
+        if let Some(code_address) = self.code_address {
+            let enc: [&dyn Encodable; 9] = [
+                &true,
+                &raw_exit_reason,
+                &self.ret,
+                &self.gas_used,
+                &self.remain_gas,
+                &self.fee_cost,
+                &self.logs,
+                &code_address,
+                &self.removed,
+            ];
+            encode_list::<_, dyn Encodable>(&enc, out);
+        } else {
+            let enc: [&dyn Encodable; 8] = [
+                &false,
+                &raw_exit_reason,
+                &self.ret,
+                &self.gas_used,
+                &self.remain_gas,
+                &self.fee_cost,
+                &self.logs,
+                &self.removed,
+            ];
+            encode_list::<_, dyn Encodable>(&enc, out);
+        }
     }
 }
 
 impl Decodable for TxResp {
-    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
-        match r.prototype()? {
-            Prototype::List(7) => Ok(TxResp {
-                exit_reason:  {
-                    let tmp: Vec<u8> = r.val_at(0)?;
-                    bincode::deserialize(&tmp)
-                        .map_err(|_| DecoderError::Custom("field exit reason"))?
-                },
-                ret:          r.val_at(1)?,
-                gas_used:     r.val_at(2)?,
-                remain_gas:   r.val_at(3)?,
-                fee_cost:     r.val_at(4)?,
-                logs:         r.list_at(5)?,
-                code_address: r.val_at(6)?,
-                removed:      r.val_at(7)?,
-            }),
-            _ => Err(DecoderError::RlpExpectedToBeList),
+    fn decode(data: &mut &[u8]) -> Result<Self, alloy_rlp::Error> {
+        let mut payload = Header::decode_bytes(data, true)?;
+        let raw_exit_reason = Vec::<u8>::decode(&mut payload)?;
+        let exit_reason = bincode::deserialize(&raw_exit_reason).unwrap();
+
+        let has_code_address = bool::decode(&mut payload)?;
+        if has_code_address {
+            Ok(Self {
+                exit_reason,
+                ret: Vec::<u8>::decode(&mut payload)?,
+                gas_used: u64::decode(&mut payload)?,
+                remain_gas: u64::decode(&mut payload)?,
+                fee_cost: U256::decode(&mut payload)?,
+                logs: Vec::<Log>::decode(&mut payload)?,
+                code_address: Some(H256::decode(&mut payload)?),
+                removed: bool::decode(&mut payload)?,
+            })
+        } else {
+            Ok(Self {
+                exit_reason,
+                ret: Vec::<u8>::decode(&mut payload)?,
+                gas_used: u64::decode(&mut payload)?,
+                remain_gas: u64::decode(&mut payload)?,
+                fee_cost: U256::decode(&mut payload)?,
+                logs: Vec::<Log>::decode(&mut payload)?,
+                code_address: None,
+                removed: bool::decode(&mut payload)?,
+            })
         }
     }
 }
@@ -46,9 +75,11 @@ mod tests {
     #[test]
     fn test_exec_ctx_codec() {
         let exec_ctx = ExecutorContext::default();
-        let bytes = rlp::encode(&exec_ctx);
-        assert_eq!(bytes, exec_ctx.rlp_bytes());
-        let decode: ExecutorContext = rlp::decode(bytes.as_ref()).unwrap();
+        let mut encoded = Vec::new();
+        exec_ctx.encode(&mut encoded);
+        assert_eq!(alloy_rlp::encode(&exec_ctx), encoded);
+
+        let decode = ExecutorContext::decode(&mut encoded.as_ref()).unwrap();
         assert_eq!(exec_ctx, decode);
     }
 }

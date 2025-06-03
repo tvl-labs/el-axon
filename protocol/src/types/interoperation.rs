@@ -12,11 +12,11 @@ pub struct VMResp {
 }
 
 #[derive(RlpEncodable, RlpDecodable, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[rlp(trailing)]
 pub struct CellWithData {
-    #[rlp(trailing)]
-    pub type_script: Option<Script>,
-    pub lock_script: Script,
     pub data:        Bytes,
+    pub lock_script: Script,
+    pub type_script: Option<Script>,
 }
 
 #[derive(RlpEncodable, RlpDecodable, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -71,20 +71,19 @@ pub struct OutPoint {
 
 impl From<&packed::OutPoint> for OutPoint {
     fn from(out_point: &packed::OutPoint) -> Self {
+        let hash: ckb_types::H256 = out_point.tx_hash().unpack();
         OutPoint {
-            tx_hash: H256::new(out_point.tx_hash().unpack().0),
+            tx_hash: H256::new(hash.0),
             index:   out_point.index().unpack(),
         }
     }
 }
 
 #[derive(RlpEncodable, RlpDecodable, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[rlp(trailing)]
 pub struct Witness {
-    #[rlp(trailing)]
     pub lock:        Option<Bytes>,
-    #[rlp(trailing)]
     pub input_type:  Option<Bytes>,
-    #[rlp(trailing)]
     pub output_type: Option<Bytes>,
 }
 

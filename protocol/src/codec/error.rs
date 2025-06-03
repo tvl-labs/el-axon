@@ -6,8 +6,8 @@ use crate::{ProtocolError, ProtocolErrorKind};
 
 #[derive(Debug, Display)]
 pub enum CodecError {
-    #[display(fmt = "rlp: from string {}", _0)]
-    Rlp(String),
+    #[display("rlp: {}", _0)]
+    Rlp(alloy_rlp::Error),
 }
 
 impl Error for CodecError {}

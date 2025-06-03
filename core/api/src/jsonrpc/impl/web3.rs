@@ -194,7 +194,7 @@ impl<Adapter: APIAdapter> Web3RpcImpl<Adapter> {
 impl<Adapter: APIAdapter + 'static> Web3RpcServer for Web3RpcImpl<Adapter> {
     #[metrics_rpc("eth_sendRawTransaction")]
     async fn send_raw_transaction(&self, tx: Hex) -> RpcResult<H256> {
-        let utx = UnverifiedTransaction::decode(&tx.as_bytes())
+        let utx: UnverifiedTransaction = UnverifiedTransaction::decode(&tx.as_bytes())
             .map_err(|e| RpcError::Internal(e.to_string()))?;
 
         let gas_price = utx.unsigned.gas_price();

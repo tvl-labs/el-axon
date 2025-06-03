@@ -1,4 +1,3 @@
-use alloy::consensus::SignableTransaction;
 pub use alloy::consensus::{
     Transaction, TxEip1559 as Eip1559Transaction, TxEip2930 as Eip2930Transaction,
     TxLegacy as LegacyTransaction,
@@ -6,14 +5,15 @@ pub use alloy::consensus::{
 pub use alloy::primitives::TxKind;
 pub use alloy::rpc::types::{AccessList, AccessListItem};
 
-use alloy::consensus::crypto::secp256k1::{public_key_to_address, recover_signer};
+use alloy::consensus::{Receipt, SignableTransaction};
 use serde::{Deserialize, Serialize};
 
 use common_crypto::secp256k1_recover;
 
+use crate::codec::transaction::rlp_encode_legacy_tx;
 use crate::types::{
-    Address, Bloom, Bytes, BytesMut, CellDepWithPubKey, ExitReason, Hash, Hasher, TxResp,
-    TypesError, H256, H512, U256, U64,
+    Address, Bytes, BytesMut, CellDepWithPubKey, Hash, Hasher, Public, TxResp, TypesError, H256,
+    H512, U256,
 };
 use crate::ProtocolResult;
 
@@ -35,13 +35,25 @@ impl UnsignedTransaction {
         }
     }
 
+    pub fn chain_id(&self) -> Option<u64> {
+        match self {
+            UnsignedTransaction::Legacy(tx) => tx.chain_id,
+            UnsignedTransaction::Eip2930(tx) => Some(tx.chain_id),
+            UnsignedTransaction::Eip1559(tx) => Some(tx.chain_id),
+        }
+    }
+
+    pub fn is_eip155(&self) -> bool {
+        match self {
+            UnsignedTransaction::Legacy(tx) => tx.chain_id.is_some(),
+            UnsignedTransaction::Eip2930(_) => true,
+            UnsignedTransaction::Eip1559(_) => true,
+        }
+    }
+
     pub fn may_cost(&self) -> ProtocolResult<U256> {
-        if let Some(res) = U256::from(self.gas_price().low_u64())
-            .checked_mul(U256::from(self.gas_limit().low_u64()))
-        {
-            return Ok(res
-                .checked_add(*self.value())
-                .unwrap_or_else(U256::max_value));
+        if let Some(res) = U256::from(self.gas_price()).checked_mul(U256::from(*self.gas_limit())) {
+            return Ok(res.checked_add(*self.value()).unwrap_or(U256::MAX));
         }
 
         Err(TypesError::PrepayGasIsTooLarge.into())
@@ -65,9 +77,9 @@ impl UnsignedTransaction {
 
     pub fn set_action(&mut self, action: TxKind) {
         match self {
-            UnsignedTransaction::Legacy(tx) => tx.kind = action,
-            UnsignedTransaction::Eip2930(tx) => tx.kind = action,
-            UnsignedTransaction::Eip1559(tx) => tx.kind = action,
+            UnsignedTransaction::Legacy(tx) => tx.to = action,
+            UnsignedTransaction::Eip2930(tx) => tx.to = action,
+            UnsignedTransaction::Eip1559(tx) => tx.to = action,
         }
     }
 
@@ -120,20 +132,11 @@ impl UnsignedTransaction {
         buf.into()
     }
 
-    pub fn encode(&self, signature: Option<SignatureComponents>) -> BytesMut {
-        UnverifiedTransaction {
-            unsigned: self.clone(),
-            signature,
-            hash: Default::default(),
-        }
-        .rlp_bytes()
-    }
-
     pub fn to(&self) -> Option<Address> {
         match self {
             UnsignedTransaction::Legacy(tx) => tx.kind().into_to(),
-            UnsignedTransaction::Eip2930(tx) => tx.get_to(),
-            UnsignedTransaction::Eip1559(tx) => tx.get_to(),
+            UnsignedTransaction::Eip2930(tx) => tx.to(),
+            UnsignedTransaction::Eip1559(tx) => tx.to(),
         }
     }
 
@@ -145,7 +148,7 @@ impl UnsignedTransaction {
         }
     }
 
-    pub fn gas_limit(&self) -> &U64 {
+    pub fn gas_limit(&self) -> &u64 {
         match self {
             UnsignedTransaction::Legacy(tx) => &tx.gas_limit,
             UnsignedTransaction::Eip2930(tx) => &tx.gas_limit,
@@ -153,7 +156,7 @@ impl UnsignedTransaction {
         }
     }
 
-    pub fn nonce(&self) -> &U64 {
+    pub fn nonce(&self) -> &u64 {
         match self {
             UnsignedTransaction::Legacy(tx) => &tx.nonce,
             UnsignedTransaction::Eip2930(tx) => &tx.nonce,
@@ -161,17 +164,17 @@ impl UnsignedTransaction {
         }
     }
 
-    pub fn action(&self) -> &TxKind {
+    pub fn action(&self) -> TxKind {
         match self {
-            UnsignedTransaction::Legacy(tx) => &tx.action,
-            UnsignedTransaction::Eip2930(tx) => &tx.action,
-            UnsignedTransaction::Eip1559(tx) => &tx.action,
+            UnsignedTransaction::Legacy(tx) => tx.kind(),
+            UnsignedTransaction::Eip2930(tx) => tx.kind(),
+            UnsignedTransaction::Eip1559(tx) => tx.kind(),
         }
     }
 
     pub fn access_list(&self) -> AccessList {
         match self {
-            UnsignedTransaction::Legacy(_) => Vec::new(),
+            UnsignedTransaction::Legacy(_) => AccessList(vec![]),
             UnsignedTransaction::Eip2930(tx) => tx.access_list.clone(),
             UnsignedTransaction::Eip1559(tx) => tx.access_list.clone(),
         }
@@ -194,7 +197,7 @@ impl UnverifiedTransaction {
     }
 
     pub fn get_hash(&self) -> H256 {
-        Hasher::digest(&self.unsigned.encode(self.signature.clone()))
+        Hasher::digest(&self.unsigned.encode_for_signing())
     }
 
     pub fn check_hash(&self) -> ProtocolResult<()> {
@@ -210,14 +213,21 @@ impl UnverifiedTransaction {
         Ok(())
     }
 
-    pub fn signature_hash(&self) -> Hash {
+    pub fn signature_hash(&self, with_chain_id: bool) -> Hash {
+        if !with_chain_id {
+            let legacy_tx = self.unsigned.get_legacy().unwrap();
+            let mut buf = BytesMut::new();
+            rlp_encode_legacy_tx(&legacy_tx, None, &mut buf);
+            return Hasher::digest(buf.freeze());
+        }
+
         Hasher::digest(self.unsigned.encode_for_signing())
     }
 
-    pub fn recover_public(&self) -> ProtocolResult<H512> {
+    pub fn recover_public(&self, with_chain_id: bool) -> ProtocolResult<H512> {
         Ok(H512::from_slice(
             &secp256k1_recover(
-                self.signature_hash().as_bytes(),
+                self.signature_hash(with_chain_id).as_slice(),
                 self.signature
                     .as_ref()
                     .ok_or(TypesError::MissingSignature)?
@@ -297,7 +307,7 @@ impl SignatureComponents {
             let r = alloy_rlp::decode_exact::<CellDepWithPubKey>(&self.r[1..])
                 .map_err(TypesError::DecodeInteroperationSigR)?;
 
-            return Ok(Hasher::digest(&r.pub_key).into());
+            return Ok(Address::from_slice(&Hasher::digest(&r.pub_key).0[12..]));
         }
 
         Err(TypesError::InvalidSignatureRType.into())
@@ -313,7 +323,7 @@ impl SignatureComponents {
 pub struct SignedTransaction {
     pub transaction: UnverifiedTransaction,
     pub sender:      Address,
-    pub public:      Option<H512>,
+    pub public:      Option<Public>,
 }
 
 impl SignedTransaction {
@@ -322,12 +332,10 @@ impl SignedTransaction {
             return Err(TypesError::Unsigned.into());
         }
 
-        let hash = utx.signature_hash();
         let sig = utx.signature.as_ref().unwrap();
-
         if sig.is_eth_sig() {
-            let public = utx.recover_public()?;
-            let signer = Hasher::digest(&public).into();
+            let public = utx.recover_public(true)?;
+            let signer = Address::from_slice(&Hasher::digest(&public).0[12..]);
 
             return Ok(SignedTransaction {
                 transaction: utx.calc_hash(),
@@ -339,7 +347,7 @@ impl SignedTransaction {
         // Otherwise it is an interoperation transaction
         Ok(SignedTransaction {
             sender:      sig.extract_interoperation_tx_sender()?,
-            public:      Some(H512::zero()),
+            public:      Some(H512::default()),
             transaction: utx.calc_hash(),
         })
     }
@@ -353,7 +361,7 @@ impl SignedTransaction {
     }
 
     pub fn is_eip155(&self) -> bool {
-        self.transaction.chain_id.is_some()
+        self.transaction.unsigned.is_eip155()
     }
 
     /// Encode a transaction receipt into bytes.
@@ -375,27 +383,19 @@ impl SignedTransaction {
     /// [`EIP-2718`]: https://eips.ethereum.org/EIPS/eip-2718#receipts
     /// [`EIP-2930`]: https://eips.ethereum.org/EIPS/eip-2930#parameters
     /// [`EIP-1559`]: https://eips.ethereum.org/EIPS/eip-1559#specification
-    pub fn encode_receipt(&self, r: &TxResp, logs_bloom: Bloom) -> Bytes {
-        // Status: either 1 (success) or 0 (failure).
-        // Only present after activation of [EIP-658](https://eips.ethereum.org/EIPS/eip-658)
-        let status: u64 = if matches!(r.exit_reason, ExitReason::Succeed(_)) {
-            1
-        } else {
-            0
+    pub fn encode_receipt(&self, r: &TxResp) -> Bytes {
+        let mut buf = BytesMut::new();
+        let receipt = Receipt {
+            status:              r.exit_reason.is_succeed().into(),
+            cumulative_gas_used: r.gas_used,
+            logs:                r.logs.clone(),
         };
-        let used_gas = U256::from(r.gas_used);
-        let legacy_receipt = {
-            let mut rlp = RlpStream::new();
-            rlp.begin_list(4);
-            rlp.append(&status);
-            rlp.append(&used_gas);
-            rlp.append(&logs_bloom);
-            rlp.append_list(&r.logs);
-            rlp.out().freeze()
-        };
-        match self.type_() {
-            x if x == 0x01 || x == 0x02 => [&x.to_be_bytes()[7..], &legacy_receipt].concat().into(),
-            _ => legacy_receipt, // legacy (0x00) or undefined type
-        }
+        let bloom = receipt.bloom_slow();
+        receipt.rlp_encode_fields_with_bloom(&bloom, &mut buf);
+        buf.freeze()
     }
+}
+
+pub fn public_to_address(public: &Public) -> Address {
+    Address::from_slice(&Hasher::digest(public)[12..])
 }

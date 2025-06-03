@@ -29,13 +29,13 @@ pub struct NodeInfo {
 impl NodeInfo {
     pub fn new(
         chain_id: u64,
-        pub_key: Secp256k1PublicKey,
+        raw_pub_key: &[u8],
         hardfork_info: Option<HardforkInfoInner>,
     ) -> Self {
-        let address = Address::from_pubkey(&pub_key);
+        let address = Address::from_raw_public_key(raw_pub_key);
         Self {
             chain_id,
-            self_pub_key: pub_key,
+            self_pub_key: Secp256k1PublicKey::try_from(raw_pub_key).unwrap(),
             self_address: address,
             hardfork_proposals: Arc::new(RwLock::new(hardfork_info)),
         }

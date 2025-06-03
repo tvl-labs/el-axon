@@ -46,8 +46,8 @@ impl Merkle {
 }
 
 fn merge(left: &Hash, right: &Hash) -> Hash {
-    let left = left.as_bytes();
-    let right = right.as_bytes();
+    let left = left.as_slice();
+    let right = right.as_slice();
 
     let mut root = Vec::with_capacity(left.len() + right.len());
     root.extend_from_slice(left);
@@ -72,7 +72,7 @@ impl<'a, C: ProtocolCodec + 'a> FromIterator<(usize, &'a C)> for TrieMerkle {
 
         iter.into_iter().for_each(|(i, val)| {
             trie.0
-                .insert(rlp::encode(&i).to_vec(), val.encode().unwrap().to_vec())
+                .insert(alloy_rlp::encode(&i), val.encode().unwrap().to_vec())
                 .unwrap()
         });
 
@@ -89,7 +89,7 @@ impl TrieMerkle {
         &self,
         index: usize,
     ) -> Result<Vec<Vec<u8>>, Box<dyn Error + 'static>> {
-        let key = rlp::encode(&index).to_vec();
+        let key = alloy_rlp::encode(&index);
         let ret = self.0.get_proof(&key)?;
         Ok(ret)
     }
@@ -98,7 +98,7 @@ impl TrieMerkle {
         let mut trie = Self::default();
         for (i, receipt) in receipts.iter().enumerate() {
             trie.0
-                .insert(rlp::encode(&i).to_vec(), receipt.to_vec())
+                .insert(alloy_rlp::encode(&i), receipt.to_vec())
                 .unwrap();
         }
 

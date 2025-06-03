@@ -6,11 +6,13 @@ pub mod transaction;
 
 pub use transaction::truncate_slice;
 
-use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
+use std::fmt::Debug;
+
+use alloy_rlp::{Decodable, Encodable};
 use serde::{Deserialize as _, Deserializer, Serializer};
 
-use crate::types::{Bytes, DBBytes, Hex, Key256Bits, TypesError, U256};
-use crate::ProtocolResult;
+use crate::types::{Bytes, BytesMut, DBBytes, Key256Bits, TypesError, U256};
+use crate::{codec::error::CodecError, ProtocolResult};
 
 static CHARS: &[u8] = b"0123456789abcdef";
 
@@ -22,12 +24,13 @@ pub trait ProtocolCodec: Sized + Send {
 
 impl<T: Encodable + Decodable + Send> ProtocolCodec for T {
     fn encode(&self) -> ProtocolResult<Bytes> {
-        Ok(self.rlp_bytes().freeze())
+        let mut buf = BytesMut::new();
+        <Self as Encodable>::encode(self, &mut buf);
+        Ok(buf.freeze())
     }
 
     fn decode<B: AsRef<[u8]>>(bytes: B) -> ProtocolResult<Self> {
-        Self::decode(&Rlp::new(bytes.as_ref()))
-            .map_err(|e| error::CodecError::Rlp(e.to_string()).into())
+        Ok(<Self as Decodable>::decode(&mut bytes.as_ref()).map_err(CodecError::Rlp)?)
     }
 }
 
@@ -39,19 +42,6 @@ impl ProtocolCodec for DBBytes {
     fn decode<B: AsRef<[u8]>>(bytes: B) -> ProtocolResult<Self> {
         let inner = Bytes::copy_from_slice(bytes.as_ref());
         Ok(Self(inner))
-    }
-}
-
-impl Encodable for Hex {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(1).append(&self.as_ref());
-    }
-}
-
-impl Decodable for Hex {
-    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
-        let b: Vec<u8> = r.val_at(0)?;
-        Ok(Hex::encode(b))
     }
 }
 
@@ -80,7 +70,8 @@ pub fn hex_decode(src: &str) -> ProtocolResult<Vec<u8>> {
 pub fn serialize_uint<S, U>(val: &U, s: S) -> Result<S::Ok, S::Error>
 where
     S: Serializer,
-    U: TryInto<U256> + Copy,
+    U: TryInto<U256> + Copy + Debug,
+    <U as TryInto<U256>>::Error: Debug,
 {
     let val: U256 = (*val).try_into().unwrap();
     let mut slice = [0u8; 2 + 64];
@@ -153,6 +144,7 @@ fn to_hex_raw<'a>(v: &'a mut [u8], bytes: &[u8], skip_leading_zero: bool) -> &'a
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::Hex;
     use rand::random;
 
     impl Hex {
@@ -178,8 +170,9 @@ mod tests {
     #[test]
     fn test_hex_rlp() {
         let origin = Hex::random();
-        let raw = origin.rlp_bytes();
-        let decode = <Hex as Decodable>::decode(&Rlp::new(raw.as_ref())).unwrap();
+        let mut encoded = Vec::new();
+        <Hex as Encodable>::encode(&origin, &mut encoded);
+        let decode = <Hex as Decodable>::decode(&mut encoded.as_ref()).unwrap();
 
         assert_eq!(origin, decode);
     }

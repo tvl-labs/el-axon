@@ -1,17 +1,18 @@
-pub use ethereum::{AccessList, AccessListItem, Account};
-pub use evm::{backend::Log, Config, ExitError, ExitFatal, ExitReason, ExitRevert, ExitSucceed};
+pub use alloy::consensus::Account;
+pub use alloy::eips::eip2930::{AccessList, AccessListItem};
+pub use alloy::primitives::Log;
+pub use evm::{Config, ExitError, ExitFatal, ExitReason, ExitRevert, ExitSucceed};
 pub use hasher::HasherKeccak;
 
+use alloy::consensus::Receipt;
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
 
 use crate::types::{
-    Address, Bloom, ExtraData, Hash, Hasher, Header, MerkleRoot, Proposal, H256, U256, U64,
+    Address, Bloom, ExtraData, Hash, Header, MerkleRoot, Proposal, H256, U256, U64,
 };
 
 use super::Hex;
-
-const BLOOM_BYTE_LENGTH: usize = 256;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExecResp {
@@ -48,6 +49,17 @@ impl Default for TxResp {
     }
 }
 
+impl TxResp {
+    pub fn bloom(&self) -> Bloom {
+        Receipt {
+            status:              self.exit_reason.is_succeed().into(),
+            cumulative_gas_used: self.gas_used,
+            logs:                self.logs.clone(),
+        }
+        .bloom_slow()
+    }
+}
+
 #[derive(RlpEncodable, RlpDecodable, Default, Clone, Debug, PartialEq, Eq)]
 pub struct ExecutorContext {
     pub block_number:           U256,
@@ -64,12 +76,12 @@ pub struct ExecutorContext {
 impl From<Proposal> for ExecutorContext {
     fn from(h: Proposal) -> Self {
         ExecutorContext {
-            block_number:           h.number.into(),
+            block_number:           U256::from(h.number),
             block_coinbase:         h.proposer,
-            block_timestamp:        h.timestamp.into(),
-            chain_id:               h.chain_id.into(),
+            block_timestamp:        U256::from(h.timestamp),
+            chain_id:               U256::from(h.chain_id),
             origin:                 h.proposer,
-            gas_price:              U256::one(),
+            gas_price:              U256::ONE,
             block_gas_limit:        h.gas_limit,
             block_base_fee_per_gas: h.base_fee_per_gas,
             extra_data:             h.extra_data,
@@ -80,12 +92,12 @@ impl From<Proposal> for ExecutorContext {
 impl From<&Header> for ExecutorContext {
     fn from(h: &Header) -> ExecutorContext {
         ExecutorContext {
-            block_number:           h.number.into(),
+            block_number:           U256::from(h.number),
             block_coinbase:         h.proposer,
-            block_timestamp:        h.timestamp.into(),
-            chain_id:               h.chain_id.into(),
+            block_timestamp:        U256::from(h.timestamp),
+            chain_id:               U256::from(h.chain_id),
             origin:                 h.proposer,
-            gas_price:              U256::one(),
+            gas_price:              U256::ONE,
             block_gas_limit:        h.gas_limit,
             block_base_fee_per_gas: h.base_fee_per_gas,
             extra_data:             h.extra_data.clone(),
@@ -111,27 +123,4 @@ pub struct EthStorageProof {
     pub key:   U256,
     pub value: U256,
     pub proof: Vec<Hex>,
-}
-
-pub fn logs_bloom<'a, I>(logs: I) -> Bloom
-where
-    I: Iterator<Item = &'a Log>,
-{
-    let mut bloom = Bloom::zero();
-
-    for log in logs {
-        m3_2048(&mut bloom, log.address.as_bytes());
-        for topic in log.topics.iter() {
-            m3_2048(&mut bloom, topic.as_bytes());
-        }
-    }
-    bloom
-}
-
-fn m3_2048(bloom: &mut Bloom, x: &[u8]) {
-    let hash = Hasher::digest(x).0;
-    for i in [0, 2, 4] {
-        let bit = (hash[i + 1] as usize + ((hash[i] as usize) << 8)) & 0x7FF;
-        bloom.0[BLOOM_BYTE_LENGTH - 1 - bit / 8] |= 1 << (bit % 8);
-    }
 }

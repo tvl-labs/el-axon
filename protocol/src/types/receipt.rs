@@ -1,7 +1,4 @@
-pub use ethereum::Log;
-pub use ethereum_types::BloomInput;
-
-use crate::types::{Address, Bloom, ExitReason, ExitSucceed, Hash, MerkleRoot, U64};
+use crate::types::{Address, Bloom, ExitReason, ExitSucceed, Hash, Log, MerkleRoot, U64};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Receipt {
@@ -43,8 +40,8 @@ impl Default for Receipt {
 impl Receipt {
     pub fn status(&self) -> U64 {
         match self.ret {
-            ExitReason::Succeed(_) => U64::one(),
-            _ => U64::zero(),
+            ExitReason::Succeed(_) => U64::ONE,
+            _ => U64::ZERO,
         }
     }
 }

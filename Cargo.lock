@@ -377,6 +377,7 @@ dependencies = [
  "const-hex",
  "derive_more 2.0.1",
  "foldhash",
+ "getrandom 0.3.3",
  "hashbrown 0.15.3",
  "indexmap 2.9.0",
  "itoa",
@@ -1188,6 +1189,7 @@ dependencies = [
  "lazy_static",
  "ophelia",
  "overlord",
+ "rand 0.7.3",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -2459,6 +2461,7 @@ dependencies = [
 name = "common-merkle"
 version = "0.2.1"
 dependencies = [
+ "alloy-rlp",
  "axon-protocol",
  "criterion",
  "hasher",

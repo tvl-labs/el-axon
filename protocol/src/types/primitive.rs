@@ -10,21 +10,19 @@ use std::{fmt, str::FromStr};
 use alloy_rlp::{RlpDecodable, RlpEncodable};
 use derive_more::Display;
 use faster_hex::withpfx_lowercase;
-use ophelia::{PublicKey, UncompressedPublicKey};
 use overlord::DurationConfig;
 use serde::{de, ser, Deserialize, Serialize};
 
-use common_crypto::Secp256k1PublicKey;
 use common_hasher::keccak256;
 
 use crate::codec::{hex_decode, hex_encode, serialize_uint};
 use crate::types::{BlockNumber, Bytes, BytesMut, TypesError};
-use crate::{ProtocolError, ProtocolResult};
+use crate::ProtocolError;
 
 pub type Hash = H256;
 pub type MerkleRoot = Hash;
+pub type Public = H512;
 
-const ADDRESS_LEN: usize = 20;
 const HEX_PREFIX: &str = "0x";
 
 pub const NIL_DATA: H256 = H256::new([
@@ -88,7 +86,7 @@ impl Hasher {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Display)]
+#[derive(RlpEncodable, RlpDecodable, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Display)]
 #[display("0x{:x}", _0)]
 pub struct Hex(Bytes);
 
@@ -434,10 +432,10 @@ pub struct ValidatorExtend {
 
 impl From<Validator> for ValidatorExtend {
     fn from(value: Validator) -> Self {
-        let address = Address::from_raw_public_key(value.pub_key.as_ref());
+        let addr = Address::from_raw_public_key(value.pub_key.as_ref());
         ValidatorExtend {
             bls_pub_key:    value.bls_pub_key,
-            address:        address.0,
+            address:        addr,
             pub_key:        value.pub_key,
             propose_weight: value.propose_weight,
             vote_weight:    value.vote_weight,
@@ -537,22 +535,6 @@ pub struct HardforkInfoInner {
     pub flags:        H256,
 }
 
-fn ensure_len(real: usize, expect: usize) -> ProtocolResult<()> {
-    if real != expect {
-        Err(TypesError::LengthMismatch { expect, real }.into())
-    } else {
-        Ok(())
-    }
-}
-
-fn clean_0x(s: &str) -> ProtocolResult<&str> {
-    if s.starts_with("0x") || s.starts_with("0X") {
-        Ok(&s[2..])
-    } else {
-        Err(TypesError::HexPrefix.into())
-    }
-}
-
 pub fn checksum(address: &str) -> String {
     let address = address.trim_start_matches("0x").to_lowercase();
     let address_hash = hex_encode(Hasher::digest(address.as_bytes()));
@@ -584,7 +566,7 @@ mod tests {
     #[test]
     fn test_eip55() {
         let addr = "0x35e70c3f5a794a77efc2ec5ba964bffcc7fd2c0a";
-        let eip55 = Address::from_hex(addr).unwrap();
+        let eip55 = Address::from_str(addr).unwrap();
         assert_eq!(
             eip55.to_string(),
             "0x35E70C3F5A794A77Efc2Ec5bA964BFfcC7Fd2C0a"
@@ -634,17 +616,17 @@ mod tests {
         assert!(h256_default.is_zero());
 
         let null_data: &[u8] = &[];
-        let rlp_null_data = rlp::encode(&null_data);
-        assert_eq!(&rlp_null_data, &rlp::NULL_RLP[..]);
+        let rlp_null_data = alloy_rlp::encode(&null_data);
+        assert_eq!(&rlp_null_data, &vec![alloy_rlp::EMPTY_STRING_CODE]);
 
         let empty_list: Vec<u8> = vec![];
-        let rlp_empty_list = rlp::encode_list(&empty_list);
-        assert_eq!(&rlp_empty_list, &rlp::EMPTY_LIST_RLP[..]);
+        let rlp_empty_list = alloy_rlp::encode(&empty_list);
+        assert_eq!(&rlp_empty_list, &vec![alloy_rlp::EMPTY_LIST_CODE]);
 
-        let hash = Hasher::digest(rlp::NULL_RLP);
+        let hash = Hasher::digest(vec![alloy_rlp::EMPTY_STRING_CODE]);
         assert_eq!(hash, RLP_NULL);
 
-        let hash = Hasher::digest(rlp::EMPTY_LIST_RLP);
+        let hash = Hasher::digest(vec![alloy_rlp::EMPTY_LIST_CODE]);
         assert_eq!(hash, RLP_EMPTY_LIST);
 
         let root = TrieMerkle::default().root_hash().unwrap();

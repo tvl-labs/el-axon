@@ -1,83 +1,89 @@
 use std::error::Error;
 
+use alloy_rlp::{encode_list, Decodable, Encodable, Header};
+use bytes::BufMut;
 use overlord::Codec;
-use rlp::{Decodable, DecoderError, Encodable, Rlp, RlpStream};
 
-use crate::types::{BlockVersion, Bytes, Proposal};
+use crate::types::{Address, BlockVersion, Bytes, ExtraData, Proof, Proposal, H256, U64};
 use crate::{codec::error::CodecError, constants::BASE_FEE_PER_GAS, lazy::CHAIN_ID, ProtocolError};
 
 impl Encodable for BlockVersion {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        let ver: u8 = (*self).into();
-        s.begin_list(1).append(&ver);
+    fn encode(&self, out: &mut dyn BufMut) {
+        let enc: [&dyn Encodable; 1] = [&0u8];
+        encode_list::<_, dyn Encodable>(&enc, out);
     }
 }
 
 impl Decodable for BlockVersion {
-    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
-        let ver: u8 = r.val_at(0)?;
-        ver.try_into()
-            .map_err(|_| DecoderError::Custom("Invalid block version"))
+    fn decode(data: &mut &[u8]) -> Result<Self, alloy_rlp::Error> {
+        let mut payload = alloy_rlp::Header::decode_bytes(data, true)?;
+        match u8::decode(&mut payload)? {
+            0 => Ok(BlockVersion::V0),
+            _ => Err(alloy_rlp::Error::Custom("Invalid block version")),
+        }
     }
 }
 
 impl Encodable for Proposal {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        s.begin_list(13)
-            .append(&self.version)
-            .append(&self.prev_hash)
-            .append(&self.proposer)
-            .append(&self.prev_state_root)
-            .append(&self.transactions_root)
-            .append(&self.signed_txs_hash)
-            .append(&self.timestamp)
-            .append(&self.number)
-            .append(&self.gas_limit.low_u64())
-            .append_list(&self.extra_data)
-            .append(&self.proof)
-            .append(&self.call_system_script_count)
-            .append_list(&self.tx_hashes);
+    fn encode(&self, out: &mut dyn BufMut) {
+        let enc: [&dyn Encodable; 13] = [
+            &self.version,
+            &self.prev_hash,
+            &self.proposer,
+            &self.prev_state_root,
+            &self.transactions_root,
+            &self.signed_txs_hash,
+            &self.timestamp,
+            &self.number,
+            &self.gas_limit.to::<u64>(),
+            &self.extra_data,
+            &self.proof,
+            &self.call_system_script_count,
+            &self.tx_hashes,
+        ];
+        encode_list::<_, dyn Encodable>(&enc, out);
     }
 }
 
 impl Decodable for Proposal {
-    fn decode(r: &Rlp) -> Result<Self, DecoderError> {
+    fn decode(data: &mut &[u8]) -> Result<Self, alloy_rlp::Error> {
+        let mut payload = Header::decode_bytes(data, true)?;
         Ok(Proposal {
-            version:                  r.val_at(0)?,
-            prev_hash:                r.val_at(1)?,
-            proposer:                 r.val_at(2)?,
-            prev_state_root:          r.val_at(3)?,
-            transactions_root:        r.val_at(4)?,
-            signed_txs_hash:          r.val_at(5)?,
-            timestamp:                r.val_at(6)?,
-            number:                   r.val_at(7)?,
-            gas_limit:                r.val_at::<u64>(8)?.into(),
-            extra_data:               r.list_at(9)?,
-            base_fee_per_gas:         BASE_FEE_PER_GAS.into(),
-            proof:                    r.val_at(10)?,
+            version:                  BlockVersion::decode(&mut payload)?,
+            prev_hash:                H256::decode(&mut payload)?,
+            proposer:                 Address::decode(&mut payload)?,
+            prev_state_root:          H256::decode(&mut payload)?,
+            transactions_root:        H256::decode(&mut payload)?,
+            signed_txs_hash:          H256::decode(&mut payload)?,
+            timestamp:                u64::decode(&mut payload)?,
+            number:                   u64::decode(&mut payload)?,
+            gas_limit:                U64::decode(&mut payload)?,
+            extra_data:               Vec::<ExtraData>::decode(&mut payload)?,
+            base_fee_per_gas:         U64::from(BASE_FEE_PER_GAS),
+            proof:                    Proof::decode(&mut payload)?,
             chain_id:                 **CHAIN_ID.load(),
-            call_system_script_count: r.val_at(11)?,
-            tx_hashes:                r.list_at(12)?,
+            call_system_script_count: u32::decode(&mut payload)?,
+            tx_hashes:                Vec::<H256>::decode(&mut payload)?,
         })
     }
 }
 
 impl Codec for Proposal {
     fn encode(&self) -> Result<Bytes, Box<dyn Error + Send>> {
-        Ok(rlp::encode(self).freeze())
+        Ok(alloy_rlp::encode(self).into())
     }
 
     fn decode(data: Bytes) -> Result<Self, Box<dyn Error + Send>> {
-        let proposal: Proposal = rlp::decode(data.as_ref())
-            .map_err(|e| ProtocolError::from(CodecError::Rlp(e.to_string())))?;
-        Ok(proposal)
+        let ret = <Self as Decodable>::decode(&mut data.as_ref())
+            .map_err(|e| ProtocolError::from(CodecError::Rlp(e)))?;
+        Ok(ret)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::traits::MessageCodec;
-    use crate::types::{Block, Bytes, ExtraData, Header, Proof, H160, H256};
+    use crate::types::{Block, Bytes, ExtraData, Header, Proof, H256};
     use rand::random;
 
     use super::*;
@@ -89,27 +95,36 @@ mod tests {
     #[test]
     fn test_version_codec() {
         let ver = BlockVersion::V0;
-        let bytes = rlp::encode(&ver);
-        assert_eq!(bytes, ver.rlp_bytes());
-        let decode: BlockVersion = rlp::decode(bytes.as_ref()).unwrap();
+        let mut encoded = Vec::new();
+        ver.encode(&mut encoded);
+
+        assert_eq!(alloy_rlp::encode(&ver), encoded);
+
+        let decode = BlockVersion::decode(&mut encoded.as_ref()).unwrap();
         assert_eq!(ver, decode);
     }
 
     #[test]
     fn test_block_codec() {
         let block = Block::default();
-        let bytes = rlp::encode(&block);
-        assert_eq!(bytes, block.rlp_bytes());
-        let decode: Block = rlp::decode(bytes.as_ref()).unwrap();
+        let mut encoded = Vec::new();
+        block.encode(&mut encoded);
+
+        assert_eq!(alloy_rlp::encode(&block), encoded);
+
+        let decode = Block::decode(&mut encoded.as_ref()).unwrap();
         assert_eq!(block, decode);
     }
 
     #[test]
     fn test_header_codec() {
         let header = Header::default();
-        let bytes = rlp::encode(&header);
-        assert_eq!(bytes, header.rlp_bytes());
-        let decode: Header = rlp::decode(bytes.as_ref()).unwrap();
+        let mut encoded = Vec::new();
+        header.encode(&mut encoded);
+
+        assert_eq!(alloy_rlp::encode(&header), encoded);
+
+        let decode = Header::decode(&mut encoded.as_ref()).unwrap();
         assert_eq!(header, decode);
     }
 
@@ -133,17 +148,17 @@ mod tests {
         let mut proposal = Proposal {
             version:                  BlockVersion::V0,
             prev_hash:                H256::random(),
-            proposer:                 H160::random(),
+            proposer:                 Address::random(),
             prev_state_root:          H256::random(),
             transactions_root:        H256::random(),
             signed_txs_hash:          H256::random(),
             timestamp:                random(),
             number:                   random(),
-            gas_limit:                30000000u64.into(),
+            gas_limit:                U64::from(30000000),
             extra_data:               vec![ExtraData {
                 inner: H256::random().0.to_vec().into(),
             }],
-            base_fee_per_gas:         1337u64.into(),
+            base_fee_per_gas:         U64::from(1337),
             proof:                    mock_proof,
             chain_id:                 0,
             call_system_script_count: random(),
