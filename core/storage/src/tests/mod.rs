@@ -1,41 +1,42 @@
 mod adapter;
 mod storage;
 
+use rand7::{random, rngs::OsRng};
+
 use common_crypto::{
     Crypto, PrivateKey, Secp256k1Recoverable, Secp256k1RecoverablePrivateKey, Signature,
 };
-use protocol::rand::{random, rngs::OsRng};
 use protocol::types::{
     Block, Eip1559Transaction, ExitReason, ExitSucceed, Hash, Hasher, Header, Proof, Receipt,
-    SignatureComponents, SignedTransaction, TransactionAction, UnverifiedTransaction,
+    SignatureComponents, SignedTransaction, UnverifiedTransaction,
 };
 use protocol::types::{Bytes, UnsignedTransaction};
 
 fn mock_signed_tx() -> SignedTransaction {
     let mut utx = UnverifiedTransaction {
         unsigned:  UnsignedTransaction::Eip1559(Eip1559Transaction {
+            chain_id:                 random::<u64>(),
             nonce:                    Default::default(),
             max_priority_fee_per_gas: Default::default(),
-            gas_price:                Default::default(),
-            gas_limit:                Default::default(),
-            action:                   TransactionAction::Create,
+            max_fee_per_gas:          Default::default(),
             value:                    Default::default(),
-            data:                     Bytes::new(),
-            access_list:              vec![],
+            gas_limit:                Default::default(),
+            to:                       Default::default(),
+            input:                    Default::default(),
+            access_list:              Default::default(),
         }),
         signature: Some(SignatureComponents {
             standard_v: 4,
             r:          Default::default(),
             s:          Default::default(),
         }),
-        chain_id:  Some(random::<u64>()),
         hash:      Default::default(),
     }
     .calc_hash();
 
     let priv_key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
     let signature = Secp256k1Recoverable::sign_message(
-        utx.signature_hash(true).as_bytes(),
+        utx.signature_hash(true).as_slice(),
         &priv_key.to_bytes(),
     )
     .unwrap()

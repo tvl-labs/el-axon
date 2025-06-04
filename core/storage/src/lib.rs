@@ -575,10 +575,10 @@ impl<Adapter: StorageAdapter> Storage for ImplStorage<Adapter> {
 
 #[derive(Debug, Display, From)]
 pub enum StorageError {
-    #[display(fmt = "get none {:?}", _0)]
+    #[display("get none {:?}", _0)]
     GetNone(String),
 
-    #[display(fmt = "decode batch value")]
+    #[display("decode batch value")]
     BatchDecode,
 }
 

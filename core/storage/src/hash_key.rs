@@ -26,11 +26,11 @@ impl CommonPrefix {
     }
 
     pub fn make_hash_key(self, hash: &Hash) -> [u8; 40] {
-        debug_assert!(hash.as_bytes().len() == Hash::len_bytes());
+        debug_assert!(hash.as_slice().len() == Hash::len_bytes());
 
         let mut key = [0u8; 40];
         key[0..8].copy_from_slice(&self.block_height);
-        key[8..40].copy_from_slice(&hash.as_bytes()[..32]);
+        key[8..40].copy_from_slice(&hash.as_slice()[..32]);
 
         key
     }

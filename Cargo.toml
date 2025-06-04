@@ -70,16 +70,16 @@ ed25519-dalek = "1.0"
 either = "1.15"
 env_logger = "0.11"
 ethereum = { version = "0.15", features = ["with-codec", "with-serde"] }
-ethereum-types = { version = "0.15", features = [
+ethers = "2.0"
+ethers-core = "2.0"
+evm = { version = "0.37", features = ["tracing", "with-serde"] }
+evm-types = { package = "ethereum-types", version = "0.14", features = [
     "arbitrary",
     "codec",
     "rlp",
     "serialize",
     "std",
 ] }
-ethers = "2.0"
-ethers-core = "2.0"
-evm = { version = "0.37", features = ["tracing", "with-serde"] }
 faketime = "0.2"
 faster-hex = "0.8"
 futures = "0.3"
@@ -128,7 +128,7 @@ reqwest = "0.12"
 revm = "2.3"
 ripemd = "0.1"
 rlp = { version = "0.6", features = ["derive"] }
-rocksdb = { version = "0.22", package = "ckb-rocksdb" }
+rocksdb = { version = "0.22", package = "ckb-rocksdb", features = ["lz4"] }
 rug = "1.19"
 rustracing = { git = "http://github.com/KaoImin/rustracing", branch = "main" }
 rustracing_jaeger = { git = "http://github.com/KaoImin/rustracing_jaeger", branch = "main" }

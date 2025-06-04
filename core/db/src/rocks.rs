@@ -271,19 +271,20 @@ impl StorageAdapter for RocksAdapter {
 
 #[derive(Debug, Display, From)]
 pub enum RocksDBError {
-    #[display(fmt = "category {} not found", _0)]
+    #[display("category {} not found", _0)]
     CategoryNotFound(&'static str),
 
-    #[display(fmt = "rocksdb {}", _0)]
+    #[display("rocksdb {}", _0)]
+    #[from]
     RocksDB(rocksdb::Error),
 
-    #[display(fmt = "parameters do not match")]
+    #[display("parameters do not match")]
     InsertParameter,
 
-    #[display(fmt = "batch length do not match")]
+    #[display("batch length do not match")]
     BatchLengthMismatch,
 
-    #[display(fmt = "Create DB path {}", _0)]
+    #[display("create db path {}", _0)]
     CreateDB(io::Error),
 }
 

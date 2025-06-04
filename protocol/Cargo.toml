@@ -19,7 +19,6 @@ ckb-types.workspace = true
 creep.workspace = true
 derive_more.workspace = true
 ethereum.workspace = true
-ethereum-types.workspace = true
 ethers-core.workspace = true
 evm.workspace = true
 faster-hex.workspace = true

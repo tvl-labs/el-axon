@@ -203,7 +203,7 @@ impl StorageAdapter for MemoryAdapter {
 
 #[derive(Debug, Display, From)]
 pub enum MemoryDBError {
-    #[display(fmt = "batch length do not match")]
+    #[display("batch length do not match")]
     BatchLengthMismatch,
 }
 

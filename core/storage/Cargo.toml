@@ -6,6 +6,7 @@ version = "0.1.0"
 
 [dependencies]
 arc-swap.workspace = true
+derive_more.workspace = true
 futures.workspace = true
 lazy_static.workspace = true
 log.workspace = true
@@ -21,6 +22,7 @@ protocol.workspace = true
 common-crypto.workspace = true
 criterion.workspace = true
 num-traits.workspace = true
+rand7.workspace = true
 
 [[bench]]
 harness = false
