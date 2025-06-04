@@ -6,7 +6,7 @@ use crate::types::U64;
 pub const MAX_GAS_LIMIT: u64 = 30_000_000;
 /// According to [go-ethereum](https://github.com/ethereum/go-ethereum/blob/be65b47/eth/gasprice/gasprice.go#L38),
 /// the maximum gas price is 500 Gwei.
-pub const MAX_GAS_PRICE: U64 = U64::from_limbs([500 * GWEI; 1]);
+pub const MAX_GAS_PRICE: u64 = 500 * GWEI;
 pub const MIN_TRANSACTION_GAS_LIMIT: u64 = 21_000;
 /// The mempool refresh timeout is 50 milliseconds.
 pub const MEMPOOL_REFRESH_TIMEOUT: u64 = 50;

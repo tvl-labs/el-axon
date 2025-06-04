@@ -4,8 +4,8 @@ use std::sync::Arc;
 use common_config_parser::types::spec::HardforkName;
 use protocol::trie::Trie as _;
 use protocol::types::{
-    Address, CkbRelatedInfo, ConsensusConfig, ConsensusConfigV0, HardforkInfo, HardforkInfoInner,
-    Metadata, MetadataInner, H256,
+    CkbRelatedInfo, ConsensusConfig, ConsensusConfigV0, HardforkInfo, HardforkInfoInner, Metadata,
+    MetadataInner, H256,
 };
 use protocol::{codec::ProtocolCodec, ProtocolResult};
 

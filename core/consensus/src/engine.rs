@@ -9,7 +9,6 @@ use overlord::error::ConsensusError as OverlordError;
 use overlord::types::{Commit, Node, OverlordMsg, Status, ViewChangeReason};
 use overlord::{Consensus as Engine, Wal};
 use parking_lot::RwLock;
-use rlp::Encodable;
 
 use common_apm::Instant;
 use common_apm_derive::trace_span;
@@ -25,7 +24,7 @@ use protocol::constants::{BASE_FEE_PER_GAS, MAX_BLOCK_GAS_LIMIT};
 use protocol::traits::{ConsensusAdapter, Context, MessageTarget, NodeInfo};
 use protocol::types::{
     Block, BlockVersion, Bytes, ExecResp, ExtraData, Hash, Hex, Metadata, Proof, Proposal,
-    SignedTransaction, ValidatorExtend, VecDisplayHelper, RLP_NULL,
+    SignedTransaction, ValidatorExtend, VecDisplayHelper, RLP_NULL, U64,
 };
 use protocol::{
     async_trait, codec::ProtocolCodec, tokio::sync::Mutex as AsyncMutex, types::HardforkInfoInner,
@@ -71,7 +70,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
             .get_txs_from_mempool(
                 ctx.clone(),
                 next_number,
-                MAX_BLOCK_GAS_LIMIT.into(),
+                MAX_BLOCK_GAS_LIMIT,
                 status.tx_num_limit,
             )
             .await?;
@@ -98,7 +97,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
                         Vec::new()
                     } else {
                         vec![ExtraData {
-                            inner: v.encode().unwrap(),
+                            inner: ProtocolCodec::encode(v).unwrap(),
                         }]
                     }
                 }
@@ -113,15 +112,15 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
         let proposal = Proposal {
             version:                  BlockVersion::V0,
             prev_hash:                status.prev_hash,
-            proposer:                 self.node_info.self_address.0,
+            proposer:                 self.node_info.self_address.into(),
             prev_state_root:          self.status.inner().last_state_root,
             transactions_root:        txs_root,
             signed_txs_hash:          digest_signed_transactions(&signed_txs),
             timestamp:                time_now(),
             number:                   next_number,
-            gas_limit:                MAX_BLOCK_GAS_LIMIT.into(),
+            gas_limit:                U64::from(MAX_BLOCK_GAS_LIMIT),
             extra_data:               extra_data_hardfork,
-            base_fee_per_gas:         BASE_FEE_PER_GAS.into(),
+            base_fee_per_gas:         U64::from(BASE_FEE_PER_GAS),
             proof:                    status.proof,
             chain_id:                 self.node_info.chain_id,
             call_system_script_count: txs.call_system_script_count,
@@ -140,7 +139,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
         let mut set = self.exemption_hash.write();
         set.insert(hash);
 
-        Ok((proposal, Bytes::from(hash.as_bytes().to_vec())))
+        Ok((proposal, Bytes::from(hash.as_slice().to_vec())))
     }
 
     #[trace_span(
@@ -375,17 +374,17 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
     ) -> Result<(), Box<dyn Error + Send>> {
         let (end, msg) = match msg {
             OverlordMsg::SignedProposal(sp) => {
-                let bytes = sp.rlp_bytes();
+                let bytes = alloy_rlp::encode(&sp);
                 (END_GOSSIP_SIGNED_PROPOSAL, bytes)
             }
 
             OverlordMsg::AggregatedVote(av) => {
-                let bytes = av.rlp_bytes();
+                let bytes = alloy_rlp::encode(&av);
                 (END_GOSSIP_AGGREGATED_VOTE, bytes)
             }
 
             OverlordMsg::SignedChoke(sc) => {
-                let bytes = sc.rlp_bytes();
+                let bytes = alloy_rlp::encode(&sc);
                 (END_GOSSIP_SIGNED_CHOKE, bytes)
             }
 
@@ -393,7 +392,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
         };
 
         self.adapter
-            .transmit(ctx, msg.freeze().to_vec(), end, MessageTarget::Broadcast)
+            .transmit(ctx, msg, end, MessageTarget::Broadcast)
             .await?;
         Ok(())
     }
@@ -411,22 +410,22 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
     ) -> Result<(), Box<dyn Error + Send>> {
         match msg {
             OverlordMsg::SignedVote(sv) => {
-                let msg = sv.rlp_bytes();
+                let msg = alloy_rlp::encode(&sv);
                 self.adapter
                     .transmit(
                         ctx,
-                        msg.freeze().to_vec(),
+                        msg,
                         END_GOSSIP_SIGNED_VOTE,
                         MessageTarget::Specified(pub_key),
                     )
                     .await?;
             }
             OverlordMsg::AggregatedVote(av) => {
-                let msg = av.rlp_bytes();
+                let msg = alloy_rlp::encode(&av);
                 self.adapter
                     .transmit(
                         ctx,
-                        msg.freeze().to_vec(),
+                        msg,
                         END_GOSSIP_AGGREGATED_VOTE,
                         MessageTarget::Specified(pub_key),
                     )
@@ -742,7 +741,7 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             ctx,
             resp.state_root,
             MAX_BLOCK_GAS_LIMIT,
-            last_status.max_tx_size.low_u64(),
+            last_status.max_tx_size.to(),
         );
 
         if block.header.number != proof.number {

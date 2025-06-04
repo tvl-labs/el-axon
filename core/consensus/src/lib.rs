@@ -28,28 +28,28 @@ pub use overlord::{types::Node, DurationConfig};
 
 #[derive(Clone, Debug, Display, PartialEq, Eq)]
 pub enum ConsensusType {
-    #[display(fmt = "Signed Proposal")]
+    #[display("Signed Proposal")]
     SignedProposal,
 
-    #[display(fmt = "Signed Vote")]
+    #[display("Signed Vote")]
     SignedVote,
 
-    #[display(fmt = "Aggregated Vote")]
+    #[display("Aggregated Vote")]
     AggregateVote,
 
-    #[display(fmt = "Rich Height")]
+    #[display("Rich Height")]
     RichHeight,
 
-    #[display(fmt = "Rpc Pull Blocks")]
+    #[display("Rpc Pull Blocks")]
     RpcPullBlocks,
 
-    #[display(fmt = "Rpc Pull Transactions")]
+    #[display("Rpc Pull Transactions")]
     RpcPullTxs,
 
-    #[display(fmt = "Signed Choke")]
+    #[display("Signed Choke")]
     SignedChoke,
 
-    #[display(fmt = "WAL Signed Transactions")]
+    #[display("WAL Signed Transactions")]
     WALSignedTxs,
 }
 
@@ -57,192 +57,172 @@ pub enum ConsensusType {
 #[derive(Debug, Display)]
 pub enum ConsensusError {
     /// Check block error.
-    #[display(
-        fmt = "Check invalid prev_hash, expect {:#x} get {:#x}",
-        expect,
-        actual
-    )]
+    #[display("Check invalid prev_hash, expect {:#x} get {:#x}", expect, actual)]
     InvalidPrevhash { expect: Hash, actual: Hash },
 
-    #[display(
-        fmt = "Check invalid order root, expect {:#x} get {:#x}",
-        expect,
-        actual
-    )]
+    #[display("Check invalid order root, expect {:#x} get {:#x}", expect, actual)]
     InvalidOrderRoot {
         expect: MerkleRoot,
         actual: MerkleRoot,
     },
 
-    #[display(
-        fmt = "Check invalid state root, expect {:#x} get {:#x}",
-        expect,
-        actual
-    )]
+    #[display("Check invalid state root, expect {:#x} get {:#x}", expect, actual)]
     InvalidStateRoot {
         expect: MerkleRoot,
         actual: MerkleRoot,
     },
 
-    #[display(
-        fmt = "Check invalid receipts root, expect {:#x} get {:#x}",
-        expect,
-        actual
-    )]
+    #[display("Check invalid receipts root, expect {:#x} get {:#x}", expect, actual)]
     InvalidReceiptsRoot {
         expect: MerkleRoot,
         actual: MerkleRoot,
     },
 
     #[display(
-        fmt = "Check invalid order signed transactions hash, expect {:#x} get {:#x}",
+        "Check invalid order signed transactions hash, expect {:#x} get {:#x}",
         expect,
         actual
     )]
     InvalidOrderSignedTransactionsHash { expect: Hash, actual: Hash },
 
-    #[display(fmt = "Check invalid status vec")]
+    #[display("Check invalid status vec")]
     InvalidStatusVec,
 
     /// Decode consensus message error.
-    #[display(fmt = "Decode {:?} message failed", _0)]
+    #[display("Decode {:?} message failed", _0)]
     DecodeErr(ConsensusType),
 
     /// Encode consensus message error.
-    #[display(fmt = "Encode {:?} message failed", _0)]
+    #[display("Encode {:?} message failed", _0)]
     EncodeErr(ConsensusType),
 
     /// Overlord consensus protocol error.
-    #[display(fmt = "Overlord error {:?}", _0)]
+    #[display("Overlord error {:?}", _0)]
     OverlordErr(Box<dyn Error + Send>),
 
     /// Consensus missed last block proof.
-    #[display(
-        fmt = "Invalid proof block number, expect {}, actual {}",
-        expect,
-        actual
-    )]
+    #[display("Invalid proof block number, expect {}, actual {}", expect, actual)]
     InvalidProof { expect: u64, actual: u64 },
 
     /// Consensus missed the pill.
-    #[display(fmt = "Consensus missed pill cooresponding {:#x}", _0)]
+    #[display("Consensus missed pill cooresponding {:#x}", _0)]
     MissingPill(Hash),
 
     /// Invalid timestamp
-    #[display(fmt = "Consensus invalid timestamp")]
+    #[display("Consensus invalid timestamp")]
     InvalidTimestamp,
 
     /// Consensus missed the block header.
-    #[display(fmt = "Consensus missed block header of {} block", _0)]
+    #[display("Consensus missed block header of {} block", _0)]
     MissingBlockHeader(u64),
 
     /// This boxed error should be a `CryptoError`.
-    #[display(fmt = "Crypto error {:?}", _0)]
+    #[display("Crypto error {:?}", _0)]
     CryptoErr(Box<CryptoError>),
 
-    #[display(fmt = "Synchronization {} block error", _0)]
+    #[display("Synchronization {} block error", _0)]
     VerifyTransaction(u64),
 
-    #[display(fmt = "Synchronization/Consensus {} block error : {}", _0, _1)]
+    #[display("Synchronization/Consensus {} block error : {}", _0, _1)]
     VerifyBlockHeader(u64, BlockHeaderField),
 
-    #[display(fmt = "Synchronization/Consensus {} block error : {}", _0, _1)]
+    #[display("Synchronization/Consensus {} block error : {}", _0, _1)]
     VerifyProof(u64, BlockProofField),
 
     ///
-    #[display(fmt = "Execute transactions error {:?}", _0)]
+    #[display("Execute transactions error {:?}", _0)]
     ExecuteErr(String),
 
     ///
     WALErr(std::io::Error),
 
-    #[display(fmt = "Call EVM error {:?}", _0)]
+    #[display("Call EVM error {:?}", _0)]
     CallEvm(ExitReason),
 
-    #[display(fmt = "Storage item not found")]
+    #[display("Storage item not found")]
     StorageItemNotFound,
 
-    #[display(fmt = "Lock in sync")]
+    #[display("Lock in sync")]
     LockInSync,
 
-    #[display(fmt = "Wal transactions mismatch, height {}", _0)]
+    #[display("Wal transactions mismatch, height {}", _0)]
     WalTxsMismatch(u64),
 
     #[display(
-        fmt = "Commit an outdated block, block_height {}, last_committed_height {}",
+        "Commit an outdated block, block_height {}, last_committed_height {}",
         _0,
         _1
     )]
     OutdatedCommit(u64, u64),
 
     /// Other error used for very few errors.
-    #[display(fmt = "{:?}", _0)]
+    #[display("{:?}", _0)]
     Other(String),
 
-    #[display(fmt = "{:?}", _0)]
+    #[display("{:?}", _0)]
     SystemTime(std::time::SystemTimeError),
 
-    #[display(fmt = "parse file name into timestamp error")]
+    #[display("parse file name into timestamp error")]
     FileNameTimestamp,
 
-    #[display(fmt = "consensus wal dir doesn't exist")]
+    #[display("consensus wal dir doesn't exist")]
     ConsensusWalDirNotExist,
 
-    #[display(fmt = "no consensus wal file available")]
+    #[display("no consensus wal file available")]
     ConsensusWalNoWalFile,
 
-    #[display(fmt = "Confused metadata range [{}, {})!", _0, _1)]
+    #[display("Confused metadata range [{}, {})!", _0, _1)]
     ConfusedMetadata(u64, u64),
 
-    #[display(fmt = "Build trie merkle tree error {}", _0)]
+    #[display("Build trie merkle tree error {}", _0)]
     BuildMerkle(String),
 
-    #[display(fmt = "Proposal hardfork info error {}", _0)]
+    #[display("Proposal hardfork info error {}", _0)]
     Hardfork(String),
 }
 
 #[derive(Debug, Display)]
 pub enum BlockHeaderField {
-    #[display(fmt = "The prev_hash mismatch the previous block")]
+    #[display("The prev_hash mismatch the previous block")]
     PreviousBlockHash,
 
-    #[display(fmt = "The prev_hash mismatch the hash in the proof field")]
+    #[display("The prev_hash mismatch the hash in the proof field")]
     ProofHash,
 
-    #[display(fmt = "The proposer is not in the committee")]
+    #[display("The proposer is not in the committee")]
     Proposer,
 
-    #[display(fmt = "There is at least one validator not in the committee")]
+    #[display("There is at least one validator not in the committee")]
     Validator,
 
-    #[display(fmt = "There is at least one validator's weight mismatch")]
+    #[display("There is at least one validator's weight mismatch")]
     Weight,
 
-    #[display(fmt = "The block version")]
+    #[display("The block version")]
     Version,
 }
 
 #[derive(Debug, Display)]
 pub enum BlockProofField {
-    #[display(fmt = "The bit_map has error with committer, can't get signed voters")]
+    #[display("The bit_map has error with committer, can't get signed voters")]
     BitMap,
 
-    #[display(fmt = "The proof signature is fraud or error")]
+    #[display("The proof signature is fraud or error")]
     Signature,
 
-    #[display(fmt = "Heights of block and proof diverse, block {}, proof {}", _0, _1)]
+    #[display("Heights of block and proof diverse, block {}, proof {}", _0, _1)]
     HeightMismatch(u64, u64),
 
-    #[display(fmt = "Hash of block and proof diverse")]
+    #[display("Hash of block and proof diverse")]
     HashMismatch,
 
-    #[display(fmt = "There is at least one validator not in the committee")]
+    #[display("There is at least one validator not in the committee")]
     Validator,
 
-    #[display(fmt = "There is at least one validator's weight mismatch")]
+    #[display("There is at least one validator's weight mismatch")]
     Weight,
 
-    #[display(fmt = "There is at least one validator's weight missing")]
+    #[display("There is at least one validator's weight missing")]
     WeightNotFound,
 }
 

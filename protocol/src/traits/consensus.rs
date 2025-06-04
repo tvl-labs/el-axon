@@ -8,7 +8,6 @@ use common_crypto::Secp256k1PublicKey;
 use crate::types::{
     Address, Block, BlockNumber, Bytes, ConsensusValidator, ExecResp, HardforkInfoInner, Hash,
     Header, Hex, MerkleRoot, Metadata, PackedTxHashes, Proof, Proposal, Receipt, SignedTransaction,
-    U256,
 };
 use crate::{async_trait, traits::Context, ProtocolResult};
 
@@ -206,7 +205,7 @@ pub trait ConsensusAdapter: CommonConsensusAdapter + Send + Sync {
         &self,
         ctx: Context,
         height: u64,
-        gas_limit: U256,
+        gas_limit: u64,
         tx_num_limit: u64,
     ) -> ProtocolResult<PackedTxHashes>;
 

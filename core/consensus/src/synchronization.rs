@@ -351,7 +351,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             last_number:     block.header.number,
             last_state_root: resp.state_root,
             tx_num_limit:    metadata.consensus_config.tx_num_limit,
-            max_tx_size:     metadata.consensus_config.max_tx_size.into(),
+            max_tx_size:     U256::from(metadata.consensus_config.max_tx_size),
             proof:           proof.clone(),
         };
 
@@ -543,9 +543,9 @@ pub enum SyncStatus {
 impl SyncStatus {
     pub fn start(&mut self, start: u64, highest: u64) {
         *self = SyncStatus::Syncing {
-            start:   start.into(),
-            current: start.into(),
-            highest: highest.into(),
+            start:   U256::from(start),
+            current: U256::from(start),
+            highest: U256::from(highest),
         };
     }
 
@@ -559,7 +559,7 @@ impl SyncStatus {
             SyncStatus::Syncing {
                 ref mut current, ..
             } => {
-                *current += U256::one();
+                *current += U256::ONE;
             }
         }
     }
@@ -642,14 +642,14 @@ mod tests {
 
         sync_status.start(0, 5);
         assert_eq!(sync_status, SyncStatus::Syncing {
-            start:   U256::zero(),
-            current: U256::zero(),
+            start:   U256::ZERO,
+            current: U256::ZERO,
             highest: U256::from(5),
         });
 
         sync_status.add_one();
         assert_eq!(sync_status, SyncStatus::Syncing {
-            start:   U256::zero(),
+            start:   U256::ZERO,
             current: U256::from(1),
             highest: U256::from(5),
         });

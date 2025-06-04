@@ -1,4 +1,4 @@
-use rlp_derive::{RlpDecodable, RlpEncodable};
+use alloy_rlp::{RlpDecodable, RlpEncodable};
 
 use protocol::codec::ProtocolCodec;
 use protocol::types::{BatchSignedTxs, Block, Bytes, Hash};

@@ -10,7 +10,7 @@ use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 
 use protocol::tokio::{self, time::sleep};
-use protocol::types::{Address, BlockNumber, Bytes, Hash, PackedTxHashes, SignedTransaction, U256};
+use protocol::types::{Address, BlockNumber, Bytes, Hash, PackedTxHashes, SignedTransaction};
 use protocol::{constants::MEMPOOL_REFRESH_TIMEOUT, ProtocolResult};
 
 use crate::tx_wrapper::{PendingQueue, TxPtr, TxWrapper};

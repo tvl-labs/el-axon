@@ -13,8 +13,8 @@ use protocol::{
     types::{
         Address, Block, BlockNumber, Bytes, ConsensusValidator, Eip1559Transaction, ExecResp, Hash,
         Hasher, Header, Hex, MerkleRoot, Metadata, Proof, Proposal, Public, Receipt,
-        SignatureComponents, SignedTransaction, TransactionAction, UnsignedTransaction,
-        UnverifiedTransaction, H160, H256, U256, U64,
+        SignatureComponents, SignedTransaction, UnsignedTransaction, UnverifiedTransaction, H256,
+        U256,
     },
     ProtocolResult,
 };
@@ -36,7 +36,7 @@ fn _mock_block_from_status(status: &CurrentStatus) -> Block {
         receipts_root:            Default::default(),
         gas_used:                 Default::default(),
         gas_limit:                Default::default(),
-        proposer:                 _mock_address().0,
+        proposer:                 _mock_address(),
         proof:                    _mock_proof(status.last_number),
         log_bloom:                Default::default(),
         extra_data:               Default::default(),
@@ -56,7 +56,7 @@ fn _mock_current_status() -> CurrentStatus {
         last_number:     0,
         last_state_root: _mock_hash(),
         tx_num_limit:    9,
-        max_tx_size:     U256::zero(),
+        max_tx_size:     U256::ZERO,
         proof:           Proof::default(),
     }
 }
@@ -81,7 +81,7 @@ fn _mock_hash() -> Hash {
 
 fn _mock_address() -> Address {
     let hash = _mock_hash();
-    Address::from_hash(hash)
+    Address::from_slice(&hash[12..])
 }
 
 fn _get_random_bytes(len: usize) -> Bytes {
@@ -105,25 +105,25 @@ fn _mock_validator() -> ConsensusValidator {
     }
 }
 
-fn gen_tx(sender: H160, addr: H160, value: u64, data: Vec<u8>) -> SignedTransaction {
+fn gen_tx(sender: Address, addr: Address, value: u64, data: Vec<u8>) -> SignedTransaction {
     SignedTransaction {
         transaction: UnverifiedTransaction {
             unsigned:  UnsignedTransaction::Eip1559(Eip1559Transaction {
-                nonce:                    U64::default(),
-                max_priority_fee_per_gas: U64::default(),
-                gas_price:                U64::default(),
-                gas_limit:                U64::from_str("0x1000000000").unwrap(),
-                action:                   TransactionAction::Call(addr),
-                value:                    value.into(),
-                data:                     data.into(),
-                access_list:              Vec::new(),
+                chain_id:                 5,
+                nonce:                    Default::default(),
+                max_priority_fee_per_gas: Default::default(),
+                max_fee_per_gas:          Default::default(),
+                gas_limit:                Default::default(),
+                value:                    Default::default(),
+                to:                       addr.into(),
+                input:                    data.into(),
+                access_list:              Default::default(),
             }),
             signature: Some(SignatureComponents {
                 standard_v: 0,
                 r:          Bytes::default(),
                 s:          Bytes::default(),
             }),
-            chain_id:  Some(0u64),
             hash:      H256::default(),
         },
         sender,
@@ -180,8 +180,8 @@ impl SynchronizationAdapter for MockSyncAdapter {
 
     fn get_tx_from_mem(&self, ctx: Context, tx_hash: &Hash) -> Option<SignedTransaction> {
         let tx = gen_tx(
-            H160::from_str("0xf000000000000000000000000000000000000000").unwrap(),
-            H160::from_str("0x1000000000000000000000000000000000000000").unwrap(),
+            Address::from_str("0xf000000000000000000000000000000000000000").unwrap(),
+            Address::from_str("0x1000000000000000000000000000000000000000").unwrap(),
             0,
             hex_decode("2839e92800000000000000000000000000000000000000000000000000000000000000030000000000000000000000000000000000000000000000000000000000000001").unwrap()
         );
@@ -294,7 +294,7 @@ impl CommonConsensusAdapter for MockSyncAdapter {
         state_root: Hash,
         proposal: &Proposal,
     ) -> ProtocolResult<Hash> {
-        Ok(H256::zero())
+        Ok(Hash::default())
     }
 
     async fn broadcast_number(&self, ctx: Context, height: u64) -> ProtocolResult<()> {

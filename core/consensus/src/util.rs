@@ -12,7 +12,7 @@ use common_crypto::{
 };
 use protocol::traits::Context;
 use protocol::types::{
-    Address, Bytes, Hash, Hasher, Hex, MerkleRoot, SignedTransaction, RLP_EMPTY_LIST,
+    Address, Bytes, BytesMut, Hash, Hasher, Hex, MerkleRoot, SignedTransaction, RLP_EMPTY_LIST,
 };
 use protocol::{ProtocolError, ProtocolResult};
 
@@ -20,7 +20,9 @@ pub fn digest_signed_transactions(stxs: &[SignedTransaction]) -> Hash {
     if stxs.is_empty() {
         RLP_EMPTY_LIST
     } else {
-        Hasher::digest(rlp::encode_list(stxs))
+        let mut buf = BytesMut::new();
+        alloy_rlp::encode_list(stxs, &mut buf);
+        Hasher::digest(buf)
     }
 }
 
@@ -48,7 +50,7 @@ pub struct OverlordCrypto {
 
 impl Crypto for OverlordCrypto {
     fn hash(&self, msg: Bytes) -> Bytes {
-        Bytes::from(Hasher::digest(msg).as_bytes().to_vec())
+        Bytes::from(Hasher::digest(msg).as_slice().to_vec())
     }
 
     fn sign(&self, hash: Bytes) -> Result<Bytes, Box<dyn Error + Send>> {
@@ -220,7 +222,7 @@ mod tests {
         ];
 
         let msg = Hasher::digest(Bytes::from("axon-consensus"));
-        let hash = HashValue::try_from(msg.as_bytes()).unwrap();
+        let hash = HashValue::try_from(msg.as_slice()).unwrap();
         let mut sigs_and_pub_keys = Vec::new();
         for i in 0..3 {
             let sig = BlsPrivateKey::try_from(private_keys[i].as_ref())

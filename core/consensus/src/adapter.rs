@@ -20,7 +20,7 @@ use protocol::traits::{
 use protocol::types::{
     BatchSignedTxs, Block, BlockNumber, BlockVersion, Bytes, ConsensusValidator, ExecResp, Hash,
     Header, Hex, MerkleRoot, Metadata, PackedTxHashes, Proof, Proposal, Receipt, SignedTransaction,
-    U256,
+    H256,
 };
 use protocol::{async_trait, tokio::task, trie, ProtocolResult};
 
@@ -58,7 +58,7 @@ where
         &self,
         ctx: Context,
         _number: u64,
-        gas_limit: U256,
+        gas_limit: u64,
         tx_num_limit: u64,
     ) -> ProtocolResult<PackedTxHashes> {
         self.mempool.package(ctx, gas_limit, tx_num_limit).await
@@ -339,7 +339,7 @@ where
             proposal.clone().into(),
         )?;
         let root = backend.get_metadata_root();
-        let metadata_handle = MetadataHandle::new(root);
+        let metadata_handle = MetadataHandle::new(H256::new(root.0));
 
         let verifier_list = metadata_handle
             .get_metadata_by_block_number(proposal.number)?
@@ -385,7 +385,8 @@ where
             Arc::clone(&self.storage),
             proposal.clone().into(),
         )?;
-        Ok(backend.get_metadata_root())
+        let root = backend.get_metadata_root();
+        Ok(Hash::new(root.0))
     }
 
     #[trace_span(kind = "consensus.adapter")]
@@ -522,7 +523,7 @@ where
             height:     proof.number,
             round:      proof.round,
             vote_type:  VoteType::Precommit,
-            block_hash: Bytes::from(proof.block_hash.as_bytes().to_vec()),
+            block_hash: Bytes::from(proof.block_hash.as_slice().to_vec()),
         };
 
         let weight_map = authority_list
@@ -537,7 +538,7 @@ where
         )
         .await?;
 
-        let vote_hash = self.crypto.hash(Bytes::from(rlp::encode(&vote)));
+        let vote_hash = self.crypto.hash(Bytes::from(alloy_rlp::encode(&vote)));
         let hex_pubkeys = metadata
             .verifier_list
             .iter()

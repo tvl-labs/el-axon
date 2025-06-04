@@ -1,13 +1,13 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use rand7::{random, rngs::OsRng};
 
 use common_crypto::{
     Crypto, PrivateKey, Secp256k1Recoverable, Secp256k1RecoverablePrivateKey, Signature,
 };
 use core_consensus::SignedTxsWAL;
-use protocol::rand::{random, rngs::OsRng};
 use protocol::types::{
-    Bytes, Eip1559Transaction, Hash, Hasher, SignatureComponents, SignedTransaction,
-    TransactionAction, UnsignedTransaction, UnverifiedTransaction,
+    Bytes, BytesMut, Eip1559Transaction, Hash, Hasher, SignatureComponents, SignedTransaction,
+    UnsignedTransaction, UnverifiedTransaction,
 };
 
 static FULL_TXS_PATH: &str = "./free-space/wal/txs";
@@ -28,27 +28,27 @@ pub fn get_random_bytes(len: usize) -> Bytes {
 fn mock_sign_tx() -> SignedTransaction {
     let mut utx = UnverifiedTransaction {
         unsigned:  UnsignedTransaction::Eip1559(Eip1559Transaction {
+            chain_id:                 5,
             nonce:                    Default::default(),
             max_priority_fee_per_gas: Default::default(),
-            gas_price:                Default::default(),
+            max_fee_per_gas:          Default::default(),
             gas_limit:                Default::default(),
-            action:                   TransactionAction::Create,
             value:                    Default::default(),
-            data:                     Bytes::new(),
-            access_list:              vec![],
+            to:                       Default::default(),
+            input:                    Default::default(),
+            access_list:              Default::default(),
         }),
         signature: Some(SignatureComponents {
             standard_v: 4,
             r:          Default::default(),
             s:          Default::default(),
         }),
-        chain_id:  Some(random::<u64>()),
         hash:      mock_hash(),
     }
     .calc_hash();
 
     let priv_key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
-    let signature = Secp256k1Recoverable::sign_message(utx.hash.as_bytes(), &priv_key.to_bytes())
+    let signature = Secp256k1Recoverable::sign_message(utx.hash.as_slice(), &priv_key.to_bytes())
         .unwrap()
         .to_bytes();
     utx.signature = Some(signature.into());
@@ -61,7 +61,10 @@ fn criterion_save_wal(c: &mut Criterion) {
     c.bench_function("save wal 1000 txs", |b| {
         let wal = SignedTxsWAL::new(FULL_TXS_PATH);
         let txs = mock_wal_txs(1000);
-        let txs_hash = Hasher::digest(Bytes::from(rlp::encode_list(&txs)));
+
+        let mut buf = BytesMut::new();
+        alloy_rlp::encode_list(&txs, &mut buf);
+        let txs_hash = Hasher::digest(buf.freeze());
 
         b.iter(|| {
             wal.save(1u64, txs_hash, txs.clone()).unwrap();
@@ -71,7 +74,10 @@ fn criterion_save_wal(c: &mut Criterion) {
     c.bench_function("save wal 2000 txs", |b| {
         let wal = SignedTxsWAL::new(FULL_TXS_PATH);
         let txs = mock_wal_txs(2000);
-        let txs_hash = Hasher::digest(Bytes::from(rlp::encode_list(&txs)));
+
+        let mut buf = BytesMut::new();
+        alloy_rlp::encode_list(&txs, &mut buf);
+        let txs_hash = Hasher::digest(buf.freeze());
 
         b.iter(|| {
             wal.save(1u64, txs_hash, txs.clone()).unwrap();
@@ -81,7 +87,10 @@ fn criterion_save_wal(c: &mut Criterion) {
     c.bench_function("save wal 4000 txs", |b| {
         let wal = SignedTxsWAL::new(FULL_TXS_PATH);
         let txs = mock_wal_txs(4000);
-        let txs_hash = Hasher::digest(Bytes::from(rlp::encode_list(&txs)));
+
+        let mut buf = BytesMut::new();
+        alloy_rlp::encode_list(&txs, &mut buf);
+        let txs_hash = Hasher::digest(buf.freeze());
 
         b.iter(|| {
             wal.save(1u64, txs_hash, txs.clone()).unwrap();
@@ -91,7 +100,10 @@ fn criterion_save_wal(c: &mut Criterion) {
     c.bench_function("save wal 8000 txs", |b| {
         let wal = SignedTxsWAL::new(FULL_TXS_PATH);
         let txs = mock_wal_txs(8000);
-        let txs_hash = Hasher::digest(Bytes::from(rlp::encode_list(&txs)));
+
+        let mut buf = BytesMut::new();
+        alloy_rlp::encode_list(&txs, &mut buf);
+        let txs_hash = Hasher::digest(buf.freeze());
 
         b.iter(|| {
             wal.save(1u64, txs_hash, txs.clone()).unwrap();
@@ -101,7 +113,10 @@ fn criterion_save_wal(c: &mut Criterion) {
     c.bench_function("save wal 16000 txs", |b| {
         let wal = SignedTxsWAL::new(FULL_TXS_PATH);
         let txs = mock_wal_txs(16000);
-        let txs_hash = Hasher::digest(Bytes::from(rlp::encode_list(&txs)));
+
+        let mut buf = BytesMut::new();
+        alloy_rlp::encode_list(&txs, &mut buf);
+        let txs_hash = Hasher::digest(buf.freeze());
 
         b.iter(|| {
             wal.save(1u64, txs_hash, txs.clone()).unwrap();
@@ -115,7 +130,9 @@ fn criterion_txs_rlp_encode(c: &mut Criterion) {
         let txs = mock_wal_txs(20000);
 
         b.iter(|| {
-            let _ = rlp::encode_list(&txs);
+            let mut buf = BytesMut::new();
+            alloy_rlp::encode_list(&txs, &mut buf);
+            let _ = buf.freeze();
         });
     });
 }

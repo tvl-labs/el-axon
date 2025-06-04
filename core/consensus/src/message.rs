@@ -4,7 +4,6 @@ use futures::TryFutureExt;
 use log::warn;
 use overlord::types::{AggregatedVote, SignedChoke, SignedProposal, SignedVote};
 use overlord::Codec;
-use rlp::Encodable;
 
 use common_apm_derive::trace_span;
 use protocol::constants::endpoints::{
@@ -22,24 +21,12 @@ pub use crate::types::PullTxsRequest;
 
 macro_rules! overlord_message {
     ($msg_name: ident, $overlord_type_name: ident) => {
-        #[derive(Clone, Debug, PartialEq, Eq)]
+        #[derive(alloy_rlp::RlpEncodable, alloy_rlp::RlpDecodable, Clone, Debug, PartialEq, Eq)]
         pub struct $msg_name(pub protocol::types::Bytes);
 
         impl From<$overlord_type_name> for $msg_name {
             fn from(overlord_ty: $overlord_type_name) -> Self {
-                Self(overlord_ty.rlp_bytes().freeze())
-            }
-        }
-
-        impl protocol::codec::ProtocolCodec for $msg_name {
-            fn encode(&self) -> protocol::ProtocolResult<protocol::types::Bytes> {
-                Ok(self.0.clone())
-            }
-
-            fn decode<B: AsRef<[u8]>>(bytes: B) -> protocol::ProtocolResult<Self> {
-                Ok(Self(rlp::decode(bytes.as_ref()).map_err(|_| {
-                    crate::ConsensusError::DecodeErr(crate::ConsensusType::SignedChoke)
-                })?))
+                Self(alloy_rlp::encode(&overlord_ty).into())
             }
         }
 
@@ -51,24 +38,12 @@ macro_rules! overlord_message {
     };
 
     ($msg_name: ident, $overlord_type_name: ident, $other_type: ident) => {
-        #[derive(Clone, Debug, PartialEq, Eq)]
+        #[derive(alloy_rlp::RlpEncodable, alloy_rlp::RlpDecodable, Clone, Debug, PartialEq, Eq)]
         pub struct $msg_name(pub protocol::types::Bytes);
 
         impl<$other_type: Codec> From<$overlord_type_name<$other_type>> for $msg_name {
             fn from(overlord_ty: $overlord_type_name<$other_type>) -> Self {
-                Self(overlord_ty.rlp_bytes().freeze())
-            }
-        }
-
-        impl protocol::codec::ProtocolCodec for $msg_name {
-            fn encode(&self) -> protocol::ProtocolResult<protocol::types::Bytes> {
-                Ok(self.0.clone())
-            }
-
-            fn decode<B: AsRef<[u8]>>(bytes: B) -> protocol::ProtocolResult<Self> {
-                Ok(Self(rlp::decode(bytes.as_ref()).map_err(|_| {
-                    crate::ConsensusError::DecodeErr(crate::ConsensusType::SignedChoke)
-                })?))
+                Self(alloy_rlp::encode(&overlord_ty).into())
             }
         }
 

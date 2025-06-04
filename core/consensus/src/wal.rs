@@ -174,7 +174,7 @@ impl ConsensusWal {
         let check_sum = Hasher::digest(info.clone());
 
         let mut content = BytesMut::new();
-        content.put(check_sum.as_bytes());
+        content.put(check_sum.as_slice());
         content.put(info);
 
         let (data_path, timestamp) = {
@@ -282,13 +282,13 @@ impl ConsensusWal {
 
             let mut info = Bytes::from(read_buf);
 
-            if info.len() < Hash::default().as_bytes().len() {
+            if info.len() < Hash::default().as_slice().len() {
                 continue;
             }
 
-            let content = info.split_off(Hash::default().as_bytes().len());
+            let content = info.split_off(Hash::default().as_slice().len());
 
-            if info == Hasher::digest(&content).as_bytes() {
+            if info == Hasher::digest(&content).as_slice() {
                 break Some(content);
             } else {
                 index += 1;
@@ -318,12 +318,11 @@ mod tests {
     use common_crypto::{
         Crypto, PrivateKey, Secp256k1Recoverable, Secp256k1RecoverablePrivateKey, Signature,
     };
-
-    use protocol::rand::{random, rngs::OsRng};
     use protocol::types::{
-        Bytes, Eip1559Transaction, Hash, SignatureComponents, SignedTransaction, TransactionAction,
+        Bytes, Eip1559Transaction, Hash, SignatureComponents, SignedTransaction, TxKind,
         UnsignedTransaction, UnverifiedTransaction,
     };
+    use rand7::{random, rngs::OsRng};
 
     use super::*;
 
@@ -338,28 +337,28 @@ mod tests {
     fn mock_sign_tx() -> SignedTransaction {
         let mut utx = UnverifiedTransaction {
             unsigned:  UnsignedTransaction::Eip1559(Eip1559Transaction {
+                chain_id:                 5,
                 nonce:                    Default::default(),
                 max_priority_fee_per_gas: Default::default(),
-                gas_price:                Default::default(),
+                max_fee_per_gas:          Default::default(),
                 gas_limit:                Default::default(),
-                action:                   TransactionAction::Create,
+                to:                       TxKind::Create,
                 value:                    Default::default(),
-                data:                     Bytes::new(),
-                access_list:              vec![],
+                input:                    Bytes::new().into(),
+                access_list:              Default::default(),
             }),
             signature: Some(SignatureComponents {
                 standard_v: 4,
                 r:          Default::default(),
                 s:          Default::default(),
             }),
-            chain_id:  Some(random::<u64>()),
             hash:      mock_hash(),
         }
         .calc_hash();
 
         let priv_key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
         let signature =
-            Secp256k1Recoverable::sign_message(utx.hash.as_bytes(), &priv_key.to_bytes())
+            Secp256k1Recoverable::sign_message(utx.hash.as_slice(), &priv_key.to_bytes())
                 .unwrap()
                 .to_bytes();
         utx.signature = Some(signature.into());
@@ -378,12 +377,13 @@ mod tests {
 
     #[test]
     fn test_txs_wal() {
-        let _ = fs::remove_dir_all(PathBuf::from_str(FULL_TXS_PATH).unwrap());
+        fs::remove_dir_all(PathBuf::from_str(FULL_TXS_PATH).unwrap()).unwrap();
 
         let wal = SignedTxsWAL::new(FULL_TXS_PATH);
         let txs_01 = mock_wal_txs(100);
         let hash_01 = Hasher::digest(BatchSignedTxs::new(txs_01.clone()).encode_msg().unwrap());
         wal.save(1u64, hash_01, txs_01.clone()).unwrap();
+
         let txs_02 = mock_wal_txs(100);
         let hash_02 = Hasher::digest(BatchSignedTxs::new(txs_02.clone()).encode_msg().unwrap());
         wal.save(3u64, hash_02, txs_02.clone()).unwrap();

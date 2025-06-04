@@ -2620,6 +2620,7 @@ dependencies = [
  "core-consensus",
  "core-executor",
  "core-interoperation",
+ "derive_more 2.0.1",
  "either",
  "hyper 1.6.0",
  "json",
@@ -2658,6 +2659,7 @@ dependencies = [
 name = "core-consensus"
 version = "0.1.0"
 dependencies = [
+ "alloy-rlp",
  "arc-swap",
  "axon-protocol",
  "bit-vec 0.6.3",
@@ -2671,6 +2673,7 @@ dependencies = [
  "core-network",
  "core-storage",
  "criterion",
+ "derive_more 2.0.1",
  "futures",
  "json",
  "lazy_static",
@@ -2678,6 +2681,7 @@ dependencies = [
  "num-traits",
  "overlord",
  "parking_lot 0.12.3",
+ "rand 0.7.3",
  "serde",
  "serde_json",
 ]
@@ -6097,8 +6101,9 @@ checksum = "ceedf44fb00f2d1984b0bc98102627ce622e083e49a5bacdb3e514fa4238e267"
 [[package]]
 name = "overlord"
 version = "0.5.0"
-source = "git+https://github.com/tvl-labs/overlord.git#4e348566f093e4218de033d22838196eee792468"
+source = "git+https://github.com/tvl-labs/overlord.git#e93c9fef1fbf3d8b374e54fa3eec9705745178b5"
 dependencies = [
+ "alloy-rlp",
  "async-trait",
  "bcs",
  "bit-vec 0.8.0",
