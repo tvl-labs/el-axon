@@ -1,18 +1,18 @@
 use std::sync::Arc;
 
 use dashmap::DashMap;
+use rand7::{random, rngs::OsRng};
 
 use common_crypto::{
     Crypto, PrivateKey, Secp256k1Recoverable, Secp256k1RecoverablePrivateKey,
     Secp256k1RecoverablePublicKey, Signature, ToPublicKey, UncompressedPublicKey,
 };
 
-use protocol::rand::{random, rngs::OsRng};
 use protocol::traits::{Context, MemPool, MemPoolAdapter};
 use protocol::types::{
-    public_to_address, recover_intact_pub_key, Bytes, Eip1559Transaction, Hash, PackedTxHashes,
-    Public, SignedTransaction, TransactionAction, UnsignedTransaction, UnverifiedTransaction, H160,
-    H256, U256, U64,
+    public_to_address, recover_intact_pub_key, Address, Bytes, Eip1559Transaction, Hash,
+    PackedTxHashes, Public, SignedTransaction, TxKind, UnsignedTransaction, UnverifiedTransaction,
+    H256, U256,
 };
 use protocol::{async_trait, tokio, ProtocolResult};
 
@@ -26,7 +26,7 @@ pub const POOL_SIZE: usize = 100_000;
 pub const MAX_TX_SIZE: u64 = 1024; // 1KB
 pub const TIMEOUT: u64 = 1000;
 pub const TIMEOUT_GAP: u64 = 100;
-pub const NATIVE_TOKEN_ISSUE_ADDRESS: H160 = system_contract_address(0x0);
+pub const NATIVE_TOKEN_ISSUE_ADDRESS: Address = Address::new(system_contract_address(0x0).0);
 
 pub struct HashMemPoolAdapter {
     network_txs: DashMap<Hash, SignedTransaction>,
@@ -71,8 +71,8 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         &self,
         _ctx: Context,
         _tx: &SignedTransaction,
-    ) -> ProtocolResult<U64> {
-        Ok(U64::zero())
+    ) -> ProtocolResult<u64> {
+        Ok(0)
     }
 
     async fn check_transaction(&self, _ctx: Context, tx: &SignedTransaction) -> ProtocolResult<()> {
@@ -134,18 +134,19 @@ pub async fn default_mempool() -> MemPoolImpl<HashMemPoolAdapter> {
 
 pub fn mock_transaction(nonce: u64, is_call_system_script: bool) -> Eip1559Transaction {
     Eip1559Transaction {
+        chain_id:                 5,
         nonce:                    nonce.into(),
-        gas_limit:                U64::one(),
-        max_priority_fee_per_gas: U64::one(),
-        gas_price:                U64::one(),
-        action:                   if is_call_system_script {
-            TransactionAction::Call(NATIVE_TOKEN_ISSUE_ADDRESS)
+        gas_limit:                1,
+        max_priority_fee_per_gas: 1,
+        max_fee_per_gas:          1,
+        to:                       if is_call_system_script {
+            TxKind::Call(NATIVE_TOKEN_ISSUE_ADDRESS)
         } else {
-            TransactionAction::Create
+            TxKind::Create
         },
-        value:                    U256::one(),
-        data:                     random_bytes(32).to_vec().into(),
-        access_list:              vec![],
+        input:                    random_bytes(32).to_vec().into(),
+        access_list:              Default::default(),
+        value:                    U256::ONE,
     }
 }
 
@@ -160,12 +161,11 @@ pub fn mock_signed_tx(
     let mut tx = UnverifiedTransaction {
         unsigned:  UnsignedTransaction::Eip1559(raw),
         signature: None,
-        chain_id:  Some(random::<u64>()),
         hash:      Default::default(),
     };
 
     let signature = if valid {
-        Secp256k1Recoverable::sign_message(tx.signature_hash(true).as_bytes(), &priv_key.to_bytes())
+        Secp256k1Recoverable::sign_message(tx.signature_hash(true).as_slice(), &priv_key.to_bytes())
             .unwrap()
             .to_bytes()
     } else {
@@ -204,14 +204,14 @@ fn check_hash(tx: &SignedTransaction) -> ProtocolResult<()> {
 
 pub fn check_sig(stx: &SignedTransaction) -> ProtocolResult<()> {
     Secp256k1Recoverable::verify_signature(
-        stx.transaction.signature_hash(true).as_bytes(),
+        stx.transaction.signature_hash(true).as_slice(),
         stx.transaction
             .signature
             .as_ref()
             .unwrap()
             .as_bytes()
             .as_ref(),
-        recover_intact_pub_key(&stx.public.unwrap()).as_bytes(),
+        recover_intact_pub_key(&stx.public.unwrap()).as_ref(),
     )
     .map_err(|err| AdapterError::VerifySignature(err.to_string()))?;
     Ok(())
@@ -273,7 +273,7 @@ pub async fn exec_flush(remove_hashes: Vec<Hash>, mempool: Arc<MemPoolImpl<HashM
 
 pub async fn exec_package(
     mempool: Arc<MemPoolImpl<HashMemPoolAdapter>>,
-    cycle_limit: U256,
+    cycle_limit: u64,
     tx_num_limit: u64,
 ) -> PackedTxHashes {
     mempool

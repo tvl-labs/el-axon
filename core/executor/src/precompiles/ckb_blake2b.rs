@@ -1,7 +1,7 @@
 use evm::executor::stack::{PrecompileFailure, PrecompileOutput};
 use evm::{Context, ExitError, ExitSucceed};
 
-use protocol::{ckb_blake2b_256, types::H160};
+use protocol::ckb_blake2b_256;
 
 use crate::err;
 use crate::precompiles::{axon_precompile_address, PrecompileContract};
@@ -10,7 +10,7 @@ use crate::precompiles::{axon_precompile_address, PrecompileContract};
 pub struct CkbBlake2b;
 
 impl PrecompileContract for CkbBlake2b {
-    const ADDRESS: H160 = axon_precompile_address(0x06);
+    const ADDRESS: evm_types::H160 = axon_precompile_address(0x06);
     const MIN_GAS: u64 = 60;
 
     fn exec_fn(

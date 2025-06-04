@@ -182,7 +182,7 @@ fn rand_remove_list<T: Clone>(keys: Vec<&T>, num: usize) -> impl Iterator<Item =
     let mut ret = Vec::with_capacity(num);
 
     for _ in 0..num {
-        let tmp = rng.gen_range(0, len);
+        let tmp = rng.gen_range(0..len);
         let idx = idx_list.remove(tmp);
         ret.push(keys[idx].clone());
         len -= 1;

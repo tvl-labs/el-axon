@@ -15,7 +15,7 @@ pub use crate::system_contract::{
     metadata::{MetadataHandle, HARDFORK_INFO},
     DataProvider,
 };
-pub use crate::utils::{code_address, decode_revert_msg, DefaultFeeAllocator, FeeInlet};
+pub use crate::utils::{decode_revert_msg, DefaultFeeAllocator, FeeInlet};
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -28,8 +28,8 @@ use evm::CreateScheme;
 use common_merkle::TrieMerkle;
 use protocol::traits::{Backend, Executor, ExecutorAdapter};
 use protocol::types::{
-    logs_bloom, Config, ExecResp, SignedTransaction, TransactionAction, TxResp, ValidatorExtend,
-    H160, H256, RLP_NULL, U256,
+    Address, Config, ExecResp, SignedTransaction, TxKind, TxResp, ValidatorExtend, H256, RLP_NULL,
+    U256, U64,
 };
 
 use crate::precompiles::build_precompile_set;
@@ -38,6 +38,7 @@ use crate::system_contract::{
     CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, HEADER_CELL_ROOT_KEY, METADATA_CONTRACT_ADDRESS,
     METADATA_ROOT_KEY,
 };
+use crate::utils::code_address;
 
 lazy_static::lazy_static! {
     pub static ref FEE_ALLOCATOR: ArcSwap<Box<dyn FeeAllocate>> = ArcSwap::from_pointee(Box::new(DefaultFeeAllocator));
@@ -53,7 +54,7 @@ pub trait FeeAllocate: Sync + Send {
         &self,
         block_number: U256,
         fee_collect: U256,
-        proposer: H160,
+        proposer: Address,
         validators: &[ValidatorExtend],
     ) -> Vec<FeeInlet>;
 }
@@ -67,8 +68,8 @@ impl Executor for AxonExecutor {
         &self,
         backend: &B,
         gas_limit: u64,
-        from: Option<H160>,
-        to: Option<H160>,
+        from: Option<Address>,
+        to: Option<Address>,
         value: U256,
         data: Vec<u8>,
         is_estimate: bool,
@@ -82,15 +83,21 @@ impl Executor for AxonExecutor {
 
         let (exit, res) = if let Some(addr) = &to {
             executor.transact_call(
-                from.unwrap_or_default(),
-                *addr,
-                value,
+                evm_types::H160(from.unwrap_or_default().into_array()),
+                evm_types::H160(addr.into_array()),
+                evm_types::U256(value.into_limbs()),
                 data,
                 gas_limit,
                 Vec::new(),
             )
         } else {
-            executor.transact_create(from.unwrap_or_default(), value, data, gas_limit, Vec::new())
+            executor.transact_create(
+                evm_types::H160(from.unwrap_or_default().into_array()),
+                evm_types::U256(value.into_limbs()),
+                data,
+                gas_limit,
+                Vec::new(),
+            )
         };
 
         let used_gas = executor.used_gas();
@@ -101,27 +108,29 @@ impl Executor for AxonExecutor {
             used_gas
         };
 
+        let fee_cost = U256::from_limbs(backend.gas_price().0).checked_mul(U256::from(used_gas));
+        let code_addr = if to.is_none() {
+            let address: evm_types::H256 = executor
+                .create_address(CreateScheme::Legacy {
+                    caller: from
+                        .map(|c| evm_types::H160(c.into_array()))
+                        .unwrap_or_default(),
+                })
+                .into();
+
+            Some(H256::new(address.0))
+        } else {
+            None
+        };
+
         TxResp {
             exit_reason:  exit,
             ret:          res,
             remain_gas:   executor.gas(),
             gas_used:     used_gas,
-            fee_cost:     backend
-                .gas_price()
-                .checked_mul(used_gas.into())
-                .unwrap_or(U256::max_value()),
+            fee_cost:     fee_cost.unwrap_or(U256::MAX),
             logs:         vec![],
-            code_address: if to.is_none() {
-                Some(
-                    executor
-                        .create_address(CreateScheme::Legacy {
-                            caller: from.unwrap_or_default(),
-                        })
-                        .into(),
-                )
-            } else {
-                None
-            },
+            code_address: code_addr,
             removed:      false,
         }
     }
@@ -137,7 +146,7 @@ impl Executor for AxonExecutor {
         let block_number = adapter.block_number();
         let mut res = Vec::with_capacity(txs_len);
         let mut encode_receipts = Vec::with_capacity(txs_len);
-        let (mut gas, mut fee) = (0u64, U256::zero());
+        let (mut gas, mut fee) = (0u64, U256::ZERO);
         let precompiles = build_precompile_set();
         self.init_local_system_contract_roots(adapter);
         let config = self.config();
@@ -146,7 +155,7 @@ impl Executor for AxonExecutor {
         before_block_hook(adapter);
 
         for tx in txs.iter() {
-            adapter.set_gas_price(tx.transaction.unsigned.gas_price());
+            adapter.set_gas_price(U64::from(tx.transaction.unsigned.gas_price()));
             adapter.set_origin(tx.sender);
 
             // Execute a transaction, if system contract dispatch return None, means the
@@ -156,10 +165,9 @@ impl Executor for AxonExecutor {
 
             r.logs = adapter.take_logs();
             gas += r.gas_used;
-            fee = fee.checked_add(r.fee_cost).unwrap_or(U256::max_value());
+            fee = fee.checked_add(r.fee_cost).unwrap_or(U256::MAX);
 
-            let logs_bloom = logs_bloom(r.logs.iter());
-            let receipt = tx.encode_receipt(&r, logs_bloom);
+            let receipt = tx.encode_receipt(&r);
             encode_receipts.push(receipt);
 
             res.push(r);
@@ -167,10 +175,12 @@ impl Executor for AxonExecutor {
 
         // Allocate collected fee for validators
         if !block_number.is_zero() {
-            let alloc =
-                (*FEE_ALLOCATOR)
-                    .load()
-                    .allocate(block_number, fee, adapter.origin(), validators);
+            let alloc = (*FEE_ALLOCATOR).load().allocate(
+                U256::from_limbs(block_number.0),
+                fee,
+                Address::new(adapter.origin().0),
+                validators,
+            );
 
             for i in alloc.iter() {
                 if !i.amount.is_zero() {
@@ -212,23 +222,23 @@ impl Executor for AxonExecutor {
 #[test]
 fn test_receipt() {
     use evm::{ExitReason, ExitSucceed};
-    use protocol::types::{Eip1559Transaction, UnsignedTransaction, UnverifiedTransaction};
+    use protocol::types::{Eip1559Transaction, Log, UnsignedTransaction, UnverifiedTransaction};
 
     let eip1559_tx = Eip1559Transaction {
         nonce:                    Default::default(),
         max_priority_fee_per_gas: Default::default(),
-        gas_price:                Default::default(),
+        max_fee_per_gas:          Default::default(),
         gas_limit:                Default::default(),
-        action:                   TransactionAction::Create,
+        to:                       Default::default(),
+        input:                    Default::default(),
         value:                    Default::default(),
-        data:                     Default::default(),
         access_list:              Default::default(),
+        chain_id:                 Default::default(),
     };
     let unsigned_tx = UnsignedTransaction::Eip1559(eip1559_tx);
     let unverified_tx = UnverifiedTransaction {
         unsigned:  unsigned_tx,
         signature: Default::default(),
-        chain_id:  Default::default(),
         hash:      Default::default(),
     };
     let tx = SignedTransaction {
@@ -238,11 +248,7 @@ fn test_receipt() {
     };
 
     let exit_reason = ExitReason::Succeed(ExitSucceed::Stopped);
-    let log = evm::backend::Log {
-        address: Default::default(),
-        topics:  Default::default(),
-        data:    Default::default(),
-    };
+    let log = Log::new_unchecked(Default::default(), Default::default(), Default::default());
     let tx_resp = TxResp {
         exit_reason,
         ret: Default::default(),
@@ -254,8 +260,7 @@ fn test_receipt() {
         removed: Default::default(),
     };
 
-    let logs_bloom = logs_bloom(tx_resp.logs.iter());
-    let receipt = tx.encode_receipt(&tx_resp, logs_bloom);
+    let receipt = tx.encode_receipt(&tx_resp);
 
     let reference_encode: Vec<u8> = [
         2u8, 249, 1, 30, 1, 10, 185, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -296,7 +301,7 @@ impl AxonExecutor {
     pub fn evm_exec<Adapter: ExecutorAdapter>(
         adapter: &mut Adapter,
         config: &Config,
-        precompiles: &BTreeMap<H160, PrecompileFn>,
+        precompiles: &BTreeMap<evm_types::H160, PrecompileFn>,
         tx: &SignedTransaction,
     ) -> TxResp {
         // Deduct pre-pay gas
@@ -305,10 +310,11 @@ impl AxonExecutor {
         // `core/executor/src/adapter/backend/read_only.rs`. The `gas_price` is never
         // larger than u64::MAX.
         let tx_gas_price = adapter.gas_price();
-        let gas_limit = tx.transaction.unsigned.gas_limit().low_u64();
+        let gas_limit = tx.transaction.unsigned.gas_limit();
         // The overflow check is done in the `check_authorization` function
         // of`core/mempool/src/adapter/mod.rs`.
-        let prepay_gas = tx_gas_price * U256::from(gas_limit);
+        let prepay_gas = tx_gas_price * evm_types::U256::from(*gas_limit);
+        let prepay_gas = U256::from_limbs(prepay_gas.0);
 
         let mut account = adapter.get_account(&sender);
         let old_nonce = account.nonce;
@@ -316,7 +322,7 @@ impl AxonExecutor {
         account.balance = account.balance.saturating_sub(prepay_gas);
         adapter.save_account(&sender, &account);
 
-        let metadata = StackSubstateMetadata::new(gas_limit, config);
+        let metadata = StackSubstateMetadata::new(*gas_limit, config);
         let mut executor = StackExecutor::new_with_precompiles(
             MemoryStackState::new(metadata, adapter),
             config,
@@ -327,24 +333,33 @@ impl AxonExecutor {
             .transaction
             .unsigned
             .access_list()
+            .0
             .into_iter()
-            .map(|x| (x.address, x.storage_keys))
+            .map(|x| {
+                (
+                    evm_types::H160(x.address.into_array()),
+                    x.storage_keys
+                        .into_iter()
+                        .map(|y| evm_types::H256(y.0))
+                        .collect::<Vec<_>>(),
+                )
+            })
             .collect::<Vec<_>>();
 
         let (exit, res) = match tx.transaction.unsigned.action() {
-            TransactionAction::Call(addr) => executor.transact_call(
-                tx.sender,
-                *addr,
-                *tx.transaction.unsigned.value(),
+            TxKind::Call(addr) => executor.transact_call(
+                evm_types::H160(tx.sender.into_array()),
+                evm_types::H160(addr.into_array()),
+                evm_types::U256(tx.transaction.unsigned.value().into_limbs()),
                 tx.transaction.unsigned.data().to_vec(),
-                gas_limit,
+                *gas_limit,
                 access_list,
             ),
-            TransactionAction::Create => executor.transact_create(
-                tx.sender,
-                *tx.transaction.unsigned.value(),
+            TxKind::Create => executor.transact_create(
+                evm_types::H160(tx.sender.into_array()),
+                evm_types::U256(tx.transaction.unsigned.value().into_limbs()),
                 tx.transaction.unsigned.data().to_vec(),
-                gas_limit,
+                *gas_limit,
                 access_list,
             ),
         };
@@ -352,10 +367,14 @@ impl AxonExecutor {
         let remained_gas = executor.gas();
         let used_gas = executor.used_gas();
 
-        let code_addr = if tx.transaction.unsigned.action() == &TransactionAction::Create
-            && exit.is_succeed()
-        {
-            Some(code_address(&tx.sender, &old_nonce))
+        let code_addr = if tx.transaction.unsigned.action() == TxKind::Create && exit.is_succeed() {
+            Some(H256::new(
+                code_address(
+                    &evm_types::H160(tx.sender.into_array()),
+                    &evm_types::U256::from(old_nonce),
+                )
+                .0,
+            ))
         } else {
             None
         };
@@ -366,15 +385,12 @@ impl AxonExecutor {
         }
 
         let mut account = adapter.get_account(&tx.sender);
-        account.nonce = old_nonce + U256::one();
+        account.nonce = old_nonce + 1;
 
         // Add remain gas
         if remained_gas != 0 {
-            let remain_gas = U256::from(remained_gas) * tx_gas_price;
-            account.balance = account
-                .balance
-                .checked_add(remain_gas)
-                .unwrap_or_else(U256::max_value);
+            let remain_gas = U256::from(remained_gas) * U256::from_limbs(tx_gas_price.0);
+            account.balance = account.balance.checked_add(remain_gas).unwrap_or(U256::MAX);
         }
 
         adapter.save_account(&tx.sender, &account);
@@ -384,8 +400,8 @@ impl AxonExecutor {
             ret:          res,
             remain_gas:   remained_gas,
             gas_used:     used_gas,
-            fee_cost:     tx_gas_price * U256::from(used_gas), /* used_gas must le transaction
-                                                                * gas_limit */
+            fee_cost:     U256::from_limbs(tx_gas_price.0) * U256::from(used_gas), /* used_gas must le transaction
+                                                                                    * gas_limit */
             logs:         vec![],
             code_address: code_addr,
             removed:      false,
@@ -397,12 +413,18 @@ impl AxonExecutor {
     /// thread context is not switched during exec function.
     fn init_local_system_contract_roots<Adapter: Backend>(&self, adapter: &Adapter) {
         CURRENT_HEADER_CELL_ROOT.with(|root| {
-            *root.borrow_mut() =
-                adapter.storage(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY);
+            *root.borrow_mut() = {
+                let new_root =
+                    adapter.storage(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY);
+                H256::new(new_root.0)
+            }
         });
 
         CURRENT_METADATA_ROOT.with(|root| {
-            *root.borrow_mut() = adapter.storage(METADATA_CONTRACT_ADDRESS, *METADATA_ROOT_KEY);
+            *root.borrow_mut() = {
+                let new_root = adapter.storage(METADATA_CONTRACT_ADDRESS, *METADATA_ROOT_KEY);
+                H256::new(new_root.0)
+            }
         });
     }
 
@@ -433,12 +455,12 @@ impl AxonExecutor {
         let block_number = adapter.block_number();
         let mut res = Vec::with_capacity(txs_len);
         let mut encode_receipts = Vec::with_capacity(txs_len);
-        let (mut gas, mut fee) = (0u64, U256::zero());
+        let (mut gas, mut fee) = (0u64, U256::ZERO);
         let precompiles = build_precompile_set();
         let config = Config::london();
 
         for tx in txs.iter() {
-            adapter.set_gas_price(tx.transaction.unsigned.gas_price());
+            adapter.set_gas_price(U64::from(tx.transaction.unsigned.gas_price()));
             adapter.set_origin(tx.sender);
 
             // Execute a transaction, if system contract dispatch return None, means the
@@ -448,10 +470,9 @@ impl AxonExecutor {
 
             r.logs = adapter.take_logs();
             gas += r.gas_used;
-            fee = fee.checked_add(r.fee_cost).unwrap_or(U256::max_value());
+            fee = fee.checked_add(r.fee_cost).unwrap_or(U256::MAX);
 
-            let logs_bloom = logs_bloom(r.logs.iter());
-            let receipt = tx.encode_receipt(&r, logs_bloom);
+            let receipt = tx.encode_receipt(&r);
             encode_receipts.push(receipt);
 
             res.push(r);
@@ -459,10 +480,12 @@ impl AxonExecutor {
 
         // Allocate collected fee for validators
         if !block_number.is_zero() {
-            let alloc =
-                (*FEE_ALLOCATOR)
-                    .load()
-                    .allocate(block_number, fee, adapter.origin(), validators);
+            let alloc = (*FEE_ALLOCATOR).load().allocate(
+                U256::from_limbs(block_number.0),
+                fee,
+                Address::new(adapter.origin().0),
+                validators,
+            );
 
             for i in alloc.iter() {
                 if !i.amount.is_zero() {
@@ -495,15 +518,15 @@ impl AxonExecutor {
     }
 }
 
-pub fn is_transaction_call(action: &TransactionAction, addr: &H160) -> bool {
-    action == &TransactionAction::Call(*addr)
+pub fn is_transaction_call(action: &TxKind, addr: &Address) -> bool {
+    action == &TxKind::Call(*addr)
 }
 
 pub fn enable_hardfork(name: HardforkName) -> bool {
     let latest_hardfork_info = &**HARDFORK_INFO.load();
-    let enable_flag = H256::from_low_u64_be((name as u64).to_be());
+    let enable_flag = H256::left_padding_from(&(name as u64).to_be_bytes());
 
-    latest_hardfork_info & &enable_flag == enable_flag
+    *latest_hardfork_info & &enable_flag == enable_flag
 }
 
 #[cfg(test)]

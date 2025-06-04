@@ -7,9 +7,10 @@ pub use store::{CellInfo, CellKey};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use ethers::abi::AbiDecode;
+use evm_types::U64;
 
 use protocol::traits::{ApplyBackend, ExecutorAdapter};
-use protocol::types::{SignedTransaction, TxResp, H160, H256};
+use protocol::types::{SignedTransaction, TxResp, H256};
 use protocol::ProtocolResult;
 
 use crate::system_contract::image_cell::store::ImageCellStore;
@@ -17,7 +18,7 @@ use crate::system_contract::utils::{succeed_resp, update_states};
 use crate::system_contract::{system_contract_address, SystemContract};
 use crate::{exec_try, system_contract_struct, MPTTrie, CURRENT_HEADER_CELL_ROOT};
 
-pub const IMAGE_CELL_CONTRACT_ADDRESS: H160 = system_contract_address(0x3);
+pub const IMAGE_CELL_CONTRACT_ADDRESS: evm_types::H160 = system_contract_address(0x3);
 static ALLOW_READ: AtomicBool = AtomicBool::new(false);
 
 system_contract_struct!(ImageCellContract);
@@ -25,15 +26,15 @@ system_contract_struct!(ImageCellContract);
 impl<Adapter: ExecutorAdapter + ApplyBackend> SystemContract<Adapter>
     for ImageCellContract<Adapter>
 {
-    const ADDRESS: H160 = IMAGE_CELL_CONTRACT_ADDRESS;
+    const ADDRESS: evm_types::H160 = IMAGE_CELL_CONTRACT_ADDRESS;
 
     fn exec_(&self, adapter: &mut Adapter, tx: &SignedTransaction) -> TxResp {
         let sender = tx.sender;
         let tx = &tx.transaction.unsigned;
         let tx_data = tx.data();
-        let gas_limit = *tx.gas_limit();
+        let gas_limit = U64::from(*tx.gas_limit());
 
-        let root = CURRENT_HEADER_CELL_ROOT.with(|r| *r.borrow());
+        let root = H256::new(CURRENT_HEADER_CELL_ROOT.with(|r| *r.borrow()).0);
         let mut store = exec_try!(
             ImageCellStore::new(root),
             gas_limit,
@@ -62,6 +63,7 @@ impl<Adapter: ExecutorAdapter + ApplyBackend> SystemContract<Adapter>
             }
         }
 
+        let sender = evm_types::H160(sender.into_array());
         update_states(adapter, sender, Self::ADDRESS);
         succeed_resp(gas_limit)
     }

@@ -12,7 +12,7 @@ pub trait MemPool: Send + Sync {
     async fn package(
         &self,
         ctx: Context,
-        cycles_limit: U256,
+        cycles_limit: u64,
         tx_num_limit: u64,
     ) -> ProtocolResult<PackedTxHashes>;
 
@@ -67,7 +67,7 @@ pub trait MemPoolAdapter: Send + Sync {
         &self,
         ctx: Context,
         tx: &SignedTransaction,
-    ) -> ProtocolResult<U64>;
+    ) -> ProtocolResult<u64>;
 
     async fn check_transaction(&self, ctx: Context, tx: &SignedTransaction) -> ProtocolResult<()>;
 

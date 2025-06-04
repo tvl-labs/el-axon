@@ -10,9 +10,7 @@ use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 
 use protocol::tokio::{self, time::sleep};
-use protocol::types::{
-    BlockNumber, Bytes, Hash, PackedTxHashes, SignedTransaction, H160, U256, U64,
-};
+use protocol::types::{Address, BlockNumber, Bytes, Hash, PackedTxHashes, SignedTransaction, U256};
 use protocol::{constants::MEMPOOL_REFRESH_TIMEOUT, ProtocolResult};
 
 use crate::tx_wrapper::{PendingQueue, TxPtr, TxWrapper};
@@ -23,9 +21,9 @@ pub struct PriorityPool {
     // The transaction data in this queue should be consistent with the real queue.
     // The difference is that it will be grouped by Sender and sorted by nonce to implement
     // the replace by fee function.
-    pending_queue:          Arc<DashMap<H160, PendingQueue>>,
+    pending_queue:          Arc<DashMap<Address, PendingQueue>>,
     // The transactions in this queue have not been processed yet and cannot be packaged.
-    co_queue:               Arc<ArrayQueue<(TxPtr, U64)>>,
+    co_queue:               Arc<ArrayQueue<(TxPtr, u64)>>,
     // Transactions in this queue will be packaged into blocks
     real_queue:             Arc<Mutex<Vec<TxPtr>>>,
     // Record all transactions in the transaction pool
@@ -91,7 +89,7 @@ impl PriorityPool {
         pool
     }
 
-    pub fn get_tx_count_by_address(&self, address: H160) -> (usize, Option<BlockNumber>) {
+    pub fn get_tx_count_by_address(&self, address: Address) -> (usize, Option<BlockNumber>) {
         let number = self.timeout_gap.lock().last_entry().map(|f| *f.key());
         if let Some(set) = self.pending_queue.get(&address) {
             return (set.count(), number);
@@ -112,7 +110,7 @@ impl PriorityPool {
         &self,
         stx: SignedTransaction,
         check_limit: bool,
-        check_nonce: U64,
+        check_nonce: u64,
     ) -> ProtocolResult<()> {
         if let Err(n) = self
             .stock_len
@@ -152,7 +150,7 @@ impl PriorityPool {
         Ok(())
     }
 
-    pub fn package(&self, _gas_limit: U256, limit: usize) -> PackedTxHashes {
+    pub fn package(&self, _gas_limit: u64, limit: usize) -> PackedTxHashes {
         let _flushing = self.flush_lock.read();
 
         let mut hashes = self.sys_tx_bucket.package();
@@ -251,7 +249,7 @@ impl PriorityPool {
         let mut q = self.real_queue.lock();
         let mut timeout_gap = self.timeout_gap.lock();
 
-        let mut remove_tip_nonce: HashMap<H160, U64> = HashMap::new();
+        let mut remove_tip_nonce: HashMap<Address, u64> = HashMap::new();
         for hash in hashes {
             if let Some((_, ptr)) = self.tx_map.remove(hash) {
                 match remove_tip_nonce.entry(ptr.sender()) {

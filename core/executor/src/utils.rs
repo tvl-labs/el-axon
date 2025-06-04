@@ -1,5 +1,5 @@
 use protocol::codec::hex_encode;
-use protocol::types::{Hasher, H160, H256, U256};
+use protocol::types::{Address, Hasher, U256};
 
 use crate::FeeAllocate;
 
@@ -11,7 +11,7 @@ const EXEC_REVERT: &str = "execution reverted: ";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FeeInlet {
-    pub address: H160,
+    pub address: Address,
     pub amount:  U256,
 }
 
@@ -23,7 +23,7 @@ impl FeeAllocate for DefaultFeeAllocator {
         &self,
         block_number: U256,
         fee_collect: U256,
-        _proposer: H160,
+        _proposer: Address,
         validators: &[protocol::types::ValidatorExtend],
     ) -> Vec<FeeInlet> {
         if fee_collect.is_zero() || block_number.is_zero() {
@@ -36,17 +36,17 @@ impl FeeAllocate for DefaultFeeAllocator {
             .iter()
             .map(|v| FeeInlet {
                 address: v.address,
-                amount:  (fee_collect / weight_sum) * v.vote_weight,
+                amount:  (fee_collect / weight_sum) * U256::from(v.vote_weight),
             })
             .collect()
     }
 }
 
-pub fn code_address(sender: &H160, nonce: &U256) -> H256 {
+pub(crate) fn code_address(sender: &evm_types::H160, nonce: &evm_types::U256) -> evm_types::H256 {
     let mut stream = rlp::RlpStream::new_list(2);
     stream.append(sender);
     stream.append(nonce);
-    Hasher::digest(&stream.out())
+    evm_types::H256(Hasher::digest(&stream.out()).0)
 }
 
 pub fn decode_revert_msg(input: &[u8]) -> String {
@@ -70,24 +70,24 @@ mod tests {
 
     #[test]
     fn test_code_address() {
-        let sender = H160::from_slice(
+        let sender = evm_types::H160::from_slice(
             hex_decode("8ab0cf264df99d83525e9e11c7e4db01558ae1b1")
                 .unwrap()
                 .as_ref(),
         );
-        let nonce: U256 = 0u64.into();
-        let addr: H160 = code_address(&sender, &nonce).into();
+        let nonce = evm_types::U256::zero();
+        let addr: evm_types::H160 = code_address(&sender, &nonce).into();
         assert_eq!(
             hex_encode(addr.0).as_str(),
             "a13763691970d9373d4fab7cc323d7ba06fa9986"
         );
 
-        let sender = H160::from_slice(
+        let sender = evm_types::H160::from_slice(
             hex_decode("6ac7ea33f8831ea9dcc53393aaa88b25a785dbf0")
                 .unwrap()
                 .as_ref(),
         );
-        let addr: H160 = code_address(&sender, &nonce).into();
+        let addr: evm_types::H160 = code_address(&sender, &nonce).into();
         assert_eq!(
             hex_encode(addr.0).as_str(),
             "cd234a471b72ba2f1ccf0a70fcaba648a5eecd8d"

@@ -2,7 +2,7 @@ use evm::executor::stack::{PrecompileFailure, PrecompileOutput};
 use evm::{Context, ExitError, ExitSucceed};
 
 use common_crypto::{secp256k1_recover, Secp256k1RecoverableSignature, Signature};
-use protocol::types::{Hasher, H160};
+use protocol::types::Hasher;
 
 use crate::err;
 use crate::precompiles::{eip_precompile_address, PrecompileContract};
@@ -11,7 +11,7 @@ use crate::precompiles::{eip_precompile_address, PrecompileContract};
 pub struct EcRecover;
 
 impl PrecompileContract for EcRecover {
-    const ADDRESS: H160 = eip_precompile_address(0x01);
+    const ADDRESS: evm_types::H160 = eip_precompile_address(0x01);
     const MIN_GAS: u64 = 3000;
 
     fn exec_fn(
@@ -42,7 +42,7 @@ impl PrecompileContract for EcRecover {
             if let Ok(p) = secp256k1_recover(&input[0..32], &s.to_bytes()) {
                 let r = Hasher::digest(&p.serialize_uncompressed()[1..65]);
                 let mut recover = [0u8; 32];
-                recover[12..].copy_from_slice(&r.as_bytes()[12..]);
+                recover[12..].copy_from_slice(&r.as_slice()[12..]);
 
                 return Ok((
                     PrecompileOutput {

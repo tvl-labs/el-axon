@@ -1366,7 +1366,7 @@ dependencies = [
  "bitflags 2.4.0",
  "cexpr",
  "clang-sys",
- "itertools 0.10.5",
+ "itertools 0.13.0",
  "proc-macro2",
  "quote",
  "regex",
@@ -2730,6 +2730,7 @@ dependencies = [
  "parking_lot 0.12.3",
  "revm",
  "ripemd",
+ "rlp",
  "rug",
  "serde_json",
  "sha2 0.10.6",
@@ -2783,6 +2784,7 @@ dependencies = [
 name = "core-mempool"
 version = "0.1.0"
 dependencies = [
+ "alloy-rlp",
  "axon-protocol",
  "ckb-types",
  "common-apm",
@@ -2795,9 +2797,11 @@ dependencies = [
  "criterion",
  "crossbeam-queue",
  "dashmap 5.5.3",
+ "derive_more 2.0.1",
  "futures",
  "log",
  "parking_lot 0.12.3",
+ "rand 0.7.3",
 ]
 
 [[package]]
@@ -3552,7 +3556,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cea14ef9355e3beab063703aa9dab15afd25f0667c341310c1e5274bb1d0da18"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7339,7 +7343,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.4",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -8359,7 +8363,7 @@ dependencies = [
  "getrandom 0.3.3",
  "once_cell",
  "rustix 1.0.7",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

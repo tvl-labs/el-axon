@@ -4,8 +4,8 @@ use std::sync::Arc;
 use common_config_parser::types::spec::HardforkName;
 use protocol::trie::Trie as _;
 use protocol::types::{
-    CkbRelatedInfo, ConsensusConfig, ConsensusConfigV0, HardforkInfo, HardforkInfoInner, Metadata,
-    MetadataInner, H160, H256,
+    Address, CkbRelatedInfo, ConsensusConfig, ConsensusConfigV0, HardforkInfo, HardforkInfoInner,
+    Metadata, MetadataInner, H256,
 };
 use protocol::{codec::ProtocolCodec, ProtocolResult};
 
@@ -57,7 +57,7 @@ impl MetadataStore {
         let trie = if root == H256::default() {
             let mut m = MPTTrie::new(Arc::clone(&trie_db));
             m.insert(
-                EPOCH_SEGMENT_KEY.as_bytes().to_vec(),
+                EPOCH_SEGMENT_KEY.as_slice().to_vec(),
                 EpochSegment::new().as_bytes(),
             )?;
             m
@@ -73,7 +73,7 @@ impl MetadataStore {
 
     pub fn set_ckb_related_info(&mut self, info: &CkbRelatedInfo) -> ProtocolResult<()> {
         self.trie.insert(
-            CKB_RELATED_INFO_KEY.as_bytes().to_vec(),
+            CKB_RELATED_INFO_KEY.as_slice().to_vec(),
             info.encode()?.to_vec(),
         )?;
         let new_root = self.trie.commit()?;
@@ -84,7 +84,7 @@ impl MetadataStore {
     pub fn append_metadata(&mut self, metadata: &Metadata) -> ProtocolResult<()> {
         let mut epoch_segment = EpochSegment::from_raw(
             self.trie
-                .get(EPOCH_SEGMENT_KEY.as_bytes())?
+                .get(EPOCH_SEGMENT_KEY.as_slice())?
                 .unwrap()
                 .to_vec(),
         )?;
@@ -118,14 +118,15 @@ impl MetadataStore {
         let current_hardfork = **HARDFORK_INFO.load();
 
         self.trie.insert(
-            EPOCH_SEGMENT_KEY.as_bytes().to_vec(),
+            EPOCH_SEGMENT_KEY.as_slice().to_vec(),
             epoch_segment.as_bytes(),
         )?;
         self.trie
             .insert(inner.epoch.to_be_bytes().to_vec(), inner.encode()?.to_vec())?;
         let config = encode_consensus_config(current_hardfork, config)?;
         self.trie
-            .insert(CONSENSUS_CONFIG.as_bytes().to_vec(), config)?;
+            .insert(CONSENSUS_CONFIG.as_slice().to_vec(), config)?;
+
         let new_root = self.trie.commit()?;
         CURRENT_METADATA_ROOT.with(|r| *r.borrow_mut() = new_root);
 
@@ -135,14 +136,14 @@ impl MetadataStore {
     pub fn update_propose_count(
         &mut self,
         block_number: u64,
-        proposer: &H160,
+        proposer: &evm_types::H160,
     ) -> ProtocolResult<()> {
         let epoch = self.get_epoch_by_block_number(block_number)?;
         let mut metadata = self.get_metadata_inner(epoch)?;
         if let Some(counter) = metadata
             .propose_counter
             .iter_mut()
-            .find(|p| &p.address == proposer)
+            .find(|p| p.address.as_slice() == proposer.as_bytes())
         {
             counter.increase();
         }
@@ -151,6 +152,7 @@ impl MetadataStore {
             metadata.epoch.to_be_bytes().to_vec(),
             metadata.encode()?.to_vec(),
         )?;
+
         let new_root = self.trie.commit()?;
         CURRENT_METADATA_ROOT.with(|r| *r.borrow_mut() = new_root);
 
@@ -158,7 +160,7 @@ impl MetadataStore {
     }
 
     pub fn get_epoch_segment(&self) -> ProtocolResult<EpochSegment> {
-        let raw = self.trie.get(EPOCH_SEGMENT_KEY.as_bytes())?.unwrap();
+        let raw = self.trie.get(EPOCH_SEGMENT_KEY.as_slice())?.unwrap();
         EpochSegment::from_raw(raw.to_vec())
     }
 
@@ -179,7 +181,7 @@ impl MetadataStore {
     pub fn get_consensus_config(&self) -> ProtocolResult<ConsensusConfig> {
         let raw = self
             .trie
-            .get(CONSENSUS_CONFIG.as_bytes())?
+            .get(CONSENSUS_CONFIG.as_slice())?
             .expect("Inner panic with can't find consensus config");
 
         decode_consensus_config(raw)
@@ -193,7 +195,7 @@ impl MetadataStore {
     pub fn get_ckb_related_info(&self) -> ProtocolResult<CkbRelatedInfo> {
         let raw = self
             .trie
-            .get(CKB_RELATED_INFO_KEY.as_bytes())?
+            .get(CKB_RELATED_INFO_KEY.as_slice())?
             .ok_or_else(|| SystemScriptError::NoneCkbRelatedInfo)?;
         CkbRelatedInfo::decode(raw)
     }
@@ -201,9 +203,10 @@ impl MetadataStore {
     pub fn update_consensus_config(&mut self, config: ConsensusConfig) -> ProtocolResult<()> {
         let current_hardfork = **HARDFORK_INFO.load();
         self.trie.insert(
-            CONSENSUS_CONFIG.as_bytes().to_vec(),
+            CONSENSUS_CONFIG.as_slice().to_vec(),
             encode_consensus_config(current_hardfork, config)?,
         )?;
+
         let new_root = self.trie.commit()?;
         CURRENT_METADATA_ROOT.with(|r| *r.borrow_mut() = new_root);
         Ok(())
@@ -215,7 +218,7 @@ impl MetadataStore {
 
     pub fn set_hardfork_info(&mut self, block_number: u64, info: H256) -> ProtocolResult<()> {
         let current_info = {
-            match self.trie.get(HARDFORK_KEY.as_bytes())? {
+            match self.trie.get(HARDFORK_KEY.as_slice())? {
                 Some(data) => {
                     let mut hardfork_info = HardforkInfo::decode(data)?;
 
@@ -235,16 +238,17 @@ impl MetadataStore {
         };
 
         self.trie.insert(
-            HARDFORK_KEY.as_bytes().to_vec(),
+            HARDFORK_KEY.as_slice().to_vec(),
             current_info.encode()?.to_vec(),
         )?;
+
         let new_root = self.trie.commit()?;
         CURRENT_METADATA_ROOT.with(|r| *r.borrow_mut() = new_root);
         Ok(())
     }
 
     pub fn hardfork_info(&self, target_number: u64) -> ProtocolResult<H256> {
-        match self.trie.get(HARDFORK_KEY.as_bytes())? {
+        match self.trie.get(HARDFORK_KEY.as_slice())? {
             Some(data) => {
                 let hardfork_info = HardforkInfo::decode(data)?;
 
@@ -254,14 +258,14 @@ impl MetadataStore {
                     }
                     return Ok(k.flags);
                 }
-                Ok(H256::zero())
+                Ok(H256::ZERO)
             }
-            None => Ok(H256::zero()),
+            None => Ok(H256::ZERO),
         }
     }
 
     pub fn hardfork_infos(&self) -> ProtocolResult<HardforkInfo> {
-        match self.trie.get(HARDFORK_KEY.as_bytes())? {
+        match self.trie.get(HARDFORK_KEY.as_slice())? {
             Some(data) => HardforkInfo::decode(data),
             None => Ok(HardforkInfo::default()),
         }
@@ -286,7 +290,7 @@ impl From<u16> for ConsensusConfigFlag {
 
 impl ConsensusConfigFlag {
     fn new(flags: H256) -> Self {
-        let v1_name_flag = H256::from_low_u64_be((HardforkName::Andromeda as u64).to_be());
+        let v1_name_flag = H256::left_padding_from(&(HardforkName::Andromeda as u64).to_be_bytes());
         let res = flags & v1_name_flag;
 
         if res & v1_name_flag == v1_name_flag {

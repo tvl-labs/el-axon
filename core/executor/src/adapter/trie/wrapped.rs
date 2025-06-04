@@ -53,7 +53,7 @@ impl<DB: TrieDB> MPTTrie<DB> {
         Ok(MPTTrie(PatriciaTrie::from(
             db,
             Arc::new(HasherKeccak::new()),
-            root.as_bytes(),
+            root.as_slice(),
         )?))
     }
 

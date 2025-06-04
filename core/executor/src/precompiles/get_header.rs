@@ -2,8 +2,6 @@ use ethers::abi::{AbiDecode, AbiEncode};
 use evm::executor::stack::{PrecompileFailure, PrecompileOutput};
 use evm::{Context, ExitError, ExitSucceed};
 
-use protocol::types::{H160, H256};
-
 use crate::precompiles::{axon_precompile_address, PrecompileContract};
 use crate::system_contract::ckb_light_client::ckb_light_client_abi;
 use crate::{err, system_contract::ckb_light_client::CkbHeaderReader, CURRENT_HEADER_CELL_ROOT};
@@ -12,7 +10,7 @@ use crate::{err, system_contract::ckb_light_client::CkbHeaderReader, CURRENT_HEA
 pub struct GetHeader;
 
 impl PrecompileContract for GetHeader {
-    const ADDRESS: H160 = axon_precompile_address(0x02);
+    const ADDRESS: evm_types::H160 = axon_precompile_address(0x02);
     const MIN_GAS: u64 = 42000;
 
     fn exec_fn(
@@ -28,8 +26,9 @@ impl PrecompileContract for GetHeader {
             }
         }
 
-        let block_hash =
-            H256(<[u8; 32] as AbiDecode>::decode(input).map_err(|_| err!(_, "decode input"))?);
+        let block_hash = evm_types::H256(
+            <[u8; 32] as AbiDecode>::decode(input).map_err(|_| err!(_, "decode input"))?,
+        );
 
         let root = CURRENT_HEADER_CELL_ROOT.with(|r| *r.borrow());
         let header_opt = CkbHeaderReader

@@ -2,8 +2,6 @@ use bn::AffineG1;
 use evm::executor::stack::{PrecompileFailure, PrecompileOutput};
 use evm::{Context, ExitError, ExitSucceed};
 
-use protocol::types::H160;
-
 use crate::err;
 use crate::precompiles::{eip_precompile_address, read_point, PrecompileContract};
 
@@ -11,7 +9,7 @@ use crate::precompiles::{eip_precompile_address, read_point, PrecompileContract}
 pub struct EcAdd;
 
 impl PrecompileContract for EcAdd {
-    const ADDRESS: H160 = eip_precompile_address(0x06);
+    const ADDRESS: evm_types::H160 = eip_precompile_address(0x06);
     const MIN_GAS: u64 = 150;
 
     fn exec_fn(

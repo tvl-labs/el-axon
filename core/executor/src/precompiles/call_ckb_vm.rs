@@ -4,7 +4,7 @@ use evm::executor::stack::{PrecompileFailure, PrecompileOutput};
 use evm::{Context, ExitError, ExitSucceed};
 
 use protocol::traits::Interoperation;
-use protocol::types::{Bytes, H160};
+use protocol::types::Bytes;
 
 use core_interoperation::{cycle_to_gas, gas_to_cycle, InteroperationImpl};
 
@@ -16,7 +16,7 @@ use crate::{err, CURRENT_HEADER_CELL_ROOT};
 pub struct CallCkbVM;
 
 impl PrecompileContract for CallCkbVM {
-    const ADDRESS: H160 = axon_precompile_address(0x04);
+    const ADDRESS: evm_types::H160 = axon_precompile_address(0x04);
     const MIN_GAS: u64 = 500;
 
     fn exec_fn(

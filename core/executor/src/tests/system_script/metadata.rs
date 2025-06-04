@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, str::FromStr, sync::Arc};
 use ethers::abi::AbiEncode;
 
 use core_db::RocksAdapter;
-use protocol::types::{CkbRelatedInfo, MemoryBackend, SignedTransaction, H160, H256, U256};
+use protocol::types::{CkbRelatedInfo, MemoryBackend, SignedTransaction, H256};
 
 use crate::{
     system_contract::{
@@ -35,7 +35,7 @@ fn test_write_functions() {
     test_init(&mut backend, &executor);
 
     let mut vicinity = gen_vicinity();
-    vicinity.block_number += U256::one();
+    vicinity.block_number += evm_types::U256::one();
     backend = MemoryBackend::new(&vicinity, BTreeMap::new());
 
     test_second(&mut backend, &executor);
@@ -45,7 +45,7 @@ fn test_write_functions() {
 }
 
 fn test_init<'a>(backend: &mut MemoryBackend<'a>, executor: &MetadataContract<MemoryBackend<'a>>) {
-    let addr = H160::from_str("0xf000000000000000000000000000000000000000").unwrap();
+    let addr = evm_types::H160::from_str("0xf000000000000000000000000000000000000000").unwrap();
     let tx = prepare_tx_1(&addr);
     let r = executor.exec_(backend, &tx);
     assert!(r.exit_reason.is_succeed());
@@ -55,7 +55,7 @@ fn test_second<'a>(
     backend: &mut MemoryBackend<'a>,
     executor: &MetadataContract<MemoryBackend<'a>>,
 ) {
-    let addr = H160::from_str("0xf000000000000000000000000000000000000000").unwrap();
+    let addr = evm_types::H160::from_str("0xf000000000000000000000000000000000000000").unwrap();
 
     // this transaction will fail because the epoch is not incremental
     // epoch should be 1 but is passed as 0
@@ -83,7 +83,7 @@ fn test_validator<'a>(
     backend: &mut MemoryBackend<'a>,
     executor: &MetadataContract<MemoryBackend<'a>>,
 ) {
-    let addr = H160::from_str("0x0000000000000000000000000000000000000000").unwrap();
+    let addr = evm_types::H160::from_str("0x0000000000000000000000000000000000000000").unwrap();
 
     // this transaction will fail because the sender is not in validator list
     let tx = prepare_tx_4(&addr);
@@ -91,7 +91,7 @@ fn test_validator<'a>(
     assert!(r.exit_reason.is_revert());
 }
 
-fn prepare_tx_1(addr: &H160) -> SignedTransaction {
+fn prepare_tx_1(addr: &evm_types::H160) -> SignedTransaction {
     let data = metadata_abi::AppendMetadataCall {
         metadata: prepare_metadata(),
     };
@@ -99,7 +99,7 @@ fn prepare_tx_1(addr: &H160) -> SignedTransaction {
     gen_tx(*addr, METADATA_CONTRACT_ADDRESS, 1000, data.encode())
 }
 
-fn prepare_tx_2(addr: &H160) -> SignedTransaction {
+fn prepare_tx_2(addr: &evm_types::H160) -> SignedTransaction {
     let mut data = metadata_abi::AppendMetadataCall {
         metadata: prepare_metadata(),
     };
@@ -109,7 +109,7 @@ fn prepare_tx_2(addr: &H160) -> SignedTransaction {
     gen_tx(*addr, METADATA_CONTRACT_ADDRESS, 1000, data.encode())
 }
 
-fn prepare_tx_3(add: &H160) -> SignedTransaction {
+fn prepare_tx_3(add: &evm_types::H160) -> SignedTransaction {
     let mut data = metadata_abi::AppendMetadataCall {
         metadata: prepare_metadata(),
     };
@@ -120,7 +120,7 @@ fn prepare_tx_3(add: &H160) -> SignedTransaction {
     gen_tx(*add, METADATA_CONTRACT_ADDRESS, 1000, data.encode())
 }
 
-fn prepare_tx_4(addr: &H160) -> SignedTransaction {
+fn prepare_tx_4(addr: &evm_types::H160) -> SignedTransaction {
     let mut data = metadata_abi::AppendMetadataCall {
         metadata: prepare_metadata(),
     };
@@ -131,7 +131,7 @@ fn prepare_tx_4(addr: &H160) -> SignedTransaction {
     gen_tx(*addr, METADATA_CONTRACT_ADDRESS, 1000, data.encode())
 }
 
-fn prepare_tx_5(addr: &H160) -> SignedTransaction {
+fn prepare_tx_5(addr: &evm_types::H160) -> SignedTransaction {
     let mut data = metadata_abi::AppendMetadataCall {
         metadata: prepare_metadata(),
     };
@@ -142,7 +142,7 @@ fn prepare_tx_5(addr: &H160) -> SignedTransaction {
     gen_tx(*addr, METADATA_CONTRACT_ADDRESS, 1000, data.encode())
 }
 
-fn prepare_tx_with_consensus_config(addr: &H160, interval: u64) -> SignedTransaction {
+fn prepare_tx_with_consensus_config(addr: &evm_types::H160, interval: u64) -> SignedTransaction {
     let data = metadata_abi::UpdateConsensusConfigCall {
         config: {
             let mut config = prepare_metadata().consensus_config;
@@ -160,7 +160,7 @@ fn test_update_consensus_config<'a>(
     executor: &MetadataContract<MemoryBackend<'a>>,
 ) {
     let interval = 10;
-    let addr = H160::from_str("0xf000000000000000000000000000000000000000").unwrap();
+    let addr = evm_types::H160::from_str("0xf000000000000000000000000000000000000000").unwrap();
     let tx = prepare_tx_with_consensus_config(&addr, interval);
 
     let r = executor.exec_(backend, &tx);
@@ -202,7 +202,8 @@ fn prepare_validator() -> ValidatorExtend {
     ValidatorExtend {
         bls_pub_key:    [1u8; 32].into(),
         pub_key:        [1u8; 32].into(),
-        address:        H160::from_str("0xf000000000000000000000000000000000000000").unwrap(),
+        address:        evm_types::H160::from_str("0xf000000000000000000000000000000000000000")
+            .unwrap(),
         propose_weight: 1u32,
         vote_weight:    1u32,
     }
@@ -223,18 +224,18 @@ fn test_set_ckb_related_info() {
         )));
     }
 
-    let old_metadata_root = H256::zero();
+    let old_metadata_root = H256::default();
     let metadata_type_id =
         H256::from_str("0xdb0782aba62896c2a7c279f3de8dbbd7fd06729cc8b7b499df93f5c450f61839")
             .unwrap();
     let mut store = MetadataStore::new(old_metadata_root).unwrap();
     let ckb_infos = CkbRelatedInfo {
         metadata_type_id,
-        checkpoint_type_id: H256::zero(),
-        xudt_args: H256::zero(),
-        stake_smt_type_id: H256::zero(),
-        delegate_smt_type_id: H256::zero(),
-        reward_smt_type_id: H256::zero(),
+        checkpoint_type_id: H256::default(),
+        xudt_args: H256::default(),
+        stake_smt_type_id: H256::default(),
+        delegate_smt_type_id: H256::default(),
+        reward_smt_type_id: H256::default(),
     };
     let result = store.set_ckb_related_info(&ckb_infos);
     assert!(result.is_ok());

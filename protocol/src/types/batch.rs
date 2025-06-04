@@ -19,15 +19,15 @@ macro_rules! batch_msg_type {
         //     }
         // }
 
-        // impl $name {
-        //     pub fn new(inner: Vec<$ty>) -> Self {
-        //         Self(inner)
-        //     }
+        impl $name {
+            pub fn new(inner: Vec<$ty>) -> Self {
+                Self(inner)
+            }
 
-        //     pub fn inner(self) -> Vec<$ty> {
-        //         self.0
-        //     }
-        // }
+            pub fn inner(self) -> Vec<$ty> {
+                self.0
+            }
+        }
     };
 }
 

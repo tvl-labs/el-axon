@@ -11,12 +11,13 @@ use std::{num::NonZeroUsize, sync::Arc};
 
 use arc_swap::ArcSwap;
 use ethers::abi::AbiDecode;
+use evm_types::U64;
 use lru::LruCache;
 use parking_lot::RwLock;
 
 use protocol::codec::ProtocolCodec;
 use protocol::traits::{ApplyBackend, ExecutorAdapter};
-use protocol::types::{HardforkInfoInner, Hasher, Metadata, SignedTransaction, TxResp, H160, H256};
+use protocol::types::{HardforkInfoInner, Hasher, Metadata, SignedTransaction, TxResp, H256};
 
 use crate::system_contract::utils::{
     generate_mpt_root_changes, revert_resp, succeed_resp, update_states,
@@ -26,7 +27,7 @@ use crate::{exec_try, system_contract_struct, CURRENT_METADATA_ROOT};
 
 type Epoch = u64;
 
-pub const METADATA_CONTRACT_ADDRESS: H160 = system_contract_address(0x1);
+pub const METADATA_CONTRACT_ADDRESS: evm_types::H160 = system_contract_address(0x1);
 const METADATA_CACHE_SIZE: NonZeroUsize = unsafe { NonZeroUsize::new_unchecked(10) };
 
 lazy_static::lazy_static! {
@@ -34,7 +35,7 @@ lazy_static::lazy_static! {
     static ref CKB_RELATED_INFO_KEY: H256 = Hasher::digest("ckb_related_info");
     pub static ref CONSENSUS_CONFIG: H256 = Hasher::digest("consensus_config");
     pub static ref HARDFORK_KEY: H256 = Hasher::digest("hardfork");
-    pub static ref HARDFORK_INFO: ArcSwap<H256> = ArcSwap::new(Arc::new(H256::zero()));
+    pub static ref HARDFORK_INFO: ArcSwap<H256> = ArcSwap::new(Arc::new(H256::ZERO));
     static ref METADATA_CACHE: RwLock<LruCache<Epoch, Metadata>> =  RwLock::new(LruCache::new(METADATA_CACHE_SIZE));
 }
 
@@ -43,15 +44,15 @@ system_contract_struct!(MetadataContract);
 impl<Adapter: ExecutorAdapter + ApplyBackend> SystemContract<Adapter>
     for MetadataContract<Adapter>
 {
-    const ADDRESS: H160 = METADATA_CONTRACT_ADDRESS;
+    const ADDRESS: evm_types::H160 = METADATA_CONTRACT_ADDRESS;
 
     fn exec_(&self, adapter: &mut Adapter, tx: &SignedTransaction) -> TxResp {
         let sender = tx.sender;
         let tx = &tx.transaction.unsigned;
         let tx_data = tx.data();
-        let gas_limit = *tx.gas_limit();
+        let gas_limit = U64::from(*tx.gas_limit());
         let block_number = adapter.block_number().as_u64();
-        let root = CURRENT_METADATA_ROOT.with(|r| *r.borrow());
+        let root = H256::new(CURRENT_METADATA_ROOT.with(|r| *r.borrow()).0);
 
         let mut store = exec_try!(
             MetadataStore::new(root),
@@ -60,7 +61,8 @@ impl<Adapter: ExecutorAdapter + ApplyBackend> SystemContract<Adapter>
         );
 
         if block_number != 0 {
-            let handle = MetadataHandle::new(CURRENT_METADATA_ROOT.with(|r| *r.borrow()));
+            let root = H256::new(CURRENT_METADATA_ROOT.with(|r| *r.borrow()).0);
+            let handle = MetadataHandle::new(root);
 
             if !exec_try!(
                 handle.is_validator(block_number, sender),
@@ -101,6 +103,7 @@ impl<Adapter: ExecutorAdapter + ApplyBackend> SystemContract<Adapter>
             }
         }
 
+        let sender = evm_types::H160(sender.into_array());
         update_states(adapter, sender, Self::ADDRESS);
 
         succeed_resp(gas_limit)
@@ -112,8 +115,7 @@ impl<Adapter: ExecutorAdapter + ApplyBackend> SystemContract<Adapter>
             return;
         }
 
-        let root = CURRENT_METADATA_ROOT.with(|r| *r.borrow());
-
+        let root = H256::new(CURRENT_METADATA_ROOT.with(|r| *r.borrow()).0);
         let mut store = MetadataStore::new(root).unwrap();
 
         if let Some(t) = adapter.get_ctx().extra_data.get(0) {

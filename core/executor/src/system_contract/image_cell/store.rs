@@ -230,8 +230,9 @@ impl ImageCellStore {
 
 impl From<&packed::OutPoint> for CellKey {
     fn from(out_point: &packed::OutPoint) -> Self {
+        let hash: [u8; 32] = out_point.tx_hash().unpack();
         CellKey {
-            tx_hash: H256(out_point.tx_hash().unpack().0),
+            tx_hash: H256::new(hash),
             index:   out_point.index().unpack(),
         }
     }
@@ -241,7 +242,7 @@ impl CellKey {
     const ENCODED_LEN: usize = 32 + 4;
 
     pub fn new(tx_hash: [u8; 32], index: u32) -> Self {
-        let tx_hash = H256(tx_hash);
+        let tx_hash = H256::new(tx_hash);
         CellKey { tx_hash, index }
     }
 

@@ -30,9 +30,10 @@ impl From<packed::CellOutput> for image_cell_abi::CellOutput {
 impl From<packed::Script> for image_cell_abi::Script {
     fn from(value: packed::Script) -> Self {
         let args: Vec<u8> = value.args().unpack();
+        let hash: [u8; 32] = value.code_hash().unpack();
 
         image_cell_abi::Script {
-            code_hash: value.code_hash().unpack().0,
+            code_hash: hash,
             hash_type: value.hash_type().into(),
             args:      args.into(),
         }

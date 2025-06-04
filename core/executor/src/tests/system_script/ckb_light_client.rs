@@ -4,7 +4,7 @@ use std::str::FromStr;
 use ethers::abi::AbiEncode;
 
 use core_db::RocksAdapter;
-use protocol::types::{Backend, MemoryBackend, TxResp, H160, H256, U256};
+use protocol::types::{Backend, MemoryBackend, TxResp, H256};
 
 use crate::system_contract::ckb_light_client::{
     ckb_light_client_abi, CkbHeaderReader, CkbLightClientContract,
@@ -75,7 +75,7 @@ fn test_update_first<'a>(
 
     let root = backend.storage(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY);
     let queried_header = CkbHeaderReader
-        .get_header_by_block_hash(root, &H256::default())
+        .get_header_by_block_hash(H256::new(root.0), &H256::default())
         .unwrap()
         .unwrap();
 
@@ -98,7 +98,7 @@ fn test_update_second<'a>(
 
     let root = backend.storage(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY);
     let queried_header = CkbHeaderReader
-        .get_header_by_block_hash(root, &H256::from_slice(&header.block_hash))
+        .get_header_by_block_hash(H256::new(root.0), &H256::from_slice(&header.block_hash))
         .unwrap()
         .unwrap();
 
@@ -118,7 +118,7 @@ fn test_roll_back_first<'a>(
 
     let root = backend.storage(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY);
     let queried_header = CkbHeaderReader
-        .get_header_by_block_hash(root, &H256::default())
+        .get_header_by_block_hash(H256::new(root.0), &H256::default())
         .unwrap()
         .unwrap();
 
@@ -138,7 +138,7 @@ fn test_roll_back_second<'a>(
 
     let root = backend.storage(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY);
     let queried_header = CkbHeaderReader
-        .get_header_by_block_hash(root, &H256::default())
+        .get_header_by_block_hash(H256::new(root.0), &H256::default())
         .unwrap();
     assert!(queried_header.is_none());
 }
@@ -163,7 +163,7 @@ fn exec<'a>(
     executor: &CkbLightClientContract<MemoryBackend<'a>>,
     data: Vec<u8>,
 ) -> TxResp {
-    let addr = H160::from_str("0xf000000000000000000000000000000000000000").unwrap();
+    let addr = evm_types::H160::from_str("0xf000000000000000000000000000000000000000").unwrap();
     let tx = gen_tx(addr, CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, 1000, data);
     executor.exec_(backend, &tx)
 }
@@ -171,15 +171,15 @@ fn exec<'a>(
 fn check_nonce(backend: &mut MemoryBackend<'_>, nonce: u64) {
     assert_eq!(
         backend.basic(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS).nonce,
-        U256::zero()
+        evm_types::U256::zero()
     );
     assert_eq!(
         backend.basic(IMAGE_CELL_CONTRACT_ADDRESS).nonce,
-        U256::zero()
+        evm_types::U256::zero()
     );
     assert_eq!(
         backend
-            .basic(H160::from_str("0xf000000000000000000000000000000000000000").unwrap())
+            .basic(evm_types::H160::from_str("0xf000000000000000000000000000000000000000").unwrap())
             .nonce,
         nonce.into()
     )

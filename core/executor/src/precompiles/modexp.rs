@@ -6,8 +6,6 @@ use evm::{Context, ExitError, ExitSucceed};
 use rug::ops::Pow;
 use rug::{integer::Order, Integer};
 
-use protocol::types::H160;
-
 use crate::err;
 use crate::precompiles::{eip_precompile_address, PrecompileContract};
 
@@ -15,7 +13,7 @@ use crate::precompiles::{eip_precompile_address, PrecompileContract};
 pub struct ModExp;
 
 impl PrecompileContract for ModExp {
-    const ADDRESS: H160 = eip_precompile_address(0x05);
+    const ADDRESS: evm_types::H160 = eip_precompile_address(0x05);
     const MIN_GAS: u64 = 200;
 
     fn exec_fn(

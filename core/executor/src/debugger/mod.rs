@@ -1,5 +1,4 @@
 mod create2;
-mod uniswap2;
 
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -8,8 +7,8 @@ use evm::tracing::{Event, EventListener};
 
 use protocol::traits::Backend;
 use protocol::types::{
-    Account, Eip1559Transaction, ExecResp, ExecutorContext, Hash, Hasher, SignedTransaction,
-    UnsignedTransaction, UnverifiedTransaction, H160, H256, NIL_DATA, RLP_NULL, U256, U64,
+    Account, Address, Eip1559Transaction, ExecResp, ExecutorContext, Hash, SignedTransaction,
+    UnsignedTransaction, UnverifiedTransaction, H256, NIL_DATA, RLP_NULL, U256, U64,
 };
 use protocol::{codec::ProtocolCodec, trie::Trie as _};
 
@@ -26,7 +25,11 @@ pub struct EvmDebugger {
 }
 
 impl EvmDebugger {
-    pub fn new(distribute_addresses: Vec<H160>, distribute_amount: U256, db_path: &str) -> Self {
+    pub fn new(
+        distribute_addresses: Vec<evm_types::H160>,
+        distribute_amount: U256,
+        db_path: &str,
+    ) -> Self {
         let mut db_data_path = db_path.to_string();
         db_data_path.push_str("/data");
         let _ = std::fs::create_dir_all(&db_data_path);
@@ -42,7 +45,7 @@ impl EvmDebugger {
 
         for distribute_address in distribute_addresses.into_iter() {
             let distribute_account = Account {
-                nonce:        U256::zero(),
+                nonce:        0,
                 balance:      distribute_amount,
                 storage_root: RLP_NULL,
                 code_hash:    NIL_DATA,
@@ -74,14 +77,14 @@ impl EvmDebugger {
         number: u64,
     ) -> AxonExecutorApplyAdapter<ImplStorage<RocksAdapter>, RocksTrieDB> {
         let exec_ctx = ExecutorContext {
-            block_number:           number.into(),
-            block_coinbase:         H160::random(),
-            block_timestamp:        time_now().into(),
-            chain_id:               5u64.into(),
-            origin:                 H160::random(),
-            gas_price:              1u64.into(),
-            block_gas_limit:        4294967295000u64.into(),
-            block_base_fee_per_gas: 1337u64.into(),
+            block_number:           U256::from(number),
+            block_coinbase:         Address::random(),
+            block_timestamp:        U256::from(time_now()),
+            chain_id:               U256::from(5),
+            origin:                 Address::random(),
+            gas_price:              U256::from(1),
+            block_gas_limit:        U64::from(4294967295000u64),
+            block_base_fee_per_gas: U64::from(1337),
             extra_data:             Default::default(),
         };
 
@@ -94,8 +97,8 @@ impl EvmDebugger {
         .unwrap()
     }
 
-    fn nonce(&self, addr: H160) -> U64 {
-        self.backend(0).basic(addr).nonce.low_u64().into()
+    fn nonce(&self, addr: evm_types::H160) -> U64 {
+        U64::from(self.backend(0).basic(addr).nonce.low_u64())
     }
 }
 
@@ -108,11 +111,10 @@ impl EventListener for EvmListener {
     }
 }
 
-pub fn mock_signed_tx(tx: Eip1559Transaction, sender: H160) -> SignedTransaction {
+pub fn mock_signed_tx(tx: Eip1559Transaction, sender: Address) -> SignedTransaction {
     let utx = UnverifiedTransaction {
         unsigned:  UnsignedTransaction::Eip1559(tx),
         hash:      Hash::default(),
-        chain_id:  Some(5u64),
         signature: None,
     };
 

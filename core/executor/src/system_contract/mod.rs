@@ -30,8 +30,7 @@ use rocksdb::DB;
 
 use protocol::traits::{CkbDataProvider, ExecutorAdapter};
 use protocol::types::{
-    Bytes, HardforkInfoInner, Hasher, Metadata, SignedTransaction, TransactionAction, TxResp, H160,
-    H256,
+    Address, Bytes, HardforkInfoInner, Hasher, Metadata, SignedTransaction, TxKind, TxResp, H256,
 };
 use protocol::{ckb_blake2b_256, ProtocolResult};
 
@@ -41,8 +40,8 @@ use crate::system_contract::{
     utils::generate_mpt_root_changes,
 };
 
-pub const fn system_contract_address(addr: u8) -> H160 {
-    H160([
+pub const fn system_contract_address(addr: u8) -> evm_types::H160 {
+    evm_types::H160([
         0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         0xff, 0xff, 0xff, 0xff, addr,
     ])
@@ -52,7 +51,7 @@ const SYSTEM_CONTRACT_ADDRESSES_PREFIX: [u8; 19] = [
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // 0xff * 8
     0xff, 0xff, 0xff, // 0xff * 3
 ];
-const SYSTEM_CONTRACT_ADDRESSES_SET: [H160; 4] = [
+const SYSTEM_CONTRACT_ADDRESSES_SET: [evm_types::H160; 4] = [
     NATIVE_TOKEN_CONTRACT_ADDRESS,
     METADATA_CONTRACT_ADDRESS,
     CKB_LIGHT_CLIENT_CONTRACT_ADDRESS,
@@ -62,8 +61,8 @@ const HEADER_CELL_DB_CACHE_SIZE: usize = 200;
 const METADATA_DB_CACHE_SIZE: usize = 10;
 
 lazy_static::lazy_static! {
-    pub static ref HEADER_CELL_ROOT_KEY: H256 = Hasher::digest("header_cell_mpt_root");
-    pub static ref METADATA_ROOT_KEY: H256 = Hasher::digest("metadata_root");
+    pub static ref HEADER_CELL_ROOT_KEY: evm_types::H256 = evm_types::H256(Hasher::digest("header_cell_mpt_root").0);
+    pub static ref METADATA_ROOT_KEY: evm_types::H256 = evm_types::H256(Hasher::digest("metadata_root").0);
     pub(crate) static ref METADATA_DB: RwLock<Option<Arc<RocksTrieDB>>> = RwLock::new(None);
     pub(crate) static ref HEADER_CELL_DB: RwLock<Option<Arc<RocksTrieDB>>> = RwLock::new(None);
 }
@@ -97,7 +96,7 @@ macro_rules! system_contract_struct {
 }
 
 pub trait SystemContract<Adapter: ExecutorAdapter + ApplyBackend> {
-    const ADDRESS: H160;
+    const ADDRESS: evm_types::H160;
 
     fn exec_(&self, adapter: &mut Adapter, tx: &SignedTransaction) -> TxResp;
 
@@ -131,7 +130,7 @@ pub fn init<Adapter: ExecutorAdapter + ApplyBackend>(
     adapter: &mut Adapter,
     metadata_list: &[Metadata],
     hardfork: HardforkInfoInner,
-) -> ProtocolResult<(H256, H256)> {
+) -> ProtocolResult<(evm_types::H256, evm_types::H256)> {
     let ret = init_system_contract_db(db, adapter);
     init_metadata_and_hardfork(adapter, ret.0, metadata_list, hardfork)?;
 
@@ -141,10 +140,10 @@ pub fn init<Adapter: ExecutorAdapter + ApplyBackend>(
 /// This method only init the CKB light client and metadata DB and should be
 /// used in run process. The return value`tuple[0]` is current metadata MPT
 /// root, `tuple[1]` is current CKB light client MPT root.
-pub fn init_system_contract_db<Adapter: ExecutorAdapter + ApplyBackend>(
+pub(crate) fn init_system_contract_db<Adapter: ExecutorAdapter + ApplyBackend>(
     db: Arc<DB>,
     adapter: &mut Adapter,
-) -> (H256, H256) {
+) -> (evm_types::H256, evm_types::H256) {
     let current_metadata_root = adapter.storage(METADATA_CONTRACT_ADDRESS, *METADATA_ROOT_KEY);
 
     // Init metadata db.
@@ -183,12 +182,13 @@ pub fn init_system_contract_db<Adapter: ExecutorAdapter + ApplyBackend>(
 /// `metadata_list.len()` should be equal to 2.
 fn init_metadata_and_hardfork<Adapter: ExecutorAdapter + ApplyBackend>(
     adapter: &mut Adapter,
-    metadata_root: H256,
+    metadata_root: evm_types::H256,
     metadata_list: &[Metadata],
     hardfork: HardforkInfoInner,
 ) -> ProtocolResult<()> {
     debug_assert!(metadata_list.len() == 2);
 
+    let metadata_root = H256::new(metadata_root.0);
     let mut store = MetadataStore::new(metadata_root)?;
     store.append_metadata(&metadata_list[0])?;
     store.append_metadata(&metadata_list[1])?;
@@ -220,14 +220,15 @@ pub fn system_contract_dispatch<Adapter: ExecutorAdapter + ApplyBackend>(
 ) -> Option<TxResp> {
     if let Some(addr) = tx.get_to() {
         log::debug!("execute addr {:#x}", addr);
+        let addr = addr.into_array();
 
-        if addr == NATIVE_TOKEN_CONTRACT_ADDRESS {
+        if addr == NATIVE_TOKEN_CONTRACT_ADDRESS.0 {
             return Some(NativeTokenContract::default().exec_(adapter, tx));
-        } else if addr == METADATA_CONTRACT_ADDRESS {
+        } else if addr == METADATA_CONTRACT_ADDRESS.0 {
             return Some(MetadataContract::default().exec_(adapter, tx));
-        } else if addr == CKB_LIGHT_CLIENT_CONTRACT_ADDRESS {
+        } else if addr == CKB_LIGHT_CLIENT_CONTRACT_ADDRESS.0 {
             return Some(CkbLightClientContract::default().exec_(adapter, tx));
-        } else if addr == IMAGE_CELL_CONTRACT_ADDRESS {
+        } else if addr == IMAGE_CELL_CONTRACT_ADDRESS.0 {
             return Some(ImageCellContract::default().exec_(adapter, tx));
         }
     }
@@ -276,9 +277,9 @@ impl CellDataProvider for DataProvider {
 
 impl HeaderProvider for DataProvider {
     fn get_header(&self, hash: &packed::Byte32) -> Option<HeaderView> {
-        let block_hash = hash.unpack();
+        let block_hash: [u8; 32] = hash.unpack();
         CkbHeaderReader
-            .get_header_by_block_hash(self.root, &H256(block_hash.0))
+            .get_header_by_block_hash(self.root, &H256::new(block_hash))
             .ok()
             .flatten()
             .map(|h| {
@@ -301,9 +302,9 @@ impl HeaderProvider for DataProvider {
 
 impl ExtensionProvider for DataProvider {
     fn get_block_extension(&self, hash: &packed::Byte32) -> Option<packed::Bytes> {
-        let block_hash = hash.unpack();
+        let block_hash: [u8; 32] = hash.unpack();
         CkbHeaderReader
-            .get_header_by_block_hash(self.root, &H256(block_hash.0))
+            .get_header_by_block_hash(self.root, &H256::new(block_hash))
             .ok()
             .flatten()
             .map(|h| h.extension.pack())
@@ -318,25 +319,25 @@ impl DataProvider {
     }
 }
 
-pub fn is_system_contract_address_format(addr: &H160) -> bool {
-    addr.0[0..19] == SYSTEM_CONTRACT_ADDRESSES_PREFIX
+pub fn is_system_contract_address_format(addr: &Address) -> bool {
+    addr.into_array()[0..19] == SYSTEM_CONTRACT_ADDRESSES_PREFIX
 }
 
-pub fn is_call_system_script(action: &TransactionAction) -> ProtocolResult<bool> {
+pub fn is_call_system_script(action: &TxKind) -> ProtocolResult<bool> {
     let call_addr = match action {
-        TransactionAction::Call(addr) => addr,
-        TransactionAction::Create => return Ok(false),
+        TxKind::Call(addr) => evm_types::H160(addr.into_array()),
+        TxKind::Create => return Ok(false),
     };
 
     // The first 19 bytes of the address are 0xff, which means that the address
     // follows system contract address format.
     if call_addr.0[0..19] == SYSTEM_CONTRACT_ADDRESSES_PREFIX {
-        if SYSTEM_CONTRACT_ADDRESSES_SET.contains(call_addr) {
+        if SYSTEM_CONTRACT_ADDRESSES_SET.contains(&call_addr) {
             return Ok(true);
         }
 
         // Call a reserved system contract address returns error.
-        return Err(SystemScriptError::ReservedAddress(*call_addr).into());
+        return Err(SystemScriptError::ReservedAddress(call_addr).into());
     }
 
     // The address is not a system contract address.
@@ -349,31 +350,31 @@ mod tests {
 
     #[test]
     fn test_is_call_system_contract() {
-        let action = TransactionAction::Create;
+        let action = TxKind::Create;
         assert!(!is_call_system_script(&action).unwrap());
 
-        let addr = H160::from_low_u64_be(0x1);
-        let action = TransactionAction::Call(addr);
+        let addr = Address::new(evm_types::H160::from_low_u64_be(0x1).0);
+        let action = TxKind::Call(addr);
         assert!(!is_call_system_script(&action).unwrap());
 
-        let addr = NATIVE_TOKEN_CONTRACT_ADDRESS;
-        let action = TransactionAction::Call(addr);
+        let addr = Address::new(NATIVE_TOKEN_CONTRACT_ADDRESS.0);
+        let action = TxKind::Call(addr);
         assert!(is_call_system_script(&action).unwrap());
 
-        let addr = METADATA_CONTRACT_ADDRESS;
-        let action = TransactionAction::Call(addr);
+        let addr = Address::new(METADATA_CONTRACT_ADDRESS.0);
+        let action = TxKind::Call(addr);
         assert!(is_call_system_script(&action).unwrap());
 
-        let addr = CKB_LIGHT_CLIENT_CONTRACT_ADDRESS;
-        let action = TransactionAction::Call(addr);
+        let addr = Address::new(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS.0);
+        let action = TxKind::Call(addr);
         assert!(is_call_system_script(&action).unwrap());
 
-        let addr = IMAGE_CELL_CONTRACT_ADDRESS;
-        let action = TransactionAction::Call(addr);
+        let addr = Address::new(IMAGE_CELL_CONTRACT_ADDRESS.0);
+        let action = TxKind::Call(addr);
         assert!(is_call_system_script(&action).unwrap());
 
-        let addr = system_contract_address(0x4);
-        let action = TransactionAction::Call(addr);
+        let addr = Address::new(system_contract_address(0x4).0);
+        let action = TxKind::Call(addr);
         assert!(is_call_system_script(&action).is_err());
     }
 }

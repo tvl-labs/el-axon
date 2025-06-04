@@ -6,8 +6,6 @@ use ethers::contract::{EthAbiCodec, EthAbiType};
 use evm::executor::stack::{PrecompileFailure, PrecompileOutput};
 use evm::{Context, ExitError, ExitSucceed};
 
-use protocol::types::H160;
-
 use crate::err;
 use crate::precompiles::{axon_precompile_address, PrecompileContract};
 
@@ -33,7 +31,7 @@ pub struct Proof {
 pub struct CMBTVerify;
 
 impl PrecompileContract for CMBTVerify {
-    const ADDRESS: H160 = axon_precompile_address(0x07);
+    const ADDRESS: evm_types::H160 = axon_precompile_address(0x07);
     const MIN_GAS: u64 = 56000;
 
     fn exec_fn(

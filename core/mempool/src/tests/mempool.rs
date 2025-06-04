@@ -75,7 +75,7 @@ macro_rules! package {
         let txs = mock_txs($insert, 0, $timeout);
         concurrent_insert(txs.clone(), Arc::clone(mempool)).await;
         protocol::tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let tx_hashes = exec_package(Arc::clone(mempool), CYCLE_LIMIT.into(), $tx_num_limit).await;
+        let tx_hashes = exec_package(Arc::clone(mempool), CYCLE_LIMIT, $tx_num_limit).await;
         assert_eq!(tx_hashes.hashes.len(), $expect_order);
     };
 }
@@ -138,7 +138,7 @@ async fn test_flush() {
     let remove_hashes: Vec<Hash> = remove_txs.iter().map(|tx| tx.transaction.hash).collect();
     exec_flush(remove_hashes, Arc::clone(&mempool)).await;
     assert_eq!(mempool.len(), 432);
-    exec_package(Arc::clone(&mempool), CYCLE_LIMIT.into(), TX_NUM_LIMIT).await;
+    exec_package(Arc::clone(&mempool), CYCLE_LIMIT, TX_NUM_LIMIT).await;
     assert_eq!(mempool.len(), 432);
 
     // flush absent txs
@@ -197,11 +197,11 @@ async fn test_repeat_insertion_with_timout_gap() {
 
     let pool = mempool.get_tx_cache();
 
-    pool.insert(txs[0].clone(), false, 0.into()).unwrap();
-    pool.insert(txs[1].clone(), false, 1.into()).unwrap();
-    pool.insert(txs[2].clone(), false, 2.into()).unwrap();
+    pool.insert(txs[0].clone(), false, 0).unwrap();
+    pool.insert(txs[1].clone(), false, 1).unwrap();
+    pool.insert(txs[2].clone(), false, 2).unwrap();
     // repeat insertion
-    pool.insert(txs[2].clone(), false, 2.into()).unwrap();
+    pool.insert(txs[2].clone(), false, 2).unwrap();
 
     pool.timeout_gap
         .lock()
@@ -211,7 +211,7 @@ async fn test_repeat_insertion_with_timout_gap() {
 
     pool.flush(&[], 20);
 
-    let list = pool.package(1000.into(), 3);
+    let list = pool.package(1000, 3);
 
     assert_eq!(
         list.hashes,
@@ -236,36 +236,36 @@ async fn test_nonce_insert() {
         let mut tx = txs[4].clone();
         match tx.transaction.unsigned {
             UnsignedTransaction::Eip1559(ref mut p) => {
-                p.gas_price = 2.into();
-                p.max_priority_fee_per_gas = 2.into();
+                p.max_fee_per_gas = 2;
+                p.max_priority_fee_per_gas = 2;
             }
-            UnsignedTransaction::Eip2930(ref mut p) => p.gas_price = 2.into(),
-            UnsignedTransaction::Legacy(ref mut p) => p.gas_price = 2.into(),
+            UnsignedTransaction::Eip2930(ref mut p) => p.gas_price = 2,
+            UnsignedTransaction::Legacy(ref mut p) => p.gas_price = 2,
         }
-        tx.transaction.hash = H256::from_low_u64_le(2);
+        tx.transaction.hash = H256::with_last_byte(2);
 
         tx
     };
 
     let pool = mempool.get_tx_cache();
 
-    pool.insert(txs[2].clone(), false, 2.into()).unwrap();
+    pool.insert(txs[2].clone(), false, 2).unwrap();
 
     assert_eq!(1, pool.len());
     assert_eq!(0, pool.real_queue_len());
 
-    pool.insert(txs[1].clone(), false, 1.into()).unwrap();
+    pool.insert(txs[1].clone(), false, 1).unwrap();
 
     assert_eq!(2, pool.len());
     assert_eq!(0, pool.real_queue_len());
 
-    pool.insert(txs[0].clone(), false, 0.into()).unwrap();
+    pool.insert(txs[0].clone(), false, 0).unwrap();
 
     assert_eq!(3, pool.len());
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     assert_eq!(3, pool.real_queue_len());
 
-    let list = pool.package(1000.into(), 2);
+    let list = pool.package(1000, 2);
 
     assert_eq!(
         list.hashes,
@@ -278,12 +278,12 @@ async fn test_nonce_insert() {
     pool.flush(&list.hashes, 1);
     assert_eq!(1, pool.real_queue_len());
     // here db nonce = 1, so nonce diff = 1
-    pool.insert(txs[3].clone(), false, 1.into()).unwrap();
+    pool.insert(txs[3].clone(), false, 1).unwrap();
     assert_eq!(2, pool.len());
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     assert_eq!(2, pool.real_queue_len());
 
-    let list = pool.package(1000.into(), 2);
+    let list = pool.package(1000, 2);
 
     assert_eq!(
         list.hashes,
@@ -296,17 +296,17 @@ async fn test_nonce_insert() {
     pool.flush(&list.hashes, 2);
     assert_eq!(0, pool.real_queue_len());
     // here db nonce = 4, so nonce diff = 1
-    pool.insert(txs[4].clone(), false, 0.into()).unwrap();
+    pool.insert(txs[4].clone(), false, 0).unwrap();
     assert_eq!(1, pool.len());
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     assert_eq!(1, pool.real_queue_len());
     // replace with high price
-    pool.insert(replace_tx.clone(), false, 0.into()).unwrap();
+    pool.insert(replace_tx.clone(), false, 0).unwrap();
     assert_eq!(2, pool.len());
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     assert_eq!(2, pool.real_queue_len());
 
-    let list = pool.package(1000.into(), 2);
+    let list = pool.package(1000, 2);
     assert_eq!(list.hashes, vec![replace_tx.transaction.hash]);
 
     pool.flush(&list.hashes, 3);

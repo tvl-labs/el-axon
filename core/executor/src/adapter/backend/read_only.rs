@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use evm::backend::Basic;
 
+use evm_types::BigEndianHash;
 use protocol::traits::{Backend, Context, ExecutorReadOnlyAdapter, ReadOnlyStorage};
 use protocol::trie::Trie as _;
 use protocol::types::{
-    Account, BigEndianHash, Bytes, ExecutorContext, MerkleRoot, H160, H256, NIL_DATA, RLP_NULL,
-    U256,
+    Account, Address, Bytes, ExecutorContext, MerkleRoot, H256, NIL_DATA, RLP_NULL, U256,
 };
 use protocol::{codec::ProtocolCodec, trie, ProtocolResult};
 
@@ -37,14 +37,14 @@ where
         self.trie.get(key).ok().flatten().map(Into::into)
     }
 
-    fn get_account(&self, address: &H160) -> Account {
-        if let Ok(Some(raw)) = self.trie.get(address.as_bytes()) {
+    fn get_account(&self, address: &Address) -> Account {
+        if let Ok(Some(raw)) = self.trie.get(address.as_slice()) {
             return Account::decode(raw).unwrap();
         }
 
         Account {
-            nonce:        U256::zero(),
-            balance:      U256::zero(),
+            nonce:        0u64,
+            balance:      U256::ZERO,
             storage_root: RLP_NULL,
             code_hash:    NIL_DATA,
         }
@@ -56,65 +56,65 @@ where
     S: ReadOnlyStorage + 'static,
     DB: trie::DB + 'static,
 {
-    fn gas_price(&self) -> U256 {
-        self.exec_ctx.gas_price
+    fn gas_price(&self) -> evm_types::U256 {
+        evm_types::U256(self.exec_ctx.gas_price.into_limbs())
     }
 
-    fn origin(&self) -> H160 {
-        self.exec_ctx.origin
+    fn origin(&self) -> evm_types::H160 {
+        evm_types::H160(self.exec_ctx.origin.into_array())
     }
 
-    fn block_number(&self) -> U256 {
-        self.exec_ctx.block_number
+    fn block_number(&self) -> evm_types::U256 {
+        evm_types::U256(self.exec_ctx.block_number.into_limbs())
     }
 
-    fn block_hash(&self, number: U256) -> H256 {
+    fn block_hash(&self, number: evm_types::U256) -> evm_types::H256 {
         let current_number = self.block_number();
         if number >= current_number {
-            return H256::default();
+            return Default::default();
         }
 
-        if (current_number - number) > U256::from(GET_BLOCK_HASH_NUMBER_RANGE) {
-            return H256::default();
+        if (current_number - number) > evm_types::U256::from(GET_BLOCK_HASH_NUMBER_RANGE) {
+            return Default::default();
         }
 
         let number = number.low_u64();
         blocking_async!(self, get_storage, get_block, Context::new(), number)
-            .map(|b| b.hash())
+            .map(|b| evm_types::H256(b.hash().0))
             .unwrap_or_default()
     }
 
-    fn block_coinbase(&self) -> H160 {
-        self.exec_ctx.block_coinbase
+    fn block_coinbase(&self) -> evm_types::H160 {
+        evm_types::H160(self.exec_ctx.block_coinbase.into_array())
     }
 
-    fn block_timestamp(&self) -> U256 {
-        self.exec_ctx.block_timestamp
+    fn block_timestamp(&self) -> evm_types::U256 {
+        evm_types::U256(self.exec_ctx.block_timestamp.into_limbs())
     }
 
-    fn block_difficulty(&self) -> U256 {
-        U256::one()
+    fn block_difficulty(&self) -> evm_types::U256 {
+        evm_types::U256::one()
     }
 
-    fn block_gas_limit(&self) -> U256 {
-        U256::from(self.exec_ctx.block_gas_limit.low_u64())
+    fn block_gas_limit(&self) -> evm_types::U256 {
+        evm_types::U256::from(self.exec_ctx.block_gas_limit.to::<u64>())
     }
 
-    fn block_base_fee_per_gas(&self) -> U256 {
-        U256::from(self.exec_ctx.block_base_fee_per_gas.low_u64())
+    fn block_base_fee_per_gas(&self) -> evm_types::U256 {
+        evm_types::U256::from(self.exec_ctx.block_base_fee_per_gas.to::<u64>())
     }
 
-    fn chain_id(&self) -> U256 {
-        self.exec_ctx.chain_id
+    fn chain_id(&self) -> evm_types::U256 {
+        evm_types::U256(self.exec_ctx.chain_id.into_limbs())
     }
 
-    fn exists(&self, address: H160) -> bool {
+    fn exists(&self, address: evm_types::H160) -> bool {
         self.trie
             .contains(&Bytes::from(address.as_bytes().to_vec()))
             .unwrap_or(false)
     }
 
-    fn basic(&self, address: H160) -> Basic {
+    fn basic(&self, address: evm_types::H160) -> Basic {
         self.trie
             .get(address.as_bytes())
             .map(|raw| {
@@ -124,15 +124,15 @@ where
                 Account::decode(raw.unwrap()).map_or_else(
                     |_| Default::default(),
                     |account| Basic {
-                        balance: account.balance,
-                        nonce:   account.nonce,
+                        balance: evm_types::U256(account.balance.into_limbs()),
+                        nonce:   evm_types::U256::from(account.nonce),
                     },
                 )
             })
             .unwrap_or_default()
     }
 
-    fn code(&self, address: H160) -> Vec<u8> {
+    fn code(&self, address: evm_types::H160) -> Vec<u8> {
         let code_hash = if let Some(bytes) = self.trie.get(address.as_bytes()).unwrap() {
             Account::decode(bytes).unwrap().code_hash
         } else {
@@ -159,36 +159,40 @@ where
     // - If a MPT tree is empty, the root should be `RLP_NULL`.
     // - In this function, when returns `H256::default()`, that means the tree is
     //   not initialized.
-    fn storage(&self, address: H160, index: H256) -> H256 {
+    fn storage(&self, address: evm_types::H160, index: evm_types::H256) -> evm_types::H256 {
         if let Ok(raw) = self.trie.get(address.as_bytes()) {
             if raw.is_none() {
-                return H256::default();
+                return Default::default();
             }
 
             Account::decode(raw.unwrap())
                 .and_then(|account| {
                     let storage_root = account.storage_root;
                     if storage_root == RLP_NULL {
-                        Ok(H256::default())
+                        Ok(Default::default())
                     } else {
                         MPTTrie::from_root(storage_root, Arc::clone(&self.db)).map(
                             |trie| match trie.get(index.as_bytes()) {
                                 Ok(Some(res)) => {
-                                    let value = U256::decode(res).unwrap();
+                                    let value: evm_types::U256 = rlp::decode(&res).unwrap();
                                     BigEndianHash::from_uint(&value)
                                 }
-                                _ => H256::default(),
+                                _ => Default::default(),
                             },
                         )
                     }
                 })
                 .unwrap_or_default()
         } else {
-            H256::default()
+            Default::default()
         }
     }
 
-    fn original_storage(&self, address: H160, index: H256) -> Option<H256> {
+    fn original_storage(
+        &self,
+        address: evm_types::H160,
+        index: evm_types::H256,
+    ) -> Option<evm_types::H256> {
         // Fixme
         Some(self.storage(address, index))
     }
@@ -226,11 +230,17 @@ where
     }
 
     pub fn get_metadata_root(&self) -> H256 {
-        self.storage(METADATA_CONTRACT_ADDRESS, *METADATA_ROOT_KEY)
+        H256::new(
+            self.storage(METADATA_CONTRACT_ADDRESS, *METADATA_ROOT_KEY)
+                .0,
+        )
     }
 
     pub fn get_image_cell_root(&self) -> H256 {
-        self.storage(IMAGE_CELL_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY)
+        H256::new(
+            self.storage(IMAGE_CELL_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY)
+                .0,
+        )
     }
 
     fn get_storage(&self) -> Arc<S> {

@@ -1,4 +1,4 @@
-use protocol::types::{CkbRelatedInfo, ConsensusConfig, HardforkInfo, Metadata, H160, H256};
+use protocol::types::{Address, CkbRelatedInfo, ConsensusConfig, HardforkInfo, Metadata, H256};
 use protocol::ProtocolResult;
 
 use std::sync::Arc;
@@ -41,7 +41,7 @@ impl MetadataHandle {
         Ok(is_last_block)
     }
 
-    pub fn is_validator(&self, block_number: u64, address: H160) -> ProtocolResult<bool> {
+    pub fn is_validator(&self, block_number: u64, address: Address) -> ProtocolResult<bool> {
         let metadata = self.get_metadata_by_block_number(block_number)?;
         Ok(metadata.verifier_list.iter().any(|v| v.address == address))
     }

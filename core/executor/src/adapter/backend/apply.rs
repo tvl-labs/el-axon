@@ -8,8 +8,8 @@ use protocol::traits::{
 };
 use protocol::trie::Trie;
 use protocol::types::{
-    Account, Bytes, ExecutorContext, Hasher, Log, MerkleRoot, H160, H256, NIL_DATA, RLP_NULL, U256,
-    U64,
+    Account, Address, Bytes, ExecutorContext, Hasher, Log, MerkleRoot, H256, NIL_DATA, RLP_NULL,
+    U256, U64,
 };
 use protocol::{codec::ProtocolCodec, trie, ProtocolResult};
 
@@ -35,7 +35,7 @@ where
         self.inner.get(key)
     }
 
-    fn get_account(&self, address: &H160) -> Account {
+    fn get_account(&self, address: &Address) -> Account {
         self.inner.get_account(address)
     }
 }
@@ -45,63 +45,67 @@ where
     S: ReadOnlyStorage + 'static,
     DB: trie::DB + 'static,
 {
-    fn gas_price(&self) -> U256 {
+    fn gas_price(&self) -> evm_types::U256 {
         self.inner.gas_price()
     }
 
-    fn origin(&self) -> H160 {
+    fn origin(&self) -> evm_types::H160 {
         self.inner.origin()
     }
 
-    fn block_hash(&self, number: U256) -> H256 {
+    fn block_hash(&self, number: evm_types::U256) -> evm_types::H256 {
         self.inner.block_hash(number)
     }
 
-    fn block_number(&self) -> U256 {
+    fn block_number(&self) -> evm_types::U256 {
         self.inner.block_number()
     }
 
-    fn block_coinbase(&self) -> H160 {
+    fn block_coinbase(&self) -> evm_types::H160 {
         self.inner.block_coinbase()
     }
 
-    fn block_timestamp(&self) -> U256 {
+    fn block_timestamp(&self) -> evm_types::U256 {
         self.inner.block_timestamp()
     }
 
-    fn block_difficulty(&self) -> U256 {
+    fn block_difficulty(&self) -> evm_types::U256 {
         self.inner.block_difficulty()
     }
 
-    fn block_gas_limit(&self) -> U256 {
+    fn block_gas_limit(&self) -> evm_types::U256 {
         self.inner.block_gas_limit()
     }
 
-    fn block_base_fee_per_gas(&self) -> U256 {
+    fn block_base_fee_per_gas(&self) -> evm_types::U256 {
         self.inner.block_base_fee_per_gas()
     }
 
-    fn chain_id(&self) -> U256 {
+    fn chain_id(&self) -> evm_types::U256 {
         self.inner.chain_id()
     }
 
-    fn exists(&self, address: H160) -> bool {
+    fn exists(&self, address: evm_types::H160) -> bool {
         self.inner.exists(address)
     }
 
-    fn basic(&self, address: H160) -> Basic {
+    fn basic(&self, address: evm_types::H160) -> Basic {
         self.inner.basic(address)
     }
 
-    fn code(&self, address: H160) -> Vec<u8> {
+    fn code(&self, address: evm_types::H160) -> Vec<u8> {
         self.inner.code(address)
     }
 
-    fn storage(&self, address: H160, key: H256) -> H256 {
+    fn storage(&self, address: evm_types::H160, key: evm_types::H256) -> evm_types::H256 {
         self.inner.storage(address, key)
     }
 
-    fn original_storage(&self, address: H160, key: H256) -> Option<H256> {
+    fn original_storage(
+        &self,
+        address: evm_types::H160,
+        key: evm_types::H256,
+    ) -> Option<evm_types::H256> {
         self.inner.original_storage(address, key)
     }
 }
@@ -111,12 +115,12 @@ where
     S: Storage + 'static,
     DB: trie::DB + 'static,
 {
-    fn set_origin(&mut self, origin: H160) {
+    fn set_origin(&mut self, origin: Address) {
         self.inner.exec_ctx.origin = origin;
     }
 
     fn set_gas_price(&mut self, gas_price: U64) {
-        self.inner.exec_ctx.gas_price = gas_price.low_u64().into();
+        self.inner.exec_ctx.gas_price = U256::from_limbs([gas_price.into_limbs()[0], 0, 0, 0]);
     }
 
     fn take_logs(&mut self) -> Vec<Log> {
@@ -129,11 +133,11 @@ where
         self.inner.trie.commit().unwrap()
     }
 
-    fn save_account(&mut self, address: &H160, account: &Account) {
+    fn save_account(&mut self, address: &Address, account: &Account) {
         self.inner
             .trie
             .insert(
-                address.as_bytes().to_vec(),
+                address.as_slice().to_vec(),
                 account.encode().unwrap().to_vec(),
             )
             .unwrap();
@@ -145,9 +149,9 @@ where
     S: Storage + 'static,
     DB: trie::DB + 'static,
 {
-    fn apply<I: IntoIterator<Item = (H256, H256)>>(
+    fn apply<I: IntoIterator<Item = (evm_types::H256, evm_types::H256)>>(
         &mut self,
-        address: H160,
+        address: evm_types::H160,
         basic: Basic,
         code: Option<Vec<u8>>,
         storage: I,
@@ -156,8 +160,8 @@ where
         let old_account = match self.inner.trie.get(address.as_bytes()) {
             Ok(Some(raw)) => Account::decode(raw).unwrap(),
             _ => Account {
-                nonce:        U256::zero(),
-                balance:      U256::zero(),
+                nonce:        0u64,
+                balance:      U256::ZERO,
                 storage_root: RLP_NULL,
                 code_hash:    NIL_DATA,
             },
@@ -178,7 +182,7 @@ where
         storage.into_iter().for_each(|(k, v)| {
             // https://github.com/ethereum/go-ethereum/blob/ad16f11f841ab3a5fdedc8ddfc602f0717a34dd0/core/state/state_object.go#L306-L311
             // if value is zero, delete it's key
-            if v == H256::zero() {
+            if v.is_zero() {
                 storage_trie
                     .remove(k.as_bytes())
                     .expect("Failed to remove entry with zero value from storage trie");
@@ -188,10 +192,7 @@ where
                         k.as_bytes().to_vec(),
                         // https://github.com/ethereum/go-ethereum/blob/ad16f11f841ab3a5fdedc8ddfc602f0717a34dd0/core/state/state_object.go#L314
                         // Trim left zeroes and then rlp
-                        U256::from_big_endian(v.as_bytes())
-                            .encode()
-                            .unwrap()
-                            .to_vec(),
+                        rlp::encode(&evm_types::U256::from_big_endian(v.as_bytes())).to_vec(),
                     )
                     .expect("trie tree insert fail");
             }
@@ -202,8 +203,8 @@ where
             .unwrap_or_else(|err| panic!("failed to update the trie storage since {err}"));
 
         let mut new_account = Account {
-            nonce: basic.nonce,
-            balance: basic.balance,
+            nonce: basic.nonce.low_u64(),
+            balance: U256::from_limbs(basic.balance.0),
             code_hash: old_account.code_hash,
             storage_root,
         };
@@ -211,12 +212,13 @@ where
         if let Some(c) = code {
             let new_code_hash = Hasher::digest(&c);
             if new_code_hash != old_account.code_hash {
+                let address: evm_types::H256 = address.into();
                 blocking_async!(
                     self,
                     get_storage,
                     insert_code,
                     Context::new(),
-                    address.into(),
+                    H256::new(address.0),
                     new_code_hash,
                     c.into()
                 );
@@ -234,8 +236,8 @@ where
                 .unwrap();
         }
 
-        new_account.balance == U256::zero()
-            && new_account.nonce == U256::zero()
+        new_account.balance == U256::ZERO
+            && new_account.nonce == 0u64
             && new_account.code_hash.is_zero()
     }
 }
@@ -248,8 +250,8 @@ where
     fn apply<A, I, L>(&mut self, values: A, logs: L, delete_empty: bool)
     where
         A: IntoIterator<Item = Apply<I>>,
-        I: IntoIterator<Item = (H256, H256)>,
-        L: IntoIterator<Item = Log>,
+        I: IntoIterator<Item = (evm_types::H256, evm_types::H256)>,
+        L: IntoIterator<Item = evm::backend::Log>,
     {
         for apply in values.into_iter() {
             match apply {
@@ -271,7 +273,13 @@ where
             }
         }
 
-        self.logs = logs.into_iter().collect::<Vec<_>>();
+        self.logs = logs
+            .into_iter()
+            .map(|i| {
+                let topics = i.topics.iter().map(|i| H256::new(i.0)).collect::<Vec<_>>();
+                Log::new_unchecked(Address::new(i.address.0), topics, i.data.into())
+            })
+            .collect::<Vec<_>>();
     }
 }
 
@@ -299,7 +307,7 @@ where
         })
     }
 
-    pub fn get_metadata_root(&self) -> H256 {
+    pub fn get_metadata_root(&self) -> evm_types::H256 {
         self.storage(METADATA_CONTRACT_ADDRESS, *METADATA_ROOT_KEY)
     }
 

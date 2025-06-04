@@ -422,3 +422,9 @@ impl SignedTransaction {
 pub fn public_to_address(public: &Public) -> Address {
     Address::from_slice(&Hasher::digest(public)[12..])
 }
+
+pub fn recover_intact_pub_key(public: &Public) -> [u8; 65] {
+    let mut inner = vec![4u8];
+    inner.extend_from_slice(public.as_slice());
+    inner[0..65].try_into().unwrap()
+}

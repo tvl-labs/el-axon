@@ -1,8 +1,8 @@
 pub mod metadata_abi;
 
 use protocol::types::{
-    CkbRelatedInfo, ConsensusConfig, Hex, Metadata, MetadataVersion, ProposeCount, ValidatorExtend,
-    H256,
+    Address, CkbRelatedInfo, ConsensusConfig, Hex, Metadata, MetadataVersion, ProposeCount,
+    ValidatorExtend, H256,
 };
 
 impl From<metadata_abi::Metadata> for Metadata {
@@ -78,7 +78,7 @@ impl From<metadata_abi::ValidatorExtend> for ValidatorExtend {
         ValidatorExtend {
             bls_pub_key:    Hex::encode(value.bls_pub_key),
             pub_key:        Hex::encode(value.pub_key),
-            address:        value.address,
+            address:        Address::new(value.address.0),
             propose_weight: value.propose_weight,
             vote_weight:    value.vote_weight,
         }
@@ -90,7 +90,7 @@ impl From<ValidatorExtend> for metadata_abi::ValidatorExtend {
         metadata_abi::ValidatorExtend {
             bls_pub_key:    value.bls_pub_key.as_bytes().into(),
             pub_key:        value.pub_key.as_bytes().into(),
-            address:        value.address,
+            address:        evm_types::H160(value.address.into_array()),
             propose_weight: value.propose_weight,
             vote_weight:    value.vote_weight,
         }
@@ -100,7 +100,7 @@ impl From<ValidatorExtend> for metadata_abi::ValidatorExtend {
 impl From<ProposeCount> for metadata_abi::ProposeCount {
     fn from(pc: ProposeCount) -> Self {
         metadata_abi::ProposeCount {
-            address: pc.address,
+            address: evm_types::H160(pc.address.into_array()),
             count:   pc.count,
         }
     }
@@ -109,7 +109,7 @@ impl From<ProposeCount> for metadata_abi::ProposeCount {
 impl From<metadata_abi::ProposeCount> for ProposeCount {
     fn from(value: metadata_abi::ProposeCount) -> Self {
         ProposeCount {
-            address: value.address,
+            address: Address::new(value.address.0),
             count:   value.count,
         }
     }
@@ -131,12 +131,12 @@ impl From<CkbRelatedInfo> for metadata_abi::CkbRelatedInfo {
 impl From<metadata_abi::CkbRelatedInfo> for CkbRelatedInfo {
     fn from(value: metadata_abi::CkbRelatedInfo) -> Self {
         CkbRelatedInfo {
-            metadata_type_id:     H256(value.metadata_type_id),
-            checkpoint_type_id:   H256(value.checkpoint_type_id),
-            xudt_args:            H256(value.xudt_args),
-            stake_smt_type_id:    H256(value.stake_smt_type_id),
-            delegate_smt_type_id: H256(value.delegate_smt_type_id),
-            reward_smt_type_id:   H256(value.reward_smt_type_id),
+            metadata_type_id:     H256::new(value.metadata_type_id),
+            checkpoint_type_id:   H256::new(value.checkpoint_type_id),
+            xudt_args:            H256::new(value.xudt_args),
+            stake_smt_type_id:    H256::new(value.stake_smt_type_id),
+            delegate_smt_type_id: H256::new(value.delegate_smt_type_id),
+            reward_smt_type_id:   H256::new(value.reward_smt_type_id),
         }
     }
 }

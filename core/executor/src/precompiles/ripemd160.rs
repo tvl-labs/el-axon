@@ -2,8 +2,6 @@ use evm::executor::stack::{PrecompileFailure, PrecompileOutput};
 use evm::{Context, ExitError, ExitSucceed};
 use ripemd::Digest;
 
-use protocol::types::H160;
-
 use crate::err;
 use crate::precompiles::{eip_precompile_address, PrecompileContract};
 
@@ -11,7 +9,7 @@ use crate::precompiles::{eip_precompile_address, PrecompileContract};
 pub struct Ripemd160;
 
 impl PrecompileContract for Ripemd160 {
-    const ADDRESS: H160 = eip_precompile_address(0x03);
+    const ADDRESS: evm_types::H160 = eip_precompile_address(0x03);
     const MIN_GAS: u64 = 600;
 
     fn exec_fn(

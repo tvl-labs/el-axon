@@ -127,7 +127,7 @@ rand7 = { package = "rand", version = "0.7" }
 reqwest = "0.12"
 revm = "2.3"
 ripemd = "0.1"
-rlp = { version = "0.6", features = ["derive"] }
+rlp = { version = "0.5", features = ["derive"] }
 rocksdb = { version = "0.22", package = "ckb-rocksdb", features = ["lz4"] }
 rug = "1.19"
 rustracing = { git = "http://github.com/KaoImin/rustracing", branch = "main" }

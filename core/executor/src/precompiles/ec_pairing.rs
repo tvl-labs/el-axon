@@ -4,7 +4,7 @@ use bn::{pairing_batch, AffineG1, AffineG2, Fq, Fq2, Group, Gt, G1, G2};
 use evm::executor::stack::{PrecompileFailure, PrecompileOutput};
 use evm::{Context, ExitError, ExitSucceed};
 
-use protocol::types::{H160, U256};
+use protocol::types::U256;
 
 use crate::err;
 use crate::precompiles::{eip_precompile_address, PrecompileContract};
@@ -13,7 +13,7 @@ use crate::precompiles::{eip_precompile_address, PrecompileContract};
 pub struct EcPairing;
 
 impl PrecompileContract for EcPairing {
-    const ADDRESS: H160 = eip_precompile_address(0x08);
+    const ADDRESS: evm_types::H160 = eip_precompile_address(0x08);
     const MIN_GAS: u64 = 45_000;
 
     fn exec_fn(
@@ -23,8 +23,7 @@ impl PrecompileContract for EcPairing {
         _is_static: bool,
     ) -> Result<(PrecompileOutput, u64), PrecompileFailure> {
         if input.is_empty() {
-            let mut res = [0u8; 32];
-            U256::one().to_big_endian(&mut res);
+            let res: [u8; 32] = U256::ONE.to_be_bytes();
 
             return Ok((
                 PrecompileOutput {
@@ -77,12 +76,11 @@ impl PrecompileContract for EcPairing {
             pairs.push((a, b));
         }
 
-        let mut res = [0u8; 32];
-        if pairing_batch(&pairs) == Gt::one() {
-            U256::one().to_big_endian(&mut res);
+        let res: [u8; 32] = if pairing_batch(&pairs) == Gt::one() {
+            U256::ONE.to_be_bytes()
         } else {
-            U256::zero().to_big_endian(&mut res);
-        }
+            U256::ZERO.to_be_bytes()
+        };
 
         Ok((
             PrecompileOutput {

@@ -17,9 +17,7 @@ use futures::future::try_join_all;
 use common_apm::Instant;
 
 use protocol::traits::{Context, MemPool, MemPoolAdapter};
-use protocol::types::{
-    BlockNumber, Hash, PackedTxHashes, SignedTransaction, H160, H256, U256, U64,
-};
+use protocol::types::{Address, BlockNumber, Hash, PackedTxHashes, SignedTransaction, H256, U256};
 use protocol::{async_trait, tokio, Display, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
 use core_executor::is_call_system_script;
@@ -89,7 +87,7 @@ where
         self.adapter
             .check_storage_exist(ctx.clone(), &stx.transaction.hash)
             .await?;
-        self.pool.insert(stx, true, U64::zero())
+        self.pool.insert(stx, true, 0)
     }
 
     async fn insert_tx(
@@ -136,7 +134,7 @@ where
         &self,
         ctx: Context,
         txs: Vec<SignedTransaction>,
-    ) -> ProtocolResult<Vec<U64>> {
+    ) -> ProtocolResult<Vec<u64>> {
         let inst = Instant::now();
         let len = txs.len();
 
@@ -157,14 +155,14 @@ where
             })
             .collect::<Vec<tokio::task::JoinHandle<Result<_, ProtocolError>>>>();
 
-        let res: Vec<U64> = try_join_all(futs)
+        let res: Vec<u64> = try_join_all(futs)
             .await
             .map_err(|e| {
                 log::error!("[mempool] verify batch txs error {:?}", e);
                 MemPoolError::VerifyBatchTransactions
             })?
             .into_iter()
-            .collect::<Result<Vec<U64>, ProtocolError>>()?;
+            .collect::<Result<Vec<u64>, ProtocolError>>()?;
 
         log::info!(
             "[mempool] verify txs done, size {} cost {:?}",
@@ -186,7 +184,7 @@ where
     Adapter: MemPoolAdapter + 'static,
 {
     async fn insert(&self, ctx: Context, tx: SignedTransaction) -> ProtocolResult<()> {
-        let is_call_system_script = is_call_system_script(tx.transaction.unsigned.action())?;
+        let is_call_system_script = is_call_system_script(&tx.transaction.unsigned.action())?;
 
         log::debug!(
             "[mempool]: is call system script {:?}",
@@ -203,7 +201,7 @@ where
     async fn package(
         &self,
         _ctx: Context,
-        gas_limit: U256,
+        gas_limit: u64,
         tx_num_limit: u64,
     ) -> ProtocolResult<PackedTxHashes> {
         log::info!(
@@ -309,7 +307,7 @@ where
 
             for (signed_tx, check_nonce) in txs.into_iter().zip(check_nonces.into_iter()) {
                 let is_call_system_script =
-                    is_call_system_script(signed_tx.transaction.unsigned.action())?;
+                    is_call_system_script(&signed_tx.transaction.unsigned.action())?;
                 if is_call_system_script {
                     self.pool.insert_system_script_tx(signed_tx)?;
                 } else {
@@ -326,7 +324,7 @@ where
     async fn get_tx_count_by_address(
         &self,
         _ctx: Context,
-        address: H160,
+        address: Address,
     ) -> ProtocolResult<(usize, Option<BlockNumber>)> {
         Ok(self.pool.get_tx_count_by_address(address))
     }
@@ -364,7 +362,7 @@ pub enum TxType {
 #[derive(Debug, Display)]
 pub enum MemPoolError {
     #[display(
-        fmt = "Tx: {:?} exceeds balance, account balance: {:?}, gas limit: {:?}",
+        "Tx: {:?} exceeds balance, account balance: {:?}, gas limit: {:?}",
         tx_hash,
         account_balance,
         tx_gas_limit
@@ -372,14 +370,14 @@ pub enum MemPoolError {
     ExceedBalance {
         tx_hash:         Hash,
         account_balance: U256,
-        tx_gas_limit:    U64,
+        tx_gas_limit:    u64,
     },
 
-    #[display(fmt = "Invalid gas price {:?}", _0)]
+    #[display("Invalid gas price {:?}", _0)]
     InvalidGasPrice(u64),
 
     #[display(
-        fmt = "Tx: {:?} exceeds size limit, now: {}, limit: {} Bytes",
+        "Tx: {:?} exceeds size limit, now: {}, limit: {} Bytes",
         tx_hash,
         size,
         max_tx_size
@@ -390,18 +388,14 @@ pub enum MemPoolError {
         size:        usize,
     },
 
-    #[display(
-        fmt = "Tx: {:?} exceeds 30000000, tx gas limit {}",
-        tx_hash,
-        gas_limit_tx
-    )]
+    #[display("Tx: {:?} exceeds 30000000, tx gas limit {}", tx_hash, gas_limit_tx)]
     ExceedGasLimit {
         tx_hash:      Hash,
         gas_limit_tx: u64,
     },
 
     #[display(
-        fmt = "Tx: {:?} gas price is less than 21000, tx gas limit {}",
+        "Tx: {:?} gas price is less than 21000, tx gas limit {}",
         tx_hash,
         gas_limit_tx
     )]
@@ -410,59 +404,59 @@ pub enum MemPoolError {
         gas_limit_tx: u64,
     },
 
-    #[display(fmt = "Tx nonce {} is invalid current nonce {}", tx_nonce, current)]
+    #[display("Tx nonce {} is invalid current nonce {}", tx_nonce, current)]
     InvalidNonce { current: u64, tx_nonce: u64 },
 
-    #[display(fmt = "Tx: {:?} inserts failed", _0)]
+    #[display("Tx: {:?} inserts failed", _0)]
     Insert(Hash),
 
-    #[display(fmt = "Mempool reaches limit: {}", _0)]
+    #[display("Mempool reaches limit: {}", _0)]
     ReachLimit(usize),
 
-    #[display(fmt = "Tx: {:?} exists in pool", _0)]
+    #[display("Tx: {:?} exists in pool", _0)]
     Dup(Hash),
 
-    #[display(fmt = "Pull txs, require: {}, response: {}", require, response)]
+    #[display("Pull txs, require: {}, response: {}", require, response)]
     EnsureBreak { require: usize, response: usize },
 
     #[display(
-        fmt = "There is duplication in order transactions. duplication tx_hash {:?}",
+        "There is duplication in order transactions. duplication tx_hash {:?}",
         _0
     )]
     EnsureDup(Hash),
 
-    #[display(fmt = "Fetch full txs, require: {}, response: {}", require, response)]
+    #[display("Fetch full txs, require: {}, response: {}", require, response)]
     MisMatch { require: usize, response: usize },
 
-    #[display(fmt = "Tx inserts candidate_queue failed, len: {}", _0)]
+    #[display("Tx inserts candidate_queue failed, len: {}", _0)]
     InsertCandidate(usize),
 
-    #[display(fmt = "Tx: {:?} check authorization error {:?}", tx_hash, err_info)]
+    #[display("Tx: {:?} check authorization error {:?}", tx_hash, err_info)]
     CheckAuthorization { tx_hash: Hash, err_info: String },
 
-    #[display(fmt = "Check_hash failed, expect: {:?}, get: {:?}", expect, actual)]
+    #[display("Check_hash failed, expect: {:?}, get: {:?}", expect, actual)]
     CheckHash { expect: Hash, actual: Hash },
 
-    #[display(fmt = "Tx: {:?} already commit", _0)]
+    #[display("Tx: {:?} already commit", _0)]
     CommittedTx(Hash),
 
-    #[display(fmt = "Tx: {:?} doesn't match our chain id", _0)]
+    #[display("Tx: {:?} doesn't match our chain id", _0)]
     WrongChain(Hash),
 
-    #[display(fmt = "Tx: {:?} timeout {}", tx_hash, timeout)]
+    #[display("Tx: {:?} timeout {}", tx_hash, timeout)]
     Timeout { tx_hash: Hash, timeout: u64 },
 
-    #[display(fmt = "Tx: {:?} invalid timeout", _0)]
+    #[display("Tx: {:?} invalid timeout", _0)]
     InvalidTimeout(Hash),
 
-    #[display(fmt = "Batch transaction validation failed")]
+    #[display("Batch transaction validation failed")]
     VerifyBatchTransactions,
 
-    #[display(fmt = "Encode transaction to JSON failed")]
+    #[display("Encode transaction to JSON failed")]
     EncodeJson,
 
-    #[display(fmt = "Invalid sender, expect: {:?}, get: {:?}", expect, actual)]
-    InvalidSender { expect: H160, actual: H160 },
+    #[display("Invalid sender, expect: {:?}, get: {:?}", expect, actual)]
+    InvalidSender { expect: Address, actual: Address },
 }
 
 impl Error for MemPoolError {}

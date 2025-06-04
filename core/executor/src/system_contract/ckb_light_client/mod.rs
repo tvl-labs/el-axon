@@ -6,10 +6,11 @@ pub use abi::ckb_light_client_abi;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use ethers::abi::AbiDecode;
+use evm_types::{H160, U64};
 
 use protocol::traits::{ApplyBackend, ExecutorAdapter};
 use protocol::trie::Trie as _;
-use protocol::types::{SignedTransaction, TxResp, H160, H256};
+use protocol::types::{SignedTransaction, TxResp, H256};
 use protocol::ProtocolResult;
 
 use crate::system_contract::ckb_light_client::store::CkbLightClientStore;
@@ -31,9 +32,9 @@ impl<Adapter: ExecutorAdapter + ApplyBackend> SystemContract<Adapter>
         let sender = tx.sender;
         let tx = &tx.transaction.unsigned;
         let tx_data = tx.data();
-        let gas_limit = *tx.gas_limit();
+        let gas_limit = U64::from(*tx.gas_limit());
 
-        let root = CURRENT_HEADER_CELL_ROOT.with(|r| *r.borrow());
+        let root = H256::new(CURRENT_HEADER_CELL_ROOT.with(|r| *r.borrow()).0);
         let mut store = exec_try!(
             CkbLightClientStore::new(root),
             gas_limit,
@@ -66,6 +67,7 @@ impl<Adapter: ExecutorAdapter + ApplyBackend> SystemContract<Adapter>
             }
         }
 
+        let sender = evm_types::H160(sender.into_array());
         update_states(adapter, sender, Self::ADDRESS);
         succeed_resp(gas_limit)
     }

@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
+use alloy_rlp::{RlpDecodable, RlpEncodable};
 use futures::future::{try_join_all, TryFutureExt};
-use rlp_derive::{RlpDecodable, RlpEncodable};
 
 use common_apm::Instant;
 use protocol::{
@@ -79,9 +79,10 @@ where
 }
 
 #[derive(Clone, Debug, Hash, RlpEncodable, RlpDecodable)]
+#[rlp(trailing)]
 pub struct MsgPullTxs {
-    pub height: Option<u64>,
     pub hashes: Vec<Hash>,
+    pub height: Option<u64>,
 }
 
 pub struct PullTxsHandler<N, M> {

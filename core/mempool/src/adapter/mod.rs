@@ -3,6 +3,7 @@ pub mod message;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{collections::HashMap, error::Error, marker::PhantomData, sync::Arc, time::Duration};
 
+use alloy_rlp::Decodable;
 use dashmap::DashMap;
 use futures::{
     channel::mpsc::{unbounded, TrySendError, UnboundedReceiver, UnboundedSender},
@@ -17,8 +18,8 @@ use protocol::traits::{
     TrustFeedback,
 };
 use protocol::types::{
-    recover_intact_pub_key, Backend, BatchSignedTxs, CellDepWithPubKey, Hash, MerkleRoot,
-    SignedTransaction, H160, U256, U64,
+    recover_intact_pub_key, Address, Backend, BatchSignedTxs, CellDepWithPubKey, Hash, MerkleRoot,
+    SignedTransaction, U256,
 };
 use protocol::{
     async_trait,
@@ -122,7 +123,7 @@ pub struct DefaultMemPoolAdapter<C, N, S, DB, I> {
     storage: Arc<S>,
     trie_db: Arc<DB>,
 
-    addr_nonce:  DashMap<H160, (U64, U256)>,
+    addr_nonce:  DashMap<Address, (u64, U256)>,
     max_tx_size: AtomicUsize,
     chain_id:    u64,
 
@@ -182,13 +183,13 @@ where
         &self,
         ctx: Context,
         stx: &SignedTransaction,
-    ) -> ProtocolResult<U64> {
+    ) -> ProtocolResult<u64> {
         let addr = &stx.sender;
         let block = self.storage.get_latest_block(ctx.clone()).await?;
         let root = self.executor_backend(ctx).await?.get_metadata_root();
 
         if MetadataHandle::new(root).is_validator(block.header.number + 1, *addr)? {
-            return Ok(U64::zero());
+            return Ok(0);
         }
 
         Err(MemPoolError::CheckAuthorization {
@@ -199,7 +200,9 @@ where
     }
 
     fn verify_chain_id(&self, ctx: Context, stx: &SignedTransaction) -> ProtocolResult<()> {
-        if stx.transaction.chain_id.is_some() && Some(self.chain_id) != stx.transaction.chain_id {
+        if stx.transaction.unsigned.chain_id().is_some()
+            && Some(self.chain_id) != stx.transaction.unsigned.chain_id()
+        {
             if ctx.is_network_origin_txs() {
                 self.network.report(
                     ctx,
@@ -242,8 +245,8 @@ where
 
     fn verify_gas_price(&self, stx: &SignedTransaction) -> ProtocolResult<()> {
         let gas_price = stx.transaction.unsigned.gas_price();
-        if gas_price == U64::zero() || gas_price >= MAX_GAS_PRICE {
-            return Err(MemPoolError::InvalidGasPrice(gas_price.low_u64()).into());
+        if gas_price == 0 || gas_price >= MAX_GAS_PRICE.to::<u128>() {
+            return Err(MemPoolError::InvalidGasPrice(gas_price as u64).into());
         }
 
         Ok(())
@@ -251,7 +254,7 @@ where
 
     fn verify_gas_limit(&self, ctx: Context, stx: &SignedTransaction) -> ProtocolResult<()> {
         let gas_limit_tx = stx.transaction.unsigned.gas_limit();
-        if gas_limit_tx < &(MIN_TRANSACTION_GAS_LIMIT.into()) {
+        if gas_limit_tx < &MIN_TRANSACTION_GAS_LIMIT {
             if ctx.is_network_origin_txs() {
                 self.network.report(
                     ctx,
@@ -264,12 +267,12 @@ where
 
             return Err(MemPoolError::UnderGasLimit {
                 tx_hash:      stx.transaction.hash,
-                gas_limit_tx: gas_limit_tx.low_u64(),
+                gas_limit_tx: *gas_limit_tx,
             }
             .into());
         }
 
-        if gas_limit_tx > &(MAX_GAS_LIMIT.into()) {
+        if gas_limit_tx > &MAX_GAS_LIMIT {
             if ctx.is_network_origin_txs() {
                 self.network.report(
                     ctx,
@@ -282,7 +285,7 @@ where
 
             return Err(MemPoolError::ExceedGasLimit {
                 tx_hash:      stx.transaction.hash,
-                gas_limit_tx: gas_limit_tx.low_u64(),
+                gas_limit_tx: *gas_limit_tx,
             }
             .into());
         }
@@ -295,9 +298,9 @@ where
         if signature.is_eth_sig() {
             // Verify secp256k1 signature
             Secp256k1Recoverable::verify_signature(
-                stx.transaction.signature_hash(true).as_bytes(),
+                stx.transaction.signature_hash(true).as_slice(),
                 signature.as_bytes().as_ref(),
-                recover_intact_pub_key(&stx.public.unwrap()).as_bytes(),
+                &recover_intact_pub_key(&stx.public.unwrap()),
             )
             .map_err(|err| AdapterError::VerifySignature(err.to_string()))?;
 
@@ -307,7 +310,8 @@ where
         let root = self.executor_backend(ctx).await?.get_image_cell_root();
 
         // Verify interoperation signature call CKB-VM mode
-        let r = rlp::decode::<CellDepWithPubKey>(&signature.r[1..]).map_err(AdapterError::Rlp)?;
+        let r = <CellDepWithPubKey as Decodable>::decode(&mut &signature.r[1..])
+            .map_err(AdapterError::Rlp)?;
         InteroperationImpl::call_ckb_vm(
             Default::default(),
             &DataProvider::new(root),
@@ -388,8 +392,8 @@ where
         &self,
         ctx: Context,
         tx: &SignedTransaction,
-    ) -> ProtocolResult<U64> {
-        if is_call_system_script(tx.transaction.unsigned.action())? {
+    ) -> ProtocolResult<u64> {
+        if is_call_system_script(&tx.transaction.unsigned.action())? {
             return self.check_system_script_tx_authorization(ctx, tx).await;
         }
 
@@ -397,8 +401,8 @@ where
         if let Some(res) = self.addr_nonce.get(addr) {
             if tx.transaction.unsigned.nonce() < &res.value().0 {
                 return Err(MemPoolError::InvalidNonce {
-                    current:  res.value().0.low_u64(),
-                    tx_nonce: tx.transaction.unsigned.nonce().low_u64(),
+                    current:  res.value().0,
+                    tx_nonce: *tx.transaction.unsigned.nonce(),
                 }
                 .into());
             } else if res.value().1 < tx.transaction.unsigned.may_cost()? {
@@ -414,28 +418,32 @@ where
         }
 
         let backend = self.executor_backend(ctx).await?;
-        let account = backend.basic(*addr);
+        let account = backend.basic((*addr).into_array().into());
+
+        let account_balance = U256::from_limbs(account.balance.0);
+        let account_nonce = account.nonce.low_u64();
+
         self.addr_nonce
-            .insert(*addr, (account.nonce.low_u64().into(), account.balance));
+            .insert(*addr, (account_nonce, account_balance));
 
-        if account.nonce.low_u64() > tx.transaction.unsigned.nonce().low_u64() {
+        if account.nonce.low_u64() > *tx.transaction.unsigned.nonce() {
             return Err(MemPoolError::InvalidNonce {
-                current:  account.nonce.as_u64(),
-                tx_nonce: tx.transaction.unsigned.nonce().low_u64(),
+                current:  account_nonce,
+                tx_nonce: *tx.transaction.unsigned.nonce(),
             }
             .into());
         }
 
-        if account.balance < tx.transaction.unsigned.may_cost()? {
+        if account_balance < tx.transaction.unsigned.may_cost()? {
             return Err(MemPoolError::ExceedBalance {
-                tx_hash:         tx.transaction.hash,
-                account_balance: account.balance,
-                tx_gas_limit:    *tx.transaction.unsigned.gas_limit(),
+                tx_hash: tx.transaction.hash,
+                account_balance,
+                tx_gas_limit: *tx.transaction.unsigned.gas_limit(),
             }
             .into());
         }
 
-        Ok(tx.transaction.unsigned.nonce() - account.nonce.low_u64())
+        Ok(tx.transaction.unsigned.nonce() - account_nonce)
     }
 
     async fn check_transaction(&self, ctx: Context, stx: &SignedTransaction) -> ProtocolResult<()> {
@@ -511,17 +519,17 @@ where
 
 #[derive(Debug, Display)]
 pub enum AdapterError {
-    #[display(fmt = "adapter: interval broadcaster drop")]
+    #[display("adapter: interval broadcaster drop")]
     IntervalBroadcasterDrop,
 
-    #[display(fmt = "adapter: internal error")]
+    #[display("adapter: internal error")]
     Internal,
 
-    #[display(fmt = "adapter: verify signature error {:?}", _0)]
+    #[display("adapter: verify signature error {:?}", _0)]
     VerifySignature(String),
 
-    #[display(fmt = "adapter: rlp decode error {:?}", _0)]
-    Rlp(rlp::DecoderError),
+    #[display("adapter: rlp decode error {:?}", _0)]
+    Rlp(alloy_rlp::Error),
 }
 
 impl Error for AdapterError {}

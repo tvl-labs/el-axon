@@ -1,17 +1,13 @@
 use std::collections::HashSet;
 
+use ckb_types::packed::Byte32;
 use ckb_types::prelude::*;
 use ckb_types::utilities::{merkle_root, CBMT};
 use ethers::abi::AbiEncode;
 use evm::Context;
 use sha2::Digest;
 
-use protocol::{
-    ckb_blake2b_256,
-    codec::hex_decode,
-    rand::random,
-    types::{H256, U256},
-};
+use protocol::{ckb_blake2b_256, codec::hex_decode, rand::random};
 
 use crate::precompiles::ckb_mbt_verify::{Proof, VerifyProofPayload};
 use crate::precompiles::{
@@ -115,7 +111,7 @@ fn test_modexp() {
     )
     .unwrap();
     let mut output = vec![0u8; 32];
-    U256::from(10055).to_big_endian(&mut output);
+    evm_types::U256::from(10055).to_big_endian(&mut output);
     test_precompile!(ModExp, input, output, 200);
 
     let input = &hex_decode(
@@ -128,7 +124,7 @@ fn test_modexp() {
     )
     .unwrap();
     let mut output = vec![0u8; 32];
-    U256::from(1).to_big_endian(&mut output);
+    evm_types::U256::from(1).to_big_endian(&mut output);
     test_precompile!(ModExp, input, output, 1360);
 }
 
@@ -226,13 +222,13 @@ fn test_verify_cmbt_proof() {
     };
 
     // Tx order is 0, 1, 2
-    let tx_hash_0 = H256::from_low_u64_be(0x00).0.pack();
-    let tx_hash_1 = H256::from_low_u64_be(0x01).0.pack();
-    let tx_hash_2 = H256::from_low_u64_be(0x02).0.pack();
+    let tx_hash_0 = evm_types::H256::from_low_u64_be(0x00).0.pack();
+    let tx_hash_1 = evm_types::H256::from_low_u64_be(0x01).0.pack();
+    let tx_hash_2 = evm_types::H256::from_low_u64_be(0x02).0.pack();
 
-    let witness_hash_0 = H256::from_low_u64_be(0x10).0.pack();
-    let witness_hash_1 = H256::from_low_u64_be(0x11).0.pack();
-    let witness_hash_2 = H256::from_low_u64_be(0x12).0.pack();
+    let witness_hash_0 = evm_types::H256::from_low_u64_be(0x10).0.pack();
+    let witness_hash_1 = evm_types::H256::from_low_u64_be(0x11).0.pack();
+    let witness_hash_2 = evm_types::H256::from_low_u64_be(0x12).0.pack();
 
     let raw_transactions_root =
         merkle_root(&[tx_hash_0.clone(), tx_hash_1.clone(), tx_hash_2.clone()]);
@@ -264,12 +260,15 @@ fn test_verify_cmbt_proof() {
         lemmas:  tx_proof
             .lemmas()
             .iter()
-            .map(|l| l.unpack().0)
+            .map(|l: &ckb_types::packed::Byte32| {
+                let lemma: [u8; 32] = <Byte32 as Unpack<[u8; 32]>>::unpack(l);
+                lemma
+            })
             .collect::<Vec<_>>(),
         leaves:  vec![
-            tx_hash_0.unpack().0,
-            tx_hash_1.unpack().0,
-            tx_hash_2.unpack().0,
+            <Byte32 as Unpack<[u8; 32]>>::unpack(&tx_hash_0),
+            <Byte32 as Unpack<[u8; 32]>>::unpack(&tx_hash_1),
+            <Byte32 as Unpack<[u8; 32]>>::unpack(&tx_hash_2),
         ],
     };
 
@@ -278,28 +277,28 @@ fn test_verify_cmbt_proof() {
         lemmas:  witness_merkle_proof
             .lemmas()
             .iter()
-            .map(|l| l.unpack().0)
+            .map(|l| <Byte32 as Unpack<[u8; 32]>>::unpack(l))
             .collect::<Vec<_>>(),
         leaves:  vec![
-            witness_hash_0.unpack().0,
-            witness_hash_1.unpack().0,
-            witness_hash_2.unpack().0,
+            <Byte32 as Unpack<[u8; 32]>>::unpack(&witness_hash_0),
+            <Byte32 as Unpack<[u8; 32]>>::unpack(&witness_hash_1),
+            <Byte32 as Unpack<[u8; 32]>>::unpack(&witness_hash_2),
         ],
     };
 
     let raw_tx_payload = VerifyProofPayload {
         verify_type:           0,
-        transactions_root:     transactions_root.unpack().0,
-        witnesses_root:        witnesses_root.unpack().0,
-        raw_transactions_root: raw_transactions_root.unpack().0,
+        transactions_root:     <Byte32 as Unpack<[u8; 32]>>::unpack(&transactions_root),
+        witnesses_root:        <Byte32 as Unpack<[u8; 32]>>::unpack(&witnesses_root),
+        raw_transactions_root: <Byte32 as Unpack<[u8; 32]>>::unpack(&raw_transactions_root),
         proof:                 raw_tx_proof,
     };
 
     let witness_payload = VerifyProofPayload {
         verify_type:           1,
-        transactions_root:     transactions_root.unpack().0,
-        witnesses_root:        witnesses_root.unpack().0,
-        raw_transactions_root: raw_transactions_root.unpack().0,
+        transactions_root:     <Byte32 as Unpack<[u8; 32]>>::unpack(&transactions_root),
+        witnesses_root:        <Byte32 as Unpack<[u8; 32]>>::unpack(&witnesses_root),
+        raw_transactions_root: <Byte32 as Unpack<[u8; 32]>>::unpack(&raw_transactions_root),
         proof:                 witness_proof,
     };
 

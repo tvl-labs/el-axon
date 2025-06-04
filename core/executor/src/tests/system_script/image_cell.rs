@@ -5,7 +5,7 @@ use ckb_types::{bytes::Bytes, packed, prelude::*};
 use ethers::abi::AbiEncode;
 
 use core_db::RocksAdapter;
-use protocol::types::{Backend, MemoryBackend, TxResp, H160, U256};
+use protocol::types::{Backend, MemoryBackend, TxResp, H256};
 
 use crate::system_contract::image_cell::{
     image_cell_abi, CellInfo, CellKey, ImageCellContract, ImageCellReader,
@@ -29,8 +29,8 @@ pub fn test_write_functions() {
         .inner_db();
     let (m_root, h_root) = init_system_contract_db(inner_db, &mut backend);
 
-    CURRENT_METADATA_ROOT.with(|r| *r.borrow_mut() = m_root);
-    CURRENT_HEADER_CELL_ROOT.with(|r| *r.borrow_mut() = h_root);
+    CURRENT_METADATA_ROOT.with(|r| *r.borrow_mut() = H256::new(m_root.0));
+    CURRENT_HEADER_CELL_ROOT.with(|r| *r.borrow_mut() = H256::new(h_root.0));
 
     test_update_first(&mut backend, &executor);
     test_update_second(&mut backend, &executor);
@@ -60,7 +60,10 @@ fn test_update_first<'a>(
 
     let root = backend.storage(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY);
     let cell_key = CellKey::new([7u8; 32], 0x0);
-    let get_cell = ImageCellReader.get_cell(root, &cell_key).unwrap().unwrap();
+    let get_cell = ImageCellReader
+        .get_cell(H256::new(root.0), &cell_key)
+        .unwrap()
+        .unwrap();
     check_cell(&get_cell, 0x1, None);
 }
 
@@ -86,7 +89,10 @@ fn test_update_second<'a>(
 
     let root = backend.storage(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY);
     let cell_key = CellKey::new([7u8; 32], 0x0);
-    let get_cell = ImageCellReader.get_cell(root, &cell_key).unwrap().unwrap();
+    let get_cell = ImageCellReader
+        .get_cell(H256::new(root.0), &cell_key)
+        .unwrap()
+        .unwrap();
     check_cell(&get_cell, 0x1, Some(0x2));
 }
 
@@ -109,7 +115,10 @@ fn test_rollback_first<'a>(
 
     let root = backend.storage(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY);
     let cell_key = CellKey::new([7u8; 32], 0x0);
-    let get_cell = ImageCellReader.get_cell(root, &cell_key).unwrap().unwrap();
+    let get_cell = ImageCellReader
+        .get_cell(H256::new(root.0), &cell_key)
+        .unwrap()
+        .unwrap();
     check_cell(&get_cell, 0x1, None);
 }
 
@@ -132,7 +141,9 @@ fn test_rollback_second<'a>(
 
     let root = backend.storage(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY);
     let cell_key = CellKey::new([7u8; 32], 0x0);
-    let get_cell = ImageCellReader.get_cell(root, &cell_key).unwrap();
+    let get_cell = ImageCellReader
+        .get_cell(H256::new(root.0), &cell_key)
+        .unwrap();
     assert!(get_cell.is_none());
 }
 
@@ -156,7 +167,7 @@ fn exec<'a>(
     executor: &ImageCellContract<MemoryBackend<'a>>,
     data: Vec<u8>,
 ) -> TxResp {
-    let addr = H160::from_str("0xf000000000000000000000000000000000000000").unwrap();
+    let addr = evm_types::H160::from_str("0xf000000000000000000000000000000000000000").unwrap();
     let tx = gen_tx(addr, IMAGE_CELL_CONTRACT_ADDRESS, 1000, data);
     executor.exec_(backend, &tx)
 }
@@ -234,15 +245,15 @@ fn prepare_outputs() -> Vec<image_cell_abi::CellInfo> {
 fn check_nonce(backend: &mut MemoryBackend<'_>, nonce: u64) {
     assert_eq!(
         backend.basic(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS).nonce,
-        U256::zero()
+        evm_types::U256::zero()
     );
     assert_eq!(
         backend.basic(IMAGE_CELL_CONTRACT_ADDRESS).nonce,
-        U256::zero()
+        evm_types::U256::zero()
     );
     assert_eq!(
         backend
-            .basic(H160::from_str("0xf000000000000000000000000000000000000000").unwrap())
+            .basic(evm_types::H160::from_str("0xf000000000000000000000000000000000000000").unwrap())
             .nonce,
         nonce.into()
     )

@@ -5,7 +5,7 @@ use ethers::core::types::Bytes as EthBytes;
 use evm::executor::stack::{PrecompileFailure, PrecompileOutput};
 use evm::{Context, ExitError, ExitSucceed};
 
-use protocol::types::{H160, H256};
+use protocol::types::H256;
 
 use crate::precompiles::{axon_precompile_address, PrecompileContract};
 use crate::system_contract::image_cell::{image_cell_abi, CellKey, ImageCellReader};
@@ -15,7 +15,7 @@ use crate::{err, CURRENT_HEADER_CELL_ROOT};
 pub struct GetCell;
 
 impl PrecompileContract for GetCell {
-    const ADDRESS: H160 = axon_precompile_address(0x03);
+    const ADDRESS: evm_types::H160 = axon_precompile_address(0x03);
     const MIN_GAS: u64 = 42000;
 
     fn exec_fn(
@@ -67,7 +67,7 @@ fn parse_input(input: &[u8]) -> Result<(H256, u32), PrecompileFailure> {
     let out_point = <image_cell_abi::OutPoint as AbiDecode>::decode(input)
         .map_err(|_| err!(_, "decode input"))?;
 
-    Ok((H256(out_point.tx_hash), out_point.index))
+    Ok((H256::new(out_point.tx_hash), out_point.index))
 }
 
 #[derive(EthAbiType, EthAbiCodec, Default, Clone, Debug, PartialEq, Eq)]

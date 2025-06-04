@@ -185,11 +185,7 @@ fn criterion_other(c: &mut Criterion) {
         b.iter(|| {
             runtime.block_on(concurrent_insert(txs.clone(), Arc::clone(mempool)));
             runtime.block_on(exec_flush(remove_hashes.clone(), Arc::clone(mempool)));
-            runtime.block_on(exec_package(
-                Arc::clone(mempool),
-                CYCLE_LIMIT.into(),
-                TX_NUM_LIMIT,
-            ));
+            runtime.block_on(exec_package(Arc::clone(mempool), CYCLE_LIMIT, TX_NUM_LIMIT));
         });
     });
     // MacOS M1 Pro, 16GB: time: 5.80 ms
@@ -216,7 +212,7 @@ fn criterion_other(c: &mut Criterion) {
         b.iter(|| {
             runtime.block_on(exec_package(
                 Arc::clone(&mempool),
-                CYCLE_LIMIT.into(),
+                CYCLE_LIMIT,
                 TX_NUM_LIMIT,
             ));
         });
