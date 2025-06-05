@@ -66,7 +66,7 @@ impl ServiceProtocol for TransmitterProtocol {
         };
 
         let remote_peer = RemotePeer::from_proto_context(&context);
-        let peer_id = remote_peer.peer_id.to_string();
+        let peer_id = PeerIdExt::to_string(&remote_peer.peer_id);
 
         // let host = remote_peer.connected_addr.host.to_owned();
         let route_fut = self.router.route_message(remote_peer.clone(), recv_msg);

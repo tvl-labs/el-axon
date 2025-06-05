@@ -153,7 +153,7 @@ impl PeerManager {
 
             let peer_id = extract_peer_id(&peer.addr).unwrap();
             common_apm::metrics::network::NETWORK_PEER_ID_DISCONNECTED_COUNT_VEC
-                .with_label_values(&[&peer_id.to_string()])
+                .with_label_values(&[&PeerIdExt::to_string(&peer_id)])
                 .inc();
 
             if self.consensus_list.read().contains(&peer_id) {

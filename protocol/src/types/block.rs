@@ -154,11 +154,6 @@ pub struct Block {
 
 impl Block {
     pub fn new(proposal: Proposal, exec_resp: ExecResp) -> Self {
-        let logs = exec_resp
-            .tx_resp
-            .iter()
-            .map(|r| r.bloom())
-            .collect::<Vec<_>>();
         let header = Header {
             version:                  proposal.version,
             prev_hash:                proposal.prev_hash,
@@ -167,7 +162,7 @@ impl Block {
             transactions_root:        proposal.transactions_root,
             signed_txs_hash:          proposal.signed_txs_hash,
             receipts_root:            exec_resp.receipt_root,
-            log_bloom:                logs,
+            log_bloom:                exec_resp.bloom(),
             timestamp:                proposal.timestamp,
             number:                   proposal.number,
             gas_used:                 U64::from_limbs([exec_resp.gas_used; 1]),
@@ -207,7 +202,7 @@ impl Block {
                     tx_index: idx as u32,
                     state_root: self.header.state_root,
                     used_gas: U64::from(res.gas_used),
-                    logs_bloom: res.bloom(),
+                    logs_bloom: res.receipt_bloom(),
                     logs: res.logs.clone(),
                     log_index,
                     code_address: res.code_address,
@@ -270,7 +265,7 @@ pub struct Header {
     pub transactions_root:        MerkleRoot,
     pub signed_txs_hash:          Hash,
     pub receipts_root:            MerkleRoot,
-    pub log_bloom:                Vec<Bloom>,
+    pub log_bloom:                Bloom,
     #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
     pub timestamp:                u64,
     #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]

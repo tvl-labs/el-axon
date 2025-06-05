@@ -2,7 +2,10 @@ pub use batch::*;
 pub use block::*;
 pub use bytes::{Buf, BufMut, Bytes, BytesMut};
 pub use ckb_client::*;
-pub use evm::{backend::*, ExitError, ExitRevert, ExitSucceed};
+pub use evm::{
+    backend::{Apply, ApplyBackend, Backend, Basic, MemoryAccount, MemoryBackend},
+    ExitError, ExitRevert, ExitSucceed,
+};
 pub use executor::{
     AccessList, AccessListItem, Account, Config, EthAccountProof, EthStorageProof, ExecResp,
     ExecutorContext, ExitReason, HasherKeccak, Log, TxResp,

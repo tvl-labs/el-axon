@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -6,18 +7,21 @@ use std::{
     time::Duration,
 };
 
-use jsonrpsee::server::{
-    IdProvider, IntoSubscriptionCloseResponse, PendingSubscriptionSink, RpcModule,
-    SubscriptionMessage, SubscriptionSink,
-};
 use jsonrpsee::types::{error::ErrorCode, params::Params, ErrorObjectOwned, SubscriptionId};
+use jsonrpsee::{
+    server::{
+        IdProvider, IntoSubscriptionCloseResponse, PendingSubscriptionSink, RpcModule,
+        SubscriptionMessage, SubscriptionSink,
+    },
+    Extensions,
+};
 use serde::{Deserialize, Serialize};
 
 use core_consensus::SYNC_STATUS;
 use protocol::tokio::sync::mpsc::{channel, Receiver, Sender};
 use protocol::tokio::{self, select, time::interval};
 use protocol::traits::{APIAdapter, Context};
-use protocol::types::{BigEndianHash, Hash, Hex, H160, H256, U256};
+use protocol::types::{Address, Hash, Hex, H256, U256};
 
 use crate::jsonrpc::{
     r#impl::from_receipt_to_web3_log,
@@ -49,6 +53,7 @@ async fn subscription_callback(
     params: Params<'static>,
     sink: PendingSubscriptionSink,
     ctx: Arc<Sender<RawHub>>,
+    _: Extensions,
 ) -> impl IntoSubscriptionCloseResponse {
     match Type::try_from(params) {
         Ok(type_) => {
@@ -267,13 +272,13 @@ impl<'a> TryFrom<Params<'a>> for Type {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 struct RawLoggerFilter {
     #[serde(default)]
-    address: MultiType<H160>,
+    address: MultiType<Address>,
     topics:  Option<Vec<MultiNestType<Hash>>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 struct LoggerFilter {
-    address: Option<Vec<H160>>,
+    address: Option<Vec<Address>>,
     topics:  Vec<Option<Vec<Option<Hash>>>>,
 }
 
@@ -318,8 +323,9 @@ impl Default for HexIdProvider {
 impl IdProvider for HexIdProvider {
     fn next_id(&self) -> SubscriptionId<'static> {
         let id = self.id.fetch_add(1, Ordering::Acquire);
-        let hash: Hash = BigEndianHash::from_uint(&U256::from(id));
+        let id = U256::from(id);
+        let hash = Hash::new(id.to_be_bytes());
 
-        SubscriptionId::Str(beef::Cow::owned(Hex::encode(hash.as_bytes()).as_string()))
+        SubscriptionId::Str(Cow::from(Hex::encode(hash.as_slice()).as_string()))
     }
 }

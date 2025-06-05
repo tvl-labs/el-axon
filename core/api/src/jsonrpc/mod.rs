@@ -14,7 +14,8 @@ use tower_http::cors::{Any as CorsAny, CorsLayer};
 use common_config_parser::types::{spec::HardforkName, Config};
 use protocol::traits::APIAdapter;
 use protocol::types::{
-    Block, CkbRelatedInfo, EthAccountProof, Hash, Hex, Metadata, Proof, Proposal, H160, H256, U256,
+    Address, Block, CkbRelatedInfo, EthAccountProof, Hash, Hex, Metadata, Proof, Proposal, H256,
+    U256,
 };
 use protocol::ProtocolResult;
 
@@ -57,7 +58,7 @@ pub trait Web3Rpc {
     #[method(name = "eth_getTransactionCount")]
     async fn get_transaction_count(
         &self,
-        address: H160,
+        address: Address,
         number: Option<BlockId>,
     ) -> RpcResult<U256>;
 
@@ -65,7 +66,7 @@ pub trait Web3Rpc {
     async fn get_block_transaction_count_by_number(&self, number: BlockId) -> RpcResult<U256>;
 
     #[method(name = "eth_getBalance")]
-    async fn get_balance(&self, address: H160, number: Option<BlockId>) -> RpcResult<U256>;
+    async fn get_balance(&self, address: Address, number: Option<BlockId>) -> RpcResult<U256>;
 
     #[method(name = "eth_call")]
     async fn call(&self, req: Web3CallRequest, number: Option<BlockId>) -> RpcResult<Hex>;
@@ -74,7 +75,7 @@ pub trait Web3Rpc {
     async fn estimate_gas(&self, req: Web3CallRequest, number: Option<BlockId>) -> RpcResult<U256>;
 
     #[method(name = "eth_getCode")]
-    async fn get_code(&self, address: H160, number: Option<BlockId>) -> RpcResult<Hex>;
+    async fn get_code(&self, address: Address, number: Option<BlockId>) -> RpcResult<Hex>;
 
     #[method(name = "eth_getTransactionReceipt")]
     async fn get_transaction_receipt(&self, hash: H256) -> RpcResult<Option<Web3Receipt>>;
@@ -119,7 +120,7 @@ pub trait Web3Rpc {
     #[method(name = "eth_getStorageAt")]
     async fn get_storage_at(
         &self,
-        address: H160,
+        address: Address,
         position: U256,
         number: Option<BlockId>,
     ) -> RpcResult<Hex>;
@@ -150,7 +151,7 @@ pub trait Web3Rpc {
     #[method(name = "eth_getProof")]
     async fn get_proof(
         &self,
-        address: H160,
+        address: Address,
         storage_position: Vec<U256>,
         number: BlockId,
     ) -> RpcResult<EthAccountProof>;
@@ -195,7 +196,7 @@ pub trait AxonNodeRpc {
     fn mining(&self) -> RpcResult<bool>;
 
     #[method(name = "eth_coinbase")]
-    fn coinbase(&self) -> RpcResult<H160>;
+    fn coinbase(&self) -> RpcResult<Address>;
 
     #[method(name = "eth_hashrate")]
     fn hashrate(&self) -> RpcResult<U256>;
@@ -288,7 +289,7 @@ pub async fn run_jsonrpc_server<Adapter: APIAdapter + 'static>(
             .max_request_body_size(config.rpc.max_payload_size)
             .max_response_body_size(config.rpc.max_payload_size)
             .max_connections(config.rpc.maxconn)
-            .set_middleware(middleware)
+            .set_http_middleware(middleware)
             .build(addr)
             .await
             .map_err(|e| APIError::HttpServer(e.to_string()))?;

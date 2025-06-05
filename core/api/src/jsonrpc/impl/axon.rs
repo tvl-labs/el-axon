@@ -30,7 +30,7 @@ impl<Adapter: APIAdapter + 'static> AxonRpcServer for AxonRpcImpl<Adapter> {
             BlockId::Hash(hash) => self.adapter.get_block_by_hash(Context::new(), hash).await,
             BlockId::Num(num) => {
                 self.adapter
-                    .get_block_by_number(Context::new(), Some(num.low_u64()))
+                    .get_block_by_number(Context::new(), Some(num.to()))
                     .await
             }
             BlockId::Latest => self.adapter.get_block_by_number(Context::new(), None).await,
@@ -52,7 +52,7 @@ impl<Adapter: APIAdapter + 'static> AxonRpcServer for AxonRpcImpl<Adapter> {
     async fn get_metadata_by_number(&self, block_number: U256) -> RpcResult<Metadata> {
         let ret = self
             .adapter
-            .get_metadata_by_number(Context::new(), Some(block_number.low_u64()))
+            .get_metadata_by_number(Context::new(), Some(block_number.to()))
             .await
             .map_err(|e| RpcError::Internal(e.to_string()))?;
 
@@ -60,7 +60,7 @@ impl<Adapter: APIAdapter + 'static> AxonRpcServer for AxonRpcImpl<Adapter> {
     }
 
     async fn get_proposal_by_number(&self, block_number: U256) -> RpcResult<Proposal> {
-        let block_number = block_number.low_u64();
+        let block_number = block_number.to();
 
         let prev_state_root = if block_number == 0 {
             H256::default()
@@ -135,19 +135,21 @@ impl<Adapter: APIAdapter + 'static> AxonRpcServer for AxonRpcImpl<Adapter> {
         let mut hardfork_infos = HashMap::new();
         for hardfork_name in HardforkName::iter() {
             if let Some(p) = proposal.as_ref() {
-                if p.flags & H256::from_low_u64_be((hardfork_name as u64).to_be()) != H256::zero() {
+                if p.flags & H256::left_padding_from(&(hardfork_name as u64).to_be_bytes())
+                    != H256::default()
+                {
                     hardfork_infos.insert(hardfork_name, HardforkStatus::Proposed);
                 }
             }
 
-            if determined_latest & H256::from_low_u64_be((hardfork_name as u64).to_be())
-                != H256::zero()
+            if determined_latest & H256::left_padding_from(&(hardfork_name as u64).to_be_bytes())
+                != H256::ZERO
             {
                 hardfork_infos.insert(hardfork_name, HardforkStatus::Determined);
             }
 
-            if enabled_latest & H256::from_low_u64_be((hardfork_name as u64).to_be())
-                != H256::zero()
+            if enabled_latest & H256::left_padding_from(&(hardfork_name as u64).to_be_bytes())
+                != H256::ZERO
             {
                 hardfork_infos.insert(hardfork_name, HardforkStatus::Enabled);
             }
@@ -163,12 +165,12 @@ fn enabled_and_determined(iter: &[HardforkInfoInner], current_number: u64) -> (H
         match iter.last() {
             Some(latest) => {
                 if latest.block_number > current_number {
-                    (H256::zero(), latest.flags)
+                    (H256::default(), latest.flags)
                 } else {
-                    (latest.flags, H256::zero())
+                    (latest.flags, H256::default())
                 }
             }
-            None => (H256::zero(), H256::zero()),
+            None => (H256::default(), H256::default()),
         }
     } else {
         let (determined, enabled) = {
@@ -194,7 +196,7 @@ fn enabled_and_determined(iter: &[HardforkInfoInner], current_number: u64) -> (H
 
         (
             enabled,
-            if determined != H256::zero() {
+            if determined != H256::default() {
                 determined ^ enabled
             } else {
                 determined
@@ -211,13 +213,13 @@ mod test {
     fn test_select() {
         let v1 = vec![HardforkInfoInner {
             block_number: 0,
-            flags:        H256::zero(),
+            flags:        H256::default(),
         }];
 
         let (ve1, vd1) = enabled_and_determined(&v1, 0);
 
-        assert_eq!(ve1, H256::zero());
-        assert_eq!(vd1, H256::zero());
+        assert_eq!(ve1, H256::default());
+        assert_eq!(vd1, H256::default());
 
         let v2 = vec![HardforkInfoInner {
             block_number: 0,
@@ -235,7 +237,7 @@ mod test {
             a[0] = 0b10;
             H256::from(a)
         });
-        assert_eq!(vd2, H256::zero());
+        assert_eq!(vd2, H256::default());
 
         let v3 = vec![
             HardforkInfoInner {
@@ -276,7 +278,7 @@ mod test {
             a[0] = 0b11;
             H256::from(a)
         });
-        assert_eq!(vd31, H256::zero());
+        assert_eq!(vd31, H256::default());
 
         let v4 = vec![
             HardforkInfoInner {
@@ -364,7 +366,7 @@ mod test {
             a[0] = 0b111;
             H256::from(a)
         });
-        assert_eq!(vd44, H256::zero());
+        assert_eq!(vd44, H256::default());
 
         let (ve45, vd45) = enabled_and_determined(&v4, 12);
 
@@ -373,6 +375,6 @@ mod test {
             a[0] = 0b111;
             H256::from(a)
         });
-        assert_eq!(vd45, H256::zero());
+        assert_eq!(vd45, H256::default());
     }
 }

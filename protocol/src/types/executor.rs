@@ -1,5 +1,6 @@
 pub use alloy::consensus::Account;
 pub use alloy::eips::eip2930::{AccessList, AccessListItem};
+use alloy::primitives::logs_bloom;
 pub use alloy::primitives::Log;
 pub use evm::{Config, ExitError, ExitFatal, ExitReason, ExitRevert, ExitSucceed};
 pub use hasher::HasherKeccak;
@@ -20,6 +21,12 @@ pub struct ExecResp {
     pub receipt_root: MerkleRoot,
     pub gas_used:     u64,
     pub tx_resp:      Vec<TxResp>,
+}
+
+impl ExecResp {
+    pub fn bloom(&self) -> Bloom {
+        logs_bloom(self.tx_resp.iter().map(|tx| tx.logs.iter()).flatten())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -50,7 +57,7 @@ impl Default for TxResp {
 }
 
 impl TxResp {
-    pub fn bloom(&self) -> Bloom {
+    pub fn receipt_bloom(&self) -> Bloom {
         Receipt {
             status:              self.exit_reason.is_succeed().into(),
             cumulative_gas_used: self.gas_used,

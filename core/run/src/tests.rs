@@ -8,6 +8,7 @@ use std::{
     sync::Arc,
 };
 
+use alloy::primitives::logs_bloom;
 use clap::{builder::TypedValueParser as _, Command};
 use hasher::HasherKeccak;
 
@@ -27,8 +28,8 @@ use protocol::{
     tokio,
     trie::{MemoryDB, PatriciaTrie, Trie as _},
     types::{
-        Bloom, BloomInput, HardforkInfo, HardforkInfoInner, Hasher, Header, Metadata, Proposal,
-        H256, RLP_EMPTY_LIST, RLP_NULL,
+        HardforkInfo, HardforkInfoInner, Hasher, Header, Log, Metadata, Proposal, H256,
+        RLP_EMPTY_LIST, RLP_NULL,
     },
 };
 
@@ -162,8 +163,8 @@ async fn check_genesis_data<'a>(case: &TestCase<'a>) {
         RLP_NULL,
     );
 
-    let logs: Vec<Bloom> = Default::default();
-    let expected_log_bloom = Bloom::from(BloomInput::Raw(rlp::encode_list(&logs).as_ref()));
+    let logs: Vec<Log> = Default::default();
+    let expected_log_bloom = logs_bloom(logs.iter());
     assert_eq!(
         genesis.block.header.log_bloom, expected_log_bloom,
         "log bloom in genesis of chain {} should be empty since no transactions, \
@@ -201,7 +202,7 @@ fn check_state(spec: &ChainSpec, genesis_header: &Header, db_group: &DatabaseGro
         tmp.version.end = tmp.version.start + metadata_0.version.end - 1;
         tmp
     };
-    let handle = MetadataHandle::new(backend.get_metadata_root());
+    let handle = MetadataHandle::new(H256::new(backend.get_metadata_root().0));
 
     assert_eq!(
         backend.get_metadata_root().as_bytes(),
@@ -257,7 +258,7 @@ fn generate_memory_mpt_root(metadata_0: Metadata, metadata_1: Metadata) -> Vec<u
 
     memory_mpt
         .insert(
-            Hasher::digest(EPOCH_SEGMENT_KEY.as_bytes()).0.to_vec(),
+            Hasher::digest(EPOCH_SEGMENT_KEY.as_slice()).0.to_vec(),
             seg.as_bytes(),
         )
         .unwrap();
@@ -265,7 +266,7 @@ fn generate_memory_mpt_root(metadata_0: Metadata, metadata_1: Metadata) -> Vec<u
     seg.append_endpoint(metadata_0.version.end).unwrap();
     memory_mpt
         .insert(
-            Hasher::digest(EPOCH_SEGMENT_KEY.as_bytes()).0.to_vec(),
+            Hasher::digest(EPOCH_SEGMENT_KEY.as_slice()).0.to_vec(),
             seg.as_bytes(),
         )
         .unwrap();
@@ -273,7 +274,7 @@ fn generate_memory_mpt_root(metadata_0: Metadata, metadata_1: Metadata) -> Vec<u
     seg.append_endpoint(metadata_1.version.end).unwrap();
     memory_mpt
         .insert(
-            Hasher::digest(EPOCH_SEGMENT_KEY.as_bytes()).0.to_vec(),
+            Hasher::digest(EPOCH_SEGMENT_KEY.as_slice()).0.to_vec(),
             seg.as_bytes(),
         )
         .unwrap();
@@ -288,9 +289,9 @@ fn generate_memory_mpt_root(metadata_0: Metadata, metadata_1: Metadata) -> Vec<u
         .unwrap();
     memory_mpt
         .insert(
-            Hasher::digest(CONSENSUS_CONFIG.as_bytes()).0.to_vec(),
+            Hasher::digest(CONSENSUS_CONFIG.as_slice()).0.to_vec(),
             encode_consensus_config(
-                H256::from_low_u64_be((HardforkName::None as u64).to_be()),
+                H256::left_padding_from(&(HardforkName::None as u64).to_be_bytes()),
                 config_0,
             )
             .unwrap(),
@@ -304,9 +305,9 @@ fn generate_memory_mpt_root(metadata_0: Metadata, metadata_1: Metadata) -> Vec<u
         .unwrap();
     memory_mpt
         .insert(
-            Hasher::digest(CONSENSUS_CONFIG.as_bytes()).0.to_vec(),
+            Hasher::digest(CONSENSUS_CONFIG.as_slice()).0.to_vec(),
             encode_consensus_config(
-                H256::from_low_u64_be((HardforkName::None as u64).to_be()),
+                H256::left_padding_from(&(HardforkName::None as u64).to_be_bytes()),
                 config_1,
             )
             .unwrap(),
@@ -314,7 +315,7 @@ fn generate_memory_mpt_root(metadata_0: Metadata, metadata_1: Metadata) -> Vec<u
         .unwrap();
 
     let info = HardforkInfoInner {
-        flags:        H256::from_low_u64_be(HardforkName::all().to_be()),
+        flags:        H256::left_padding_from(&HardforkName::all().to_be_bytes()),
         block_number: 0,
     };
     let hardfork = HardforkInfo { inner: vec![info] }
@@ -323,7 +324,7 @@ fn generate_memory_mpt_root(metadata_0: Metadata, metadata_1: Metadata) -> Vec<u
         .to_vec();
 
     memory_mpt
-        .insert(Hasher::digest(HARDFORK_KEY.as_bytes()).0.to_vec(), hardfork)
+        .insert(Hasher::digest(HARDFORK_KEY.as_slice()).0.to_vec(), hardfork)
         .unwrap();
     memory_mpt.root().unwrap()
 }

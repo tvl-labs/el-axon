@@ -72,7 +72,7 @@ pub trait APIAdapter: Send + Sync {
         &self,
         ctx: Context,
         address: Address,
-    ) -> ProtocolResult<(U256, Option<BlockNumber>)>;
+    ) -> ProtocolResult<(u64, Option<BlockNumber>)>;
 
     async fn evm_call(
         &self,

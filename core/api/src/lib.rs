@@ -10,19 +10,19 @@ use protocol::{Display, ProtocolError, ProtocolErrorKind};
 
 #[derive(Debug, Display)]
 pub enum APIError {
-    #[display(fmt = "adapter error {:?}", _0)]
+    #[display("adapter error {_0}")]
     Adapter(String),
 
-    #[display(fmt = "http server error {:?}", _0)]
+    #[display("http server error {_0}")]
     HttpServer(String),
 
-    #[display(fmt = "web socket server error {:?}", _0)]
+    #[display("web socket server error {_0}")]
     WebSocketServer(String),
 
-    #[display(fmt = "storage error {:?}", _0)]
+    #[display("storage error {_0}")]
     Storage(String),
 
-    #[display(fmt = "Invalid request payload {:?}", _0)]
+    #[display("Invalid request payload {_0}")]
     RequestPayload(String),
 }
 

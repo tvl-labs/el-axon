@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use core_consensus::SYNC_STATUS;
 use protocol::lazy::CHAIN_ID;
-use protocol::types::{Hash, Hasher, Hex, H160, H256, U256};
+use protocol::types::{Address, Hash, Hasher, Hex, H256, U256};
 
 use crate::jsonrpc::{web3_types::Web3SyncStatus, AxonNodeRpcServer, RpcResult};
 
@@ -26,7 +26,7 @@ impl NodeRpcImpl {
 
 impl AxonNodeRpcServer for NodeRpcImpl {
     fn chain_id(&self) -> RpcResult<U256> {
-        Ok((**CHAIN_ID.load()).into())
+        Ok(U256::from(**CHAIN_ID.load()))
     }
 
     fn net_version(&self) -> RpcResult<String> {
@@ -49,12 +49,12 @@ impl AxonNodeRpcServer for NodeRpcImpl {
         Ok(false)
     }
 
-    fn coinbase(&self) -> RpcResult<H160> {
-        Ok(H160::default())
+    fn coinbase(&self) -> RpcResult<Address> {
+        Ok(Address::default())
     }
 
     fn hashrate(&self) -> RpcResult<U256> {
-        Ok(U256::one())
+        Ok(U256::ONE)
     }
 
     fn submit_work(&self, _nc: U256, _hash: H256, _summary: Hex) -> RpcResult<bool> {

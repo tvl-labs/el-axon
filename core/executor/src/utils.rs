@@ -42,7 +42,7 @@ impl FeeAllocate for DefaultFeeAllocator {
     }
 }
 
-pub(crate) fn code_address(sender: &evm_types::H160, nonce: &evm_types::U256) -> evm_types::H256 {
+pub fn code_address(sender: &evm_types::H160, nonce: &evm_types::U256) -> evm_types::H256 {
     let mut stream = rlp::RlpStream::new_list(2);
     stream.append(sender);
     stream.append(nonce);

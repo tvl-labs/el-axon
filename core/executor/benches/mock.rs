@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use common_crypto::{
     Crypto, PrivateKey, Secp256k1Recoverable, Secp256k1RecoverablePrivateKey, Signature,
@@ -8,8 +8,8 @@ use protocol::{
     codec::hex_decode,
     types::{
         public_to_address, Account, Address, Bytes, Eip1559Transaction, ExecutorContext, Public,
-        SignedTransaction, TransactionAction, UnsignedTransaction, UnverifiedTransaction, H160,
-        H512, NIL_DATA, RLP_NULL, U256, U64,
+        SignedTransaction, TxKind, UnsignedTransaction, UnverifiedTransaction, NIL_DATA, RLP_NULL,
+        U256, U64,
     },
 };
 
@@ -20,7 +20,7 @@ use core_storage::ImplStorage;
 lazy_static::lazy_static! {
     static ref PRIVATE_KEY: Secp256k1RecoverablePrivateKey
         = Secp256k1RecoverablePrivateKey::try_from(hex_decode("95500289866f83502cc1fb894ef5e2b840ca5f867cc9e84ab32fb8872b5dd36c").unwrap().as_ref()).unwrap();
-    static ref DISTRIBUTE_ADDRESS: Address = Address::from_hex("0x35e70c3f5a794a77efc2ec5ba964bffcc7fd2c0a").unwrap();
+    static ref DISTRIBUTE_ADDRESS: Address = Address::from_str("0x35e70c3f5a794a77efc2ec5ba964bffcc7fd2c0a").unwrap();
 }
 
 const DATA_PATH: &str = "../../free-space/rocks/data";
@@ -37,7 +37,7 @@ pub fn new_storage() -> (RocksTrieDB, ImplStorage<RocksAdapter>) {
 pub fn init_account() -> (Account, Address) {
     let account = Account {
         nonce:        0u64.into(),
-        balance:      111_320_000_011_u64.into(),
+        balance:      U256::from(111_320_000_011u64),
         storage_root: RLP_NULL,
         code_hash:    NIL_DATA,
     };
@@ -46,13 +46,13 @@ pub fn init_account() -> (Account, Address) {
 
 pub fn mock_executor_context() -> ExecutorContext {
     ExecutorContext {
-        block_number:           1u64.into(),
-        block_coinbase:         DISTRIBUTE_ADDRESS.0,
-        block_timestamp:        time_now().into(),
-        chain_id:               U256::one(),
-        origin:                 DISTRIBUTE_ADDRESS.0,
-        gas_price:              85u64.into(),
-        block_gas_limit:        100_000_000_000u64.into(),
+        block_number:           U256::from(1),
+        block_coinbase:         *DISTRIBUTE_ADDRESS,
+        block_timestamp:        U256::from(time_now()),
+        chain_id:               U256::from(1),
+        origin:                 *DISTRIBUTE_ADDRESS,
+        gas_price:              U256::from(85),
+        block_gas_limit:        U64::from(100_000_000_000u64),
         block_base_fee_per_gas: Default::default(),
         extra_data:             Default::default(),
     }
@@ -76,24 +76,24 @@ pub fn mock_transactions(n: usize) -> Vec<SignedTransaction> {
             )
         };
         let raw_tx = Eip1559Transaction {
-            nonce:                    U64::zero(),
-            max_priority_fee_per_gas: 1u64.into(),
-            gas_price:                1u64.into(),
-            gas_limit:                10_000_000u64.into(),
-            action:                   TransactionAction::Call(key_pairs.get(i).unwrap().addr),
-            value:                    (1_000_000_000_u64 - 1000_u64 * i as u64).into(),
-            data:                     Bytes::default(),
-            access_list:              vec![],
+            chain_id:                 0,
+            nonce:                    0,
+            max_priority_fee_per_gas: 1,
+            max_fee_per_gas:          1,
+            gas_limit:                10_000_000,
+            to:                       TxKind::Call(key_pairs.get(i).unwrap().addr),
+            value:                    U256::from(1_000_000_000_u64 - 1000_u64 * i as u64),
+            input:                    Default::default(),
+            access_list:              Default::default(),
         };
         let tx = {
             let mut utx = UnverifiedTransaction {
                 unsigned:  UnsignedTransaction::Eip1559(raw_tx),
                 signature: None,
-                chain_id:  Some(0u64),
                 hash:      Default::default(),
             };
             let hash = utx.signature_hash(true);
-            let signature = Secp256k1Recoverable::sign_message(hash.as_bytes(), &sender_priv_key)
+            let signature = Secp256k1Recoverable::sign_message(hash.as_slice(), &sender_priv_key)
                 .unwrap()
                 .to_bytes();
             utx.signature = Some(signature.into());
@@ -110,8 +110,8 @@ pub fn mock_transactions(n: usize) -> Vec<SignedTransaction> {
 
 struct KeyPair {
     pub private_key: Bytes,
-    pub addr:        H160,
-    pub public_key:  H512,
+    pub addr:        Address,
+    pub public_key:  Public,
 }
 
 impl From<Secp256k1RecoverablePrivateKey> for KeyPair {
@@ -129,7 +129,7 @@ impl From<Secp256k1RecoverablePrivateKey> for KeyPair {
 }
 
 fn gen_key_pairs(n: usize) -> Vec<KeyPair> {
-    use protocol::rand::rngs::OsRng;
+    use rand7::rngs::OsRng;
 
     let mut result = Vec::with_capacity(n);
     for _ in 0..n {

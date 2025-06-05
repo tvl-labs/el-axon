@@ -24,7 +24,7 @@ use protocol::rand::{self, seq::SliceRandom};
 use crate::peer_manager::PeerManager;
 
 pub use self::{
-    addr::{AddrKnown, AddressManager, MisbehaveResult, Misbehavior},
+    addr::{AddressManager, MisbehaveResult, Misbehavior},
     proto::{DiscoveryMessage, Node, Nodes},
     state::SessionState,
 };

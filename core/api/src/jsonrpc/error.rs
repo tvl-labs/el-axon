@@ -3,58 +3,56 @@ use jsonrpsee::types::{error::ErrorObject, ErrorObjectOwned};
 use protocol::types::{ExitReason, TxResp};
 use protocol::{codec::hex_encode, Display};
 
-use core_executor::decode_revert_msg;
-
 use crate::jsonrpc::web3_types::BlockId;
 
 #[derive(Clone, Display, Debug)]
 pub enum RpcError {
-    #[display(fmt = "Decode interoperation signature r error since {}", _0)]
+    #[display("Decode interoperation signature r error since {}", _0)]
     DecodeInteroperationSigR(String),
-    #[display(fmt = "Decode interoperation signature s error since {}", _0)]
+    #[display("Decode interoperation signature s error since {}", _0)]
     DecodeInteroperationSigS(String),
-    #[display(fmt = "Invalid address source")]
+    #[display("Invalid address source")]
     InvalidAddressSource,
-    #[display(fmt = "Missing dummy input cell")]
+    #[display("Missing dummy input cell")]
     MissingDummyInputCell,
-    #[display(fmt = "Cannot find image cell")]
+    #[display("Cannot find image cell")]
     CannotFindImageCell,
-    #[display(fmt = "Gas price is zero")]
+    #[display("Gas price is zero")]
     GasPriceIsZero,
-    #[display(fmt = "Gas price is too large")]
+    #[display("Gas price is too large")]
     GasPriceIsTooLarge,
-    #[display(fmt = "Gas limit is less than 21000")]
+    #[display("Gas limit is less than 21000")]
     GasLimitIsTooLow,
-    #[display(fmt = "Gas limit is too large")]
+    #[display("Gas limit is too large")]
     GasLimitIsTooLarge,
-    #[display(fmt = "Transaction is not signed")]
+    #[display("Transaction is not signed")]
     TransactionIsNotSigned,
-    #[display(fmt = "Cannot get latest block")]
+    #[display("Cannot get latest block")]
     CannotGetLatestBlock,
-    #[display(fmt = "Invalid block hash")]
+    #[display("Invalid block hash")]
     InvalidBlockHash,
-    #[display(fmt = "Invalid from block number {}", _0)]
+    #[display("Invalid from block number {}", _0)]
     InvalidFromBlockNumber(u64),
-    #[display(fmt = "Invalid block range from {} to {} limit to {}", _0, _1, _2)]
+    #[display("Invalid block range from {} to {} limit to {}", _0, _1, _2)]
     InvalidBlockRange(u64, u64, u64),
-    #[display(fmt = "Invalid newest block {:?}", _0)]
+    #[display("Invalid newest block {:?}", _0)]
     InvalidNewestBlock(BlockId),
-    #[display(fmt = "Invalid position {}", _0)]
+    #[display("Invalid position {}", _0)]
     InvalidPosition(u64),
-    #[display(fmt = "Cannot find the block")]
+    #[display("Cannot find the block")]
     CannotFindBlock,
-    #[display(fmt = "Invalid reward percentiles {} {}", _0, _1)]
+    #[display("Invalid reward percentiles {} {}", _0, _1)]
     InvalidRewardPercentiles(f64, f64),
-    #[display(fmt = "Invalid from block number and to block number union")]
+    #[display("Invalid from block number and to block number union")]
     InvalidFromBlockAndToBlockUnion,
-    #[display(fmt = "Invalid filter id {}", _0)]
+    #[display("Invalid filter id {}", _0)]
     CannotFindFilterId(u64),
-    #[display(fmt = "Not allow to call system contract address")]
+    #[display("Not allow to call system contract address")]
     CallSystemContract,
 
-    #[display(fmt = "EVM error {}", "decode_revert_msg(&_0.ret)")]
+    #[display("EVM error {}", "decode_revert_msg(&_0.ret)")]
     Evm(TxResp),
-    #[display(fmt = "Internal error: {}", _0)]
+    #[display("Internal error: {}", _0)]
     Internal(String),
 }
 

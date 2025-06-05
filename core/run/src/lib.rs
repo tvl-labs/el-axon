@@ -3,7 +3,9 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use common_apm::metrics::mempool::{MEMPOOL_CO_QUEUE_LEN, MEMPOOL_LEN_GAUGE};
 use common_config_parser::types::spec::{ChainSpec, InitialAccount};
 use common_config_parser::types::{Config, ConfigMempool};
-use common_crypto::{BlsPrivateKey, BlsPublicKey, Secp256k1, Secp256k1PrivateKey, ToPublicKey};
+use common_crypto::{
+    BlsPrivateKey, BlsPublicKey, PublicKey, Secp256k1, Secp256k1PrivateKey, ToPublicKey,
+};
 
 pub use core_consensus::stop_signal::StopOpt;
 use core_consensus::stop_signal::StopSignal;
@@ -14,8 +16,8 @@ use protocol::traits::{
     Context, Executor, Gossip, MemPool, Network, NodeInfo, PeerTrust, ReadOnlyStorage, Rpc, Storage,
 };
 use protocol::types::{
-    Block, Bloom, BloomInput, ConsensusValidator, ExecResp, HardforkInfoInner, Header, Metadata,
-    Proposal, RichBlock, SignedTransaction, ValidatorExtend, H256,
+    Block, ConsensusValidator, ExecResp, HardforkInfoInner, Header, Metadata, Proposal, RichBlock,
+    SignedTransaction, ValidatorExtend, H256, U256,
 };
 use protocol::{lazy::CHAIN_ID, trie::DB as TrieDB, ProtocolResult};
 
@@ -244,7 +246,7 @@ async fn start<K: KeyProvider>(
             .map(|privkey| {
                 NodeInfo::new(
                     current_block.header.chain_id,
-                    privkey.pub_key(),
+                    &privkey.pub_key().to_bytes(),
                     hardfork_info,
                 )
             })
@@ -403,7 +405,7 @@ async fn get_status_agent(
     let current_consensus_status = CurrentStatus {
         prev_hash:       block.hash(),
         last_number:     header.number,
-        max_tx_size:     metadata.consensus_config.max_tx_size.into(),
+        max_tx_size:     U256::from(metadata.consensus_config.max_tx_size),
         tx_num_limit:    metadata.consensus_config.tx_num_limit,
         proof:           latest_proof,
         last_state_root: header.state_root,
@@ -472,15 +474,7 @@ async fn execute_genesis(
 
     partial_genesis.block.header.state_root = resp.state_root;
     partial_genesis.block.header.receipts_root = resp.receipt_root;
-
-    let logs = resp
-        .tx_resp
-        .iter()
-        .map(|r| Bloom::from(BloomInput::Raw(rlp::encode_list(&r.logs).as_ref())))
-        .collect::<Vec<_>>();
-    let log_bloom = Bloom::from(BloomInput::Raw(rlp::encode_list(&logs).as_ref()));
-
-    partial_genesis.block.header.log_bloom = log_bloom;
+    partial_genesis.block.header.log_bloom = resp.bloom();
 
     log::info!("The genesis block is executed {:?}", partial_genesis.block);
     log::info!("Response for genesis is {:?}", resp);
@@ -592,7 +586,7 @@ pub fn set_hardfork_info(
                 );
             }
 
-            if proposed_info.flags == H256::zero() {
+            if proposed_info.flags == H256::ZERO {
                 return Ok(());
             }
 

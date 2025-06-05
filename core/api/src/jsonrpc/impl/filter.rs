@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use protocol::tokio::sync::mpsc::{channel, Receiver, Sender};
 use protocol::tokio::{self, select, sync::oneshot, time::interval};
 use protocol::traits::{APIAdapter, Context};
-use protocol::types::{BlockNumber, Hash, Receipt, H160, H256, U256, U64};
+use protocol::types::{Address, BlockNumber, Hash, Receipt, H256, U256, U64};
 use protocol::{async_trait, rand::prelude::*};
 
 use crate::jsonrpc::web3_types::{BlockId, FilterChanges, RawLoggerFilter, Web3Log};
@@ -32,7 +32,7 @@ where
 pub struct LoggerFilter {
     pub from_block: Option<BlockId>,
     pub to_block:   Option<BlockId>,
-    pub address:    Option<Vec<H160>>,
+    pub address:    Option<Vec<Address>>,
     pub topics:     Vec<Option<Vec<Option<Hash>>>>,
 }
 
@@ -64,7 +64,7 @@ impl Web3FilterServer for AxonWeb3RpcFilter {
             return Err(RpcError::InvalidFromBlockAndToBlockUnion.into());
         }
         match filter.to_block {
-            Some(BlockId::Earliest) | Some(BlockId::Num(U64([0]))) => {
+            Some(BlockId::Earliest) | Some(BlockId::Num(U64::ZERO)) => {
                 return Err(RpcError::Internal("Invalid to_block".to_string()).into())
             }
             _ => (),
@@ -204,7 +204,7 @@ where
 
                 match from {
                     BlockId::Num(n) => {
-                        if n.low_u64() < header.number {
+                        if n.to::<u64>() < header.number {
                             filter.from_block = Some(BlockId::Num(U64::from(header.number + 1)));
                         }
                     }
@@ -246,7 +246,7 @@ where
             sender.send(res).unwrap()
         } else {
             sender
-                .send(Err(RpcError::CannotFindFilterId(id.as_u64()).into()))
+                .send(Err(RpcError::CannotFindFilterId(id.to()).into()))
                 .unwrap()
         }
     }
@@ -302,7 +302,7 @@ where
         let (start, end) = {
             let convert = |id: &BlockId| -> BlockNumber {
                 match id {
-                    BlockId::Num(n) => n.low_u64(),
+                    BlockId::Num(n) => n.to::<u64>(),
                     BlockId::Earliest => 0,
                     _ => latest_number,
                 }
@@ -390,5 +390,5 @@ where
 
 fn random_id() -> U256 {
     let bytes: [u8; 32] = thread_rng().gen();
-    U256::from_big_endian(&bytes)
+    U256::from_be_slice(&bytes)
 }

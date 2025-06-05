@@ -6,11 +6,11 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use protocol::codec::ProtocolCodec;
 use protocol::types::{
-    AccessList, Block, Bloom, Bytes, Hash, Header, Hex, Public, Receipt, SignedTransaction, H160,
-    H256, H64, MAX_PRIORITY_FEE_PER_GAS, U256, U64,
+    AccessList, Address, Block, Bloom, Bytes, Hash, Header, Hex, Public, Receipt,
+    SignedTransaction, H256, H64, MAX_PRIORITY_FEE_PER_GAS, U256, U64,
 };
 
-pub const EMPTY_UNCLE_HASH: H256 = H256([
+pub const EMPTY_UNCLE_HASH: H256 = H256::new([
     0x1d, 0xcc, 0x4d, 0xe8, 0xde, 0xc7, 0x5d, 0x7a, 0xab, 0x85, 0xb5, 0x67, 0xb6, 0xcc, 0xd4, 0x1a,
     0xd3, 0x12, 0x45, 0x1b, 0x94, 0x8a, 0x74, 0x13, 0xf0, 0xa1, 0x42, 0xfd, 0x40, 0xd4, 0x93, 0x47,
 ]);
@@ -54,8 +54,8 @@ pub struct Web3Transaction {
     pub hash:                     Hash,
     pub nonce:                    U64,
     pub transaction_index:        Option<U64>,
-    pub from:                     H160,
-    pub to:                       Option<H160>,
+    pub from:                     Address,
+    pub to:                       Option<Address>,
     pub value:                    U256,
     pub gas:                      U64,
     pub gas_price:                U64,
@@ -85,11 +85,11 @@ impl From<SignedTransaction> for Web3Transaction {
         let signature = stx.transaction.signature.clone().unwrap_or_default();
         let is_eip1559 = stx.transaction.unsigned.is_eip1559();
 
-        let sig_v = signature.add_chain_replay_protection(stx.transaction.chain_id);
+        let sig_v = signature.add_chain_replay_protection(stx.transaction.unsigned.chain_id());
         let (sig_r, sig_s) = if signature.is_eth_sig() {
             (
-                Either::Left(U256::from(&signature.r[..])),
-                Either::Left(U256::from(&signature.s[..])),
+                Either::Left(U256::from_be_slice(&signature.r[..])),
+                Either::Left(U256::from_be_slice(&signature.s[..])),
             )
         } else {
             (
@@ -99,20 +99,22 @@ impl From<SignedTransaction> for Web3Transaction {
         };
 
         Web3Transaction {
-            type_:                    Some(stx.type_().into()),
+            type_:                    Some(U64::from(stx.type_())),
             block_number:             None,
             block_hash:               None,
             raw:                      Hex::encode(stx.transaction.encode().unwrap()),
             public_key:               stx.public,
-            gas:                      *stx.transaction.unsigned.gas_limit(),
-            gas_price:                stx.transaction.unsigned.gas_price(),
+            gas:                      U64::from(*stx.transaction.unsigned.gas_limit()),
+            gas_price:                U64::from(stx.transaction.unsigned.gas_price()),
             max_fee_per_gas:          if is_eip1559 {
                 Some(U64::from(MAX_PRIORITY_FEE_PER_GAS))
             } else {
                 None
             },
             max_priority_fee_per_gas: if is_eip1559 {
-                Some(*stx.transaction.unsigned.max_priority_fee_per_gas())
+                Some(U64::from(
+                    *stx.transaction.unsigned.max_priority_fee_per_gas(),
+                ))
             } else {
                 None
             },
@@ -120,13 +122,13 @@ impl From<SignedTransaction> for Web3Transaction {
             from:                     stx.sender,
             to:                       stx.get_to(),
             input:                    Hex::encode(stx.transaction.unsigned.data()),
-            nonce:                    *stx.transaction.unsigned.nonce(),
+            nonce:                    U64::from(*stx.transaction.unsigned.nonce()),
             transaction_index:        None,
             value:                    *stx.transaction.unsigned.value(),
             access_list:              Some(stx.transaction.unsigned.access_list()),
-            chain_id:                 stx.transaction.chain_id.map(|id| id.into()),
+            chain_id:                 stx.transaction.unsigned.chain_id().map(|id| U64::from(id)),
             standard_v:               None,
-            v:                        sig_v.into(),
+            v:                        U256::from(sig_v),
             r:                        sig_r,
             s:                        sig_s,
         }
@@ -135,7 +137,7 @@ impl From<SignedTransaction> for Web3Transaction {
 
 impl Web3Transaction {
     pub fn add_block_number(mut self, block_number: u64) -> Self {
-        self.block_number = Some(block_number.into());
+        self.block_number = Some(U64::from(block_number));
         self
     }
 
@@ -145,14 +147,14 @@ impl Web3Transaction {
     }
 
     pub fn add_tx_index(mut self, index: usize) -> Self {
-        self.transaction_index = Some(index.into());
+        self.transaction_index = Some(U64::from(index));
         self
     }
 
     pub fn update_with_receipt(&mut self, receipt: &Receipt) {
-        self.block_number = Some(receipt.block_number.into());
+        self.block_number = Some(U64::from(receipt.block_number));
         self.block_hash = Some(receipt.block_hash);
-        self.transaction_index = Some(receipt.tx_index.into());
+        self.transaction_index = Some(U64::from(receipt.tx_index));
     }
 }
 
@@ -161,17 +163,17 @@ impl Web3Transaction {
 pub struct Web3Receipt {
     pub block_number:        U256,
     pub block_hash:          H256,
-    pub contract_address:    Option<H160>,
+    pub contract_address:    Option<Address>,
     pub cumulative_gas_used: U64,
     pub effective_gas_price: U64,
-    pub from:                H160,
+    pub from:                Address,
     pub gas_used:            U64,
     pub logs:                Vec<Web3ReceiptLog>,
     pub logs_bloom:          Bloom,
     #[serde(rename = "root")]
     pub state_root:          Hash,
     pub status:              U64,
-    pub to:                  Option<H160>,
+    pub to:                  Option<Address>,
     pub transaction_hash:    Hash,
     pub transaction_index:   Option<U256>,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
@@ -181,7 +183,7 @@ pub struct Web3Receipt {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Web3ReceiptLog {
-    pub address:           H160,
+    pub address:           Address,
     pub topics:            Vec<H256>,
     pub data:              Hex,
     pub block_number:      U256,
@@ -200,21 +202,21 @@ impl Web3Receipt {
             .enumerate()
             .map(|(idx, log)| Web3ReceiptLog {
                 address:           log.address,
-                topics:            log.topics.clone(),
-                data:              Hex::encode(&log.data),
-                block_number:      receipt.block_number.into(),
+                topics:            log.data.topics().to_vec(),
+                data:              Hex::encode(&log.data.data),
+                block_number:      U256::from(receipt.block_number),
                 block_hash:        receipt.block_hash,
                 transaction_hash:  receipt.tx_hash,
-                transaction_index: Some(receipt.tx_index.into()),
-                log_index:         idx.into(),
+                transaction_index: Some(U256::from(receipt.tx_index)),
+                log_index:         U256::from(idx),
                 removed:           false,
             })
             .collect::<Vec<_>>();
 
         Web3Receipt {
-            block_number:        receipt.block_number.into(),
+            block_number:        U256::from(receipt.block_number),
             block_hash:          receipt.block_hash,
-            contract_address:    receipt.code_address.map(Into::into),
+            contract_address:    receipt.code_address.map(|h| Address::from_slice(&h[12..])),
             cumulative_gas_used: receipt.used_gas,
             effective_gas_price: receipt.used_gas,
             from:                receipt.sender,
@@ -225,8 +227,8 @@ impl Web3Receipt {
             state_root:          receipt.state_root,
             to:                  stx.get_to(),
             transaction_hash:    receipt.tx_hash,
-            transaction_index:   Some(receipt.tx_index.into()),
-            transaction_type:    Some(stx.type_().into()),
+            transaction_index:   Some(U256::from(receipt.tx_index)),
+            transaction_type:    Some(U64::from(stx.type_())),
         }
     }
 }
@@ -238,8 +240,8 @@ pub struct Web3Block {
     pub parent_hash:       H256,
     #[serde(rename = "sha3Uncles")]
     pub sha3_uncles:       H256,
-    pub author:            H160,
-    pub miner:             H160,
+    pub author:            Address,
+    pub miner:             Address,
     pub state_root:        H256,
     pub transactions_root: H256,
     pub receipts_root:     H256,
@@ -262,9 +264,12 @@ pub struct Web3Block {
 
 impl From<Block> for Web3Block {
     fn from(b: Block) -> Self {
+        let mut extra = Vec::new();
+        alloy_rlp::encode_list(&b.header.extra_data, &mut extra);
+
         Web3Block {
             hash:              b.hash(),
-            number:            b.header.number.into(),
+            number:            U64::from(b.header.number),
             author:            b.header.proposer,
             parent_hash:       b.header.prev_hash,
             sha3_uncles:       EMPTY_UNCLE_HASH,
@@ -273,15 +278,15 @@ impl From<Block> for Web3Block {
             state_root:        b.header.state_root,
             receipts_root:     b.header.receipts_root,
             miner:             b.header.proposer,
-            difficulty:        U256::one(),
-            total_difficulty:  Some(b.header.number.into()),
+            difficulty:        U256::ONE,
+            total_difficulty:  Some(U256::from(b.header.number)),
             seal_fields:       vec![],
             base_fee_per_gas:  b.header.base_fee_per_gas,
-            extra_data:        Hex::encode(rlp::encode_list(&b.header.extra_data)),
-            size:              Some(b.header.size().into()),
+            extra_data:        Hex::encode(extra),
+            size:              Some(U256::from(b.header.size())),
             gas_limit:         b.header.gas_limit,
             gas_used:          b.header.gas_used,
-            timestamp:         b.header.timestamp.into(),
+            timestamp:         U256::from(b.header.timestamp),
             transactions:      b
                 .tx_hashes
                 .into_iter()
@@ -305,8 +310,8 @@ pub enum TransactionCondition {
 pub struct Web3CallRequest {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub transaction_type:         Option<U64>,
-    pub from:                     Option<H160>,
-    pub to:                       Option<H160>,
+    pub from:                     Option<Address>,
+    pub to:                       Option<Address>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub gas_price:                Option<U64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -349,7 +354,7 @@ pub enum BlockId {
 impl From<BlockId> for Option<u64> {
     fn from(id: BlockId) -> Self {
         match id {
-            BlockId::Num(num) => Some(num.low_u64()),
+            BlockId::Num(num) => Some(num.to()),
             BlockId::Earliest => Some(0),
             _ => None,
         }
@@ -529,7 +534,7 @@ pub struct Web3Filter {
     pub to_block:   Option<BlockId>,
     pub block_hash: Option<H256>,
     #[serde(default)]
-    pub address:    MultiType<H160>,
+    pub address:    MultiType<Address>,
     pub topics:     Option<Vec<MultiNestType<Hash>>>,
 }
 
@@ -646,7 +651,7 @@ where
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct Web3Log {
-    pub address:           H160,
+    pub address:           Address,
     pub topics:            Vec<H256>,
     pub data:              Hex,
     pub block_hash:        Option<H256>,
@@ -786,7 +791,7 @@ pub struct Web3Header {
     pub gas_limit:         U64,
     pub gas_used:          U64,
     pub logs_bloom:        Option<Bloom>,
-    pub miner:             H160,
+    pub miner:             Address,
     pub nonce:             H64,
     pub mix_hash:          H256,
     pub hash:              H256,
@@ -802,8 +807,11 @@ pub struct Web3Header {
 
 impl From<Header> for Web3Header {
     fn from(h: Header) -> Self {
+        let mut extra = Vec::new();
+        alloy_rlp::encode_list(&h.extra_data, &mut extra);
+
         Web3Header {
-            number:            h.number.into(),
+            number:            U256::from(h.number),
             parent_hash:       h.prev_hash,
             sha3_uncles:       EMPTY_UNCLE_HASH,
             logs_bloom:        Some(h.log_bloom),
@@ -811,11 +819,11 @@ impl From<Header> for Web3Header {
             state_root:        h.state_root,
             receipts_root:     h.receipts_root,
             miner:             h.proposer,
-            difficulty:        U256::one(),
-            extra_data:        Hex::encode(rlp::encode_list(&h.extra_data)),
+            difficulty:        U256::ONE,
+            extra_data:        Hex::encode(extra),
             gas_limit:         h.gas_limit,
             gas_used:          h.gas_used,
-            timestamp:         h.timestamp.into(),
+            timestamp:         U256::from(h.timestamp),
             nonce:             H64::default(),
             mix_hash:          H256::default(),
             hash:              h.hash(),
@@ -836,7 +844,7 @@ pub struct RawLoggerFilter {
     pub from_block: Option<BlockId>,
     pub to_block:   Option<BlockId>,
     #[serde(default)]
-    pub address:    MultiType<H160>,
+    pub address:    MultiType<Address>,
     pub topics:     Option<Vec<MultiNestType<Hash>>>,
 }
 
@@ -860,9 +868,9 @@ mod tests {
         assert!(json.is_boolean());
 
         let status = Web3SyncStatus::Doing(SyncStatus {
-            starting_block: random::<u64>().into(),
-            current_block:  random::<u64>().into(),
-            highest_block:  random::<u64>().into(),
+            starting_block: U256::from(random::<u64>()),
+            current_block:  U256::from(random::<u64>()),
+            highest_block:  U256::from(random::<u64>()),
             known_states:   U256::default(),
             pulled_states:  U256::default(),
         });

@@ -1,6 +1,4 @@
-use crate::types::{
-    Address, BlockNumber, Hash, MerkleRoot, PackedTxHashes, SignedTransaction, U256, U64,
-};
+use crate::types::{Address, BlockNumber, Hash, MerkleRoot, PackedTxHashes, SignedTransaction};
 use crate::{async_trait, traits::Context, ProtocolResult};
 
 #[async_trait]

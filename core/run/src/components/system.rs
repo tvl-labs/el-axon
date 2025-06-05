@@ -1,4 +1,4 @@
-use std::panic::PanicInfo;
+use std::panic::PanicHookInfo;
 
 use backtrace::Backtrace;
 
@@ -24,7 +24,7 @@ pub(crate) async fn set_ctrl_c_handle() {
     // register channel of panic
     let (panic_sender, mut panic_receiver) = tokio::sync::mpsc::channel::<()>(1);
 
-    std::panic::set_hook(Box::new(move |info: &PanicInfo| {
+    std::panic::set_hook(Box::new(move |info: &PanicHookInfo| {
         let panic_sender = panic_sender.clone();
         panic_log(info);
         panic_sender.try_send(()).expect("panic_receiver is droped");
@@ -36,7 +36,7 @@ pub(crate) async fn set_ctrl_c_handle() {
     };
 }
 
-fn panic_log(info: &PanicInfo) {
+fn panic_log(info: &PanicHookInfo) {
     let backtrace = Backtrace::new();
     let thread = std::thread::current();
     let name = thread.name().unwrap_or("unnamed");

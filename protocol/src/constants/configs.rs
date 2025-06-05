@@ -1,5 +1,3 @@
-use crate::types::U64;
-
 /// There is not a standard for the maximum gas limit, as long as the account
 /// balance can pay the `gas_limit * gas_price`. For reduce some useless
 /// calculation, `30_000_000` is large enough to cover the transaction usage.

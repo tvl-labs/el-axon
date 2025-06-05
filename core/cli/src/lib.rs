@@ -37,11 +37,11 @@ pub struct AxonCli {
 
 impl AxonCli {
     pub fn init(application_version: Version, kernel_version: Version) -> Self {
-        let mix_version = format!(
+        let _mix_version = format!(
             "{}-with-axon-kernel-{}",
             application_version, kernel_version
         );
-        let cmd = Cli::command().version(mix_version);
+        let cmd = Cli::command();
         let cli = Cli::from_arg_matches(&cmd.get_matches()).unwrap_or_else(|_| unreachable!());
         AxonCli {
             kernel_version,

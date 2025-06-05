@@ -6,10 +6,12 @@ edition = "2021"
 
 [dependencies]
 # async-graphql = { version = "3.0", features = ["tracing"] }
+alloy-rlp.workspace = true
 beef.workspace = true
 ckb-jsonrpc-types.workspace = true
 ckb-traits.workspace = true
 ckb-types.workspace = true
+derive_more.workspace = true
 hyper.workspace = true
 jsonrpsee.workspace = true
 log.workspace = true

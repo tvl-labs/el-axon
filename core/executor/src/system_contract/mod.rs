@@ -140,7 +140,7 @@ pub fn init<Adapter: ExecutorAdapter + ApplyBackend>(
 /// This method only init the CKB light client and metadata DB and should be
 /// used in run process. The return value`tuple[0]` is current metadata MPT
 /// root, `tuple[1]` is current CKB light client MPT root.
-pub(crate) fn init_system_contract_db<Adapter: ExecutorAdapter + ApplyBackend>(
+pub fn init_system_contract_db<Adapter: ExecutorAdapter + ApplyBackend>(
     db: Arc<DB>,
     adapter: &mut Adapter,
 ) -> (evm_types::H256, evm_types::H256) {

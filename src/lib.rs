@@ -2,7 +2,7 @@ pub use core_executor::{DefaultFeeAllocator, FeeAllocate, FeeInlet};
 pub use core_run::KeyProvider;
 pub use protocol::{
     async_trait,
-    types::{ValidatorExtend, H160, U256},
+    types::{ValidatorExtend, U256},
 };
 
 use std::sync::Arc;

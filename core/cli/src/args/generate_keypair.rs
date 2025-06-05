@@ -2,10 +2,10 @@ use std::path::{Path, PathBuf};
 use std::{fs::File, io::Write};
 
 use clap::Parser;
+use rand7::rngs::OsRng;
 use serde::Serialize;
 
 use common_crypto::{BlsPrivateKey, PrivateKey, PublicKey, Secp256k1PrivateKey, ToBlsPublicKey};
-use protocol::rand::rngs::OsRng;
 use protocol::types::{Address, Bytes, Hex};
 use tentacle_secio::SecioKeyPair;
 
@@ -93,7 +93,7 @@ impl Keypair {
             index:           i,
             net_private_key: Hex::encode(&net_seckey),
             public_key:      Hex::encode(&pubkey),
-            address:         Address::from_pubkey_bytes(pubkey).map_err(Error::Running)?,
+            address:         Address::from_raw_public_key(&pubkey),
             peer_id:         secio_keypair.public_key().peer_id().to_base58(),
             bls_private_key: Hex::encode(&bls_seckey),
             bls_public_key:  Hex::encode(bls_pub_key.to_bytes()),

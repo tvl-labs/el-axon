@@ -97,7 +97,7 @@ where
                 code_hash:    NIL_DATA,
             }
             .encode()?;
-            self.insert(account.address.as_bytes().to_vec(), raw_account.to_vec())?;
+            self.insert(account.address.as_slice().to_vec(), raw_account.to_vec())?;
         }
         Ok(self)
     }

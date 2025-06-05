@@ -15,7 +15,7 @@ hex.workspace = true
 molecule.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-serde_with.workspace = true
+serde_with = "3.12"
 toml.workspace = true
 
 axon-protocol = { path = "../../protocol" }

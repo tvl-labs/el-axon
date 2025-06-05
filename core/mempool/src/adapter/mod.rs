@@ -245,7 +245,7 @@ where
 
     fn verify_gas_price(&self, stx: &SignedTransaction) -> ProtocolResult<()> {
         let gas_price = stx.transaction.unsigned.gas_price();
-        if gas_price == 0 || gas_price >= MAX_GAS_PRICE.to::<u128>() {
+        if gas_price == 0 || gas_price >= (MAX_GAS_PRICE as u128) {
             return Err(MemPoolError::InvalidGasPrice(gas_price as u64).into());
         }
 

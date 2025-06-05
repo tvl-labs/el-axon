@@ -5,9 +5,9 @@ use protocol::traits::{
 };
 use protocol::trie::Trie as _;
 use protocol::types::{
-    Account, BigEndianHash, Block, BlockNumber, Bytes, CkbRelatedInfo, EthAccountProof,
-    EthStorageProof, ExecutorContext, HardforkInfo, HardforkInfoInner, Hash, Header, Hex, Metadata,
-    Proposal, Receipt, SignedTransaction, TxResp, H160, H256, NIL_DATA, RLP_NULL, U256, U64,
+    Account, Address, Block, BlockNumber, Bytes, CkbRelatedInfo, EthAccountProof, EthStorageProof,
+    ExecutorContext, HardforkInfo, HardforkInfoInner, Hash, Header, Hex, Metadata, Proposal,
+    Receipt, SignedTransaction, TxResp, H256, NIL_DATA, RLP_NULL, U256, U64,
 };
 use protocol::{
     async_trait, codec::ProtocolCodec, constants::MAX_BLOCK_GAS_LIMIT, trie, ProtocolResult,
@@ -164,14 +164,14 @@ where
     async fn get_account(
         &self,
         _ctx: Context,
-        address: H160,
+        address: Address,
         number: Option<BlockNumber>,
     ) -> ProtocolResult<Account> {
-        match self.evm_backend(number).await?.get(address.as_bytes()) {
+        match self.evm_backend(number).await?.get(address.as_slice()) {
             Some(bytes) => Account::decode(bytes),
             None => Ok(Account {
-                nonce:        U256::zero(),
-                balance:      U256::zero(),
+                nonce:        0,
+                balance:      U256::ZERO,
                 storage_root: RLP_NULL,
                 code_hash:    NIL_DATA,
             }),
@@ -181,19 +181,19 @@ where
     async fn get_pending_tx_count(
         &self,
         ctx: Context,
-        address: H160,
-    ) -> ProtocolResult<(U256, Option<BlockNumber>)> {
+        address: Address,
+    ) -> ProtocolResult<(u64, Option<BlockNumber>)> {
         self.mempool
             .get_tx_count_by_address(ctx, address)
             .await
-            .map(|(n, b)| (U256::from(n), b))
+            .map(|(n, b)| (n as u64, b))
     }
 
     async fn evm_call(
         &self,
         _ctx: Context,
-        from: Option<H160>,
-        to: Option<H160>,
+        from: Option<Address>,
+        to: Option<Address>,
         gas_price: Option<U64>,
         gas_limit: Option<U64>,
         value: U256,
@@ -205,8 +205,8 @@ where
         let mut exec_ctx = ExecutorContext::from(mock_header);
         exec_ctx.origin = from.unwrap_or_default();
         exec_ctx.gas_price = gas_price
-            .map(|p| U256::from(p.low_u64()))
-            .unwrap_or_else(U256::one);
+            .map(|p| U256::from(p.to::<u64>()))
+            .unwrap_or_else(|| U256::ONE);
 
         let backend = AxonExecutorReadOnlyAdapter::from_root(
             state_root,
@@ -214,9 +214,7 @@ where
             Arc::clone(&self.storage),
             exec_ctx,
         )?;
-        let gas_limit = gas_limit
-            .map(|gas| gas.low_u64())
-            .unwrap_or(MAX_BLOCK_GAS_LIMIT);
+        let gas_limit = gas_limit.map(|gas| gas.to()).unwrap_or(MAX_BLOCK_GAS_LIMIT);
 
         Ok(AxonExecutor.call(&backend, gas_limit, from, to, value, data, estimate))
     }
@@ -226,48 +224,50 @@ where
     }
 
     async fn peer_count(&self, ctx: Context) -> ProtocolResult<U256> {
-        self.net.peer_count(ctx).map(Into::into)
+        Ok(U256::from(self.net.peer_count(ctx)?))
     }
 
     async fn get_storage_at(
         &self,
         _ctx: Context,
-        address: H160,
+        address: Address,
         position: U256,
         state_root: Hash,
     ) -> ProtocolResult<Bytes> {
         let state_mpt_tree = MPTTrie::from_root(state_root, Arc::clone(&self.trie_db))?;
 
         let raw_account = state_mpt_tree
-            .get(address.as_bytes())?
+            .get(address.as_slice())?
             .ok_or_else(|| APIError::Adapter("Can't find this address".to_string()))?;
 
         let account = Account::decode(raw_account).unwrap();
-
         let storage_mpt_tree = MPTTrie::from_root(account.storage_root, Arc::clone(&self.trie_db))?;
 
-        let hash: Hash = BigEndianHash::from_uint(&position);
+        let hash = Hash::new(position.to_be_bytes());
         let value: H256 = storage_mpt_tree
-            .get(hash.as_bytes())?
-            .map(|v| BigEndianHash::from_uint(&U256::decode(v).unwrap()))
-            .unwrap_or(H256::zero());
+            .get(hash.as_slice())?
+            .map(|v| {
+                let raw = U256::decode(v).unwrap();
+                H256::new(raw.to_be_bytes())
+            })
+            .unwrap_or_default();
         Ok(Bytes::from(value.0.to_vec()))
     }
 
     async fn get_proof(
         &self,
         _ctx: Context,
-        address: H160,
+        address: Address,
         storage_position: Vec<U256>,
         state_root: Hash,
     ) -> ProtocolResult<EthAccountProof> {
         let state_mpt_tree = MPTTrie::from_root(state_root, Arc::clone(&self.trie_db))?;
         let account_proof: Vec<Hex> = state_mpt_tree
-            .get_proof(address.as_bytes())?
+            .get_proof(address.as_slice())?
             .into_iter()
             .map(Hex::encode)
             .collect();
-        match state_mpt_tree.get(address.as_bytes())? {
+        match state_mpt_tree.get(address.as_slice())? {
             Some(raw_account) => {
                 let account = Account::decode(raw_account).unwrap();
 
@@ -277,13 +277,13 @@ where
                 let mut storage_proofs = Vec::with_capacity(storage_position.len());
 
                 for h in storage_position {
-                    let hash: Hash = BigEndianHash::from_uint(&h);
+                    let hash = Hash::new(h.to_be_bytes());
                     let storage_proof = storage_mpt_tree
-                        .get_proof(hash.as_bytes())?
+                        .get_proof(hash.as_slice())?
                         .into_iter()
                         .map(Hex::encode)
                         .collect();
-                    let proof = match storage_mpt_tree.get(hash.as_bytes())? {
+                    let proof = match storage_mpt_tree.get(hash.as_slice())? {
                         Some(v) => EthStorageProof {
                             key:   h,
                             value: U256::decode(&v).unwrap(),
@@ -292,7 +292,7 @@ where
                         // key is not exist
                         None => EthStorageProof {
                             key:   h,
-                            value: U256::zero(),
+                            value: U256::ZERO,
                             proof: storage_proof,
                         },
                     };
@@ -302,7 +302,7 @@ where
                     address,
                     balance: account.balance,
                     code_hash: account.code_hash,
-                    nonce: account.nonce,
+                    nonce: U256::from(account.nonce),
                     storage_hash: account.storage_root,
                     account_proof,
                     storage_proof: storage_proofs,
@@ -312,16 +312,16 @@ where
                 // account is not exist
                 Ok(EthAccountProof {
                     address,
-                    balance: U256::zero(),
-                    code_hash: H256::zero(),
-                    nonce: U256::zero(),
-                    storage_hash: H256::zero(),
+                    balance: U256::ZERO,
+                    code_hash: H256::default(),
+                    nonce: U256::ZERO,
+                    storage_hash: H256::default(),
                     account_proof,
                     storage_proof: storage_position
                         .into_iter()
                         .map(|h| EthStorageProof {
                             key:   h,
-                            value: U256::zero(),
+                            value: U256::ZERO,
                             proof: Vec::new(),
                         })
                         .collect(),
