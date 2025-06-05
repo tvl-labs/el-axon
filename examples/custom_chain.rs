@@ -1,6 +1,6 @@
 #![allow(clippy::diverging_sub_expression)]
 
-use axon::{async_trait, FeeAllocate, FeeInlet, KeyProvider, ValidatorExtend, H160, U256};
+use axon::{async_trait, Address, FeeAllocate, FeeInlet, KeyProvider, ValidatorExtend, U256};
 
 #[derive(Default, Clone, Debug)]
 struct CustomFeeAllocator;
@@ -10,7 +10,7 @@ impl FeeAllocate for CustomFeeAllocator {
         &self,
         _block_number: U256,
         _fee_collect: U256,
-        _proposer: H160,
+        _proposer: Address,
         _validators: &[ValidatorExtend],
     ) -> Vec<FeeInlet> {
         // Write your custom fee allocation process below.

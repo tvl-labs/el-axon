@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use axon_types::{
     basic::{Byte33, Byte48, Identity, Uint32, Uint64},
-    metadata::{Metadata, MetadataCellData, MetadataCellDataReader, MetadataList, ValidatorList},
+    metadata::{
+        Address, Hasher, Metadata, MetadataCellData, MetadataCellDataReader, MetadataList,
+        ValidatorList,
+    },
 };
 use clap::{Parser, Subcommand};
 use molecule::prelude::{Builder, Entity, Reader};
@@ -37,7 +40,8 @@ pub struct Validator {
 
 impl From<Validator> for axon_types::metadata::Validator {
     fn from(value: Validator) -> Self {
-        let address = axon_protocol::types::Address::from_raw_public_key(value.pub_key.as_slice());
+        let address = Hasher::digest(&value.pub_key.as_slice())[12..].to_vec();
+        let address = Address::from_slice(&address);
         Self::new_builder()
             .bls_pub_key(Byte48::from_slice(value.bls_pub_key.as_slice()).unwrap())
             .pub_key(Byte33::from_slice(value.pub_key.as_slice()).unwrap())

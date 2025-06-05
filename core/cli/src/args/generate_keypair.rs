@@ -6,7 +6,7 @@ use rand7::rngs::OsRng;
 use serde::Serialize;
 
 use common_crypto::{BlsPrivateKey, PrivateKey, PublicKey, Secp256k1PrivateKey, ToBlsPublicKey};
-use protocol::types::{Address, Bytes, Hex};
+use protocol::types::{Address, Bytes, Hasher, Hex};
 use tentacle_secio::SecioKeyPair;
 
 use crate::error::{Error, Result};
@@ -93,7 +93,7 @@ impl Keypair {
             index:           i,
             net_private_key: Hex::encode(&net_seckey),
             public_key:      Hex::encode(&pubkey),
-            address:         Address::from_raw_public_key(&pubkey),
+            address:         Address::from_slice(&Hasher::digest(pubkey).0[12..]),
             peer_id:         secio_keypair.public_key().peer_id().to_base58(),
             bls_private_key: Hex::encode(&bls_seckey),
             bls_public_key:  Hex::encode(bls_pub_key.to_bytes()),

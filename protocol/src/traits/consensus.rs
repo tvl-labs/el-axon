@@ -7,7 +7,8 @@ use common_crypto::Secp256k1PublicKey;
 
 use crate::types::{
     Address, Block, BlockNumber, Bytes, ConsensusValidator, ExecResp, HardforkInfoInner, Hash,
-    Header, Hex, MerkleRoot, Metadata, PackedTxHashes, Proof, Proposal, Receipt, SignedTransaction,
+    Hasher, Header, Hex, MerkleRoot, Metadata, PackedTxHashes, Proof, Proposal, Receipt,
+    SignedTransaction,
 };
 use crate::{async_trait, traits::Context, ProtocolResult};
 
@@ -31,7 +32,8 @@ impl NodeInfo {
         raw_pub_key: &[u8],
         hardfork_info: Option<HardforkInfoInner>,
     ) -> Self {
-        let address = Address::from_raw_public_key(raw_pub_key);
+        let address = Hasher::digest(&raw_pub_key)[12..].to_vec();
+        let address = Address::from_slice(&address);
         Self {
             chain_id,
             self_pub_key: Secp256k1PublicKey::try_from(raw_pub_key).unwrap(),

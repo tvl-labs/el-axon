@@ -432,10 +432,10 @@ pub struct ValidatorExtend {
 
 impl From<Validator> for ValidatorExtend {
     fn from(value: Validator) -> Self {
-        let addr = Address::from_raw_public_key(value.pub_key.as_ref());
+        let address = Hasher::digest(&value.pub_key.as_bytes())[12..].to_vec();
         ValidatorExtend {
             bls_pub_key:    value.bls_pub_key,
-            address:        addr,
+            address:        Address::from_slice(&address),
             pub_key:        value.pub_key,
             propose_weight: value.propose_weight,
             vote_weight:    value.vote_weight,
