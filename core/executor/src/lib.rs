@@ -526,7 +526,7 @@ pub fn enable_hardfork(name: HardforkName) -> bool {
     let latest_hardfork_info = &**HARDFORK_INFO.load();
     let enable_flag = H256::left_padding_from(&(name as u64).to_be_bytes());
 
-    *latest_hardfork_info & &enable_flag == enable_flag
+    *latest_hardfork_info & enable_flag == enable_flag
 }
 
 #[cfg(test)]
