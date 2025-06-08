@@ -2,6 +2,7 @@ pub use batch::*;
 pub use block::*;
 pub use bytes::{Buf, BufMut, Bytes, BytesMut};
 pub use ckb_client::*;
+pub use evm::executor::stack::{PrecompileFailure, PrecompileFn, PrecompileOutput, PrecompileSet};
 pub use evm::{
     backend::{Apply, ApplyBackend, Backend, Basic, MemoryAccount, MemoryBackend},
     ExitError, ExitRevert, ExitSucceed,

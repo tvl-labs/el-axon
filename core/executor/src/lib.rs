@@ -10,6 +10,7 @@ mod utils;
 pub use crate::adapter::{
     AxonExecutorApplyAdapter, AxonExecutorReadOnlyAdapter, MPTTrie, RocksTrieDB,
 };
+pub use crate::precompiles::build_precompile_set;
 pub use crate::system_contract::{
     is_call_system_script, is_system_contract_address_format,
     metadata::{MetadataHandle, HARDFORK_INFO},
@@ -32,7 +33,6 @@ use protocol::types::{
     U256, U64,
 };
 
-use crate::precompiles::build_precompile_set;
 use crate::system_contract::{
     after_block_hook, before_block_hook, system_contract_dispatch,
     CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, HEADER_CELL_ROOT_KEY, METADATA_CONTRACT_ADDRESS,
