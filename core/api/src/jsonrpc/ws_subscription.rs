@@ -22,6 +22,7 @@ use protocol::tokio::sync::mpsc::{channel, Receiver, Sender};
 use protocol::tokio::{self, select, time::interval};
 use protocol::traits::{APIAdapter, Context};
 use protocol::types::{Address, Hash, Hex, H256, U256};
+use serde_json::value::RawValue;
 
 use crate::jsonrpc::{
     r#impl::from_receipt_to_web3_log,
@@ -136,7 +137,7 @@ where
                 log_vec.push((block.header.number, block.tx_hashes));
 
                 let web3_header = Web3Header::from(block.header);
-                let msg = SubscriptionMessage::from_json(&web3_header).unwrap();
+                let msg = build_subscription_message(web3_header);
 
                 for hub in self.header_hubs.iter_mut() {
                     let _ignore = hub.sink.send(msg.clone()).await;
@@ -144,7 +145,7 @@ where
             }
 
             let latest_web3_header = Web3Header::from(latest_block.header);
-            let msg = SubscriptionMessage::from_json(&latest_web3_header).unwrap();
+            let msg = build_subscription_message(latest_web3_header);
 
             for hub in self.header_hubs.iter_mut() {
                 let _ignore = hub.sink.send(msg.clone()).await;
@@ -154,7 +155,7 @@ where
         // Send all sync status
         if !self.sync_hubs.is_empty() {
             let web3_sync_state: Web3SyncStatus = { SYNC_STATUS.read().clone().into() };
-            let msg = SubscriptionMessage::from_json(&web3_sync_state).unwrap();
+            let msg = build_subscription_message(web3_sync_state);
 
             for hub in self.sync_hubs.iter_mut() {
                 // unbound sender can ignore it's return
@@ -201,7 +202,7 @@ where
                         );
 
                         for log in logs.drain(..) {
-                            let msg = SubscriptionMessage::from_json(&log).unwrap();
+                            let msg = build_subscription_message(log);
                             // unbound sender can ignore it's return
                             let _ignore = hub.sink.send(msg).await;
                         }
@@ -328,4 +329,8 @@ impl IdProvider for HexIdProvider {
 
         SubscriptionId::Str(Cow::from(Hex::encode(hash.as_slice()).as_string()))
     }
+}
+
+fn build_subscription_message(msg: impl Serialize) -> SubscriptionMessage {
+    SubscriptionMessage::from(RawValue::from_string(serde_json::to_string(&msg).unwrap()).unwrap())
 }

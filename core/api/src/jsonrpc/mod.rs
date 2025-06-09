@@ -7,7 +7,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use ckb_jsonrpc_types::{CellInfo, HeaderView as CkbHeaderView, OutPoint};
 use hyper::{header::CONTENT_TYPE, Method};
-use jsonrpsee::server::{ServerBuilder, ServerHandle};
+use jsonrpsee::server::{ServerBuilder, ServerConfigBuilder, ServerHandle};
 use jsonrpsee::{core::RpcResult, proc_macros::rpc};
 use tower_http::cors::{Any as CorsAny, CorsLayer};
 
@@ -27,7 +27,7 @@ use crate::jsonrpc::web3_types::{
 use crate::jsonrpc::ws_subscription::{ws_subscription_module, HexIdProvider};
 use crate::APIError;
 
-#[rpc(server)]
+#[rpc(server, client)]
 pub trait Web3Rpc {
     /// Sends signed transaction, returning its hash.
     #[method(name = "eth_sendRawTransaction")]
@@ -157,7 +157,7 @@ pub trait Web3Rpc {
     ) -> RpcResult<EthAccountProof>;
 }
 
-#[rpc(server)]
+#[rpc(server, client)]
 pub trait Web3Filter {
     #[method(name = "eth_newFilter")]
     async fn new_filter(&self, filter: RawLoggerFilter) -> RpcResult<U256>;
@@ -175,7 +175,7 @@ pub trait Web3Filter {
     async fn uninstall_filter(&self, id: U256) -> RpcResult<bool>;
 }
 
-#[rpc(server)]
+#[rpc(server, client)]
 pub trait AxonNodeRpc {
     #[method(name = "eth_chainId")]
     fn chain_id(&self) -> RpcResult<U256>;
@@ -214,7 +214,7 @@ pub trait AxonNodeRpc {
     fn pprof(&self, enable: bool) -> RpcResult<bool>;
 }
 
-#[rpc(server)]
+#[rpc(server, client)]
 pub trait AxonRpc {
     #[method(name = "axon_getBlockById")]
     async fn get_block_by_id(&self, block_id: BlockId) -> RpcResult<Option<Block>>;
@@ -238,7 +238,7 @@ pub trait AxonRpc {
     async fn hardfork_infos(&self) -> RpcResult<HashMap<HardforkName, HardforkStatus>>;
 }
 
-#[rpc(server)]
+#[rpc(server, client)]
 pub trait CkbLightClientRpc {
     #[method(name = "ckb_getBlockHeaderByHash")]
     async fn get_block_header_by_hash(&self, hash: Hash) -> RpcResult<Option<CkbHeaderView>>;
@@ -284,11 +284,14 @@ pub async fn run_jsonrpc_server<Adapter: APIAdapter + 'static>(
             .allow_headers([CONTENT_TYPE]);
         let middleware = tower::ServiceBuilder::new().layer(cors);
 
-        let server = ServerBuilder::new()
+        let server_cfg = ServerConfigBuilder::new()
             .http_only()
             .max_request_body_size(config.rpc.max_payload_size)
             .max_response_body_size(config.rpc.max_payload_size)
             .max_connections(config.rpc.maxconn)
+            .build();
+        let server = ServerBuilder::new()
+            .set_config(server_cfg)
             .set_http_middleware(middleware)
             .build(addr)
             .await
@@ -298,12 +301,15 @@ pub async fn run_jsonrpc_server<Adapter: APIAdapter + 'static>(
     }
 
     if let Some(addr) = config.rpc.ws_listening_address {
-        let server = ServerBuilder::new()
+        let server_cfg = ServerConfigBuilder::new()
             .ws_only()
             .max_request_body_size(config.rpc.max_payload_size)
-            .max_request_body_size(config.rpc.max_payload_size)
+            .max_response_body_size(config.rpc.max_payload_size)
             .max_connections(config.rpc.maxconn)
             .set_id_provider(HexIdProvider::default())
+            .build();
+        let server = ServerBuilder::new()
+            .set_config(server_cfg)
             .build(addr)
             .await
             .map_err(|e| APIError::WebSocketServer(e.to_string()))?;

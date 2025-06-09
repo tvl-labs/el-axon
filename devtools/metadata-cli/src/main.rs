@@ -1,12 +1,10 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use axon_protocol::types::{Address, Hasher};
 use axon_types::{
     basic::{Byte33, Byte48, Identity, Uint32, Uint64},
-    metadata::{
-        Address, Hasher, Metadata, MetadataCellData, MetadataCellDataReader, MetadataList,
-        ValidatorList,
-    },
+    metadata::{Metadata, MetadataCellData, MetadataCellDataReader, MetadataList, ValidatorList},
 };
 use clap::{Parser, Subcommand};
 use molecule::prelude::{Builder, Entity, Reader};

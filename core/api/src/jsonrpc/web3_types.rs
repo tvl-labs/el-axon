@@ -700,6 +700,19 @@ impl Serialize for Web3SyncStatus {
     }
 }
 
+impl<'de> Deserialize<'de> for Web3SyncStatus {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        if let Ok(v) = Deserialize::deserialize(deserializer) {
+            return Ok(Web3SyncStatus::Doing(v));
+        }
+
+        Ok(Web3SyncStatus::False)
+    }
+}
+
 #[derive(Serialize, Deserialize, Default, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncStatus {

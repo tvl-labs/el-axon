@@ -97,7 +97,7 @@ jemallocator = { version = "0.5", features = [
 ], package = "tikv-jemallocator" }
 json = "0.12"
 jsonrpc-core = "18.0"
-jsonrpsee = { version = "0.24", features = ["client", "macros", "server"] }
+jsonrpsee = { version = "0.25", features = ["client", "macros", "server"] }
 lazy_static = "1.5"
 libc = "0.2"
 log = "0.4"
@@ -157,7 +157,7 @@ thiserror = "1.0"
 tokio = { version = "1.45", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 toml = "0.8"
-tower = "0.4"
+tower = "0.5"
 tower-http = { version = "0.6", features = ["cors"] }
 trackable = "1.2"
 trie = { package = "cita_trie", version = "5.0" }

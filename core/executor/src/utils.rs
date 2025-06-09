@@ -21,24 +21,12 @@ pub struct DefaultFeeAllocator;
 impl FeeAllocate for DefaultFeeAllocator {
     fn allocate(
         &self,
-        block_number: U256,
-        fee_collect: U256,
+        _block_number: U256,
+        _fee_collect: U256,
         _proposer: Address,
-        validators: &[protocol::types::ValidatorExtend],
+        _validators: &[protocol::types::ValidatorExtend],
     ) -> Vec<FeeInlet> {
-        if fee_collect.is_zero() || block_number.is_zero() {
-            return Vec::new();
-        }
-
-        let weight_sum = U256::from(validators.iter().map(|v| v.vote_weight).sum::<u32>());
-
-        validators
-            .iter()
-            .map(|v| FeeInlet {
-                address: v.address,
-                amount:  (fee_collect / weight_sum) * U256::from(v.vote_weight),
-            })
-            .collect()
+        vec![]
     }
 }
 
