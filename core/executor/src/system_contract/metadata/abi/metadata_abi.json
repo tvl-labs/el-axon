@@ -142,6 +142,53 @@
       {
         "components": [
           {
+            "components": [
+              {
+                "internalType": "bytes",
+                "name": "bls_pub_key",
+                "type": "bytes"
+              },
+              {
+                "internalType": "bytes",
+                "name": "pub_key",
+                "type": "bytes"
+              },
+              {
+                "internalType": "address",
+                "name": "address_",
+                "type": "address"
+              },
+              {
+                "internalType": "uint32",
+                "name": "propose_weight",
+                "type": "uint32"
+              },
+              {
+                "internalType": "uint32",
+                "name": "vote_weight",
+                "type": "uint32"
+              }
+            ],
+            "internalType": "struct MetadataType.ValidatorExtend[]",
+            "name": "verifier_list",
+            "type": "tuple[]"
+          }
+        ],
+        "internalType": "struct MetadataType.ValidatorList",
+        "name": "validators",
+        "type": "tuple"
+      }
+    ],
+    "name": "updateValidatorList",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "components": [
+          {
             "internalType": "bytes32",
             "name": "metadata_type_id",
             "type": "bytes32"

@@ -478,6 +478,10 @@ pub struct ProposeCount {
 }
 
 impl ProposeCount {
+    pub fn new(address: H160, count: u64) -> Self {
+        ProposeCount { address, count }
+    }
+
     pub fn increase(&mut self) {
         self.count += 1;
     }

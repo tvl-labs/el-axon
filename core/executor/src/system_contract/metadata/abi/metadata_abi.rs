@@ -10,13 +10,177 @@ pub use metadata_contract::*;
     non_camel_case_types
 )]
 pub mod metadata_contract {
-    #[rustfmt::skip]
-    const __ABI: &str = "[\n  {\n    \"inputs\": [\n      {\n        \"components\": [\n          {\n            \"components\": [\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"start\",\n                \"type\": \"uint64\"\n              },\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"end\",\n                \"type\": \"uint64\"\n              }\n            ],\n            \"internalType\": \"struct MetadataType.MetadataVersion\",\n            \"name\": \"version\",\n            \"type\": \"tuple\"\n          },\n          {\n            \"internalType\": \"uint64\",\n            \"name\": \"epoch\",\n            \"type\": \"uint64\"\n          },\n          {\n            \"components\": [\n              {\n                \"internalType\": \"bytes\",\n                \"name\": \"bls_pub_key\",\n                \"type\": \"bytes\"\n              },\n              {\n                \"internalType\": \"bytes\",\n                \"name\": \"pub_key\",\n                \"type\": \"bytes\"\n              },\n              {\n                \"internalType\": \"address\",\n                \"name\": \"address_\",\n                \"type\": \"address\"\n              },\n              {\n                \"internalType\": \"uint32\",\n                \"name\": \"propose_weight\",\n                \"type\": \"uint32\"\n              },\n              {\n                \"internalType\": \"uint32\",\n                \"name\": \"vote_weight\",\n                \"type\": \"uint32\"\n              }\n            ],\n            \"internalType\": \"struct MetadataType.ValidatorExtend[]\",\n            \"name\": \"verifier_list\",\n            \"type\": \"tuple[]\"\n          },\n          {\n            \"components\": [\n              {\n                \"internalType\": \"address\",\n                \"name\": \"address_\",\n                \"type\": \"address\"\n              },\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"count\",\n                \"type\": \"uint64\"\n              }\n            ],\n            \"internalType\": \"struct MetadataType.ProposeCount[]\",\n            \"name\": \"propose_counter\",\n            \"type\": \"tuple[]\"\n          },\n          {\n            \"components\": [\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"propose_ratio\",\n                \"type\": \"uint64\"\n              },\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"prevote_ratio\",\n                \"type\": \"uint64\"\n              },\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"precommit_ratio\",\n                \"type\": \"uint64\"\n              },\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"brake_ratio\",\n                \"type\": \"uint64\"\n              },\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"tx_num_limit\",\n                \"type\": \"uint64\"\n              },\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"max_tx_size\",\n                \"type\": \"uint64\"\n              },\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"gas_limit\",\n                \"type\": \"uint64\"\n              },\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"interval\",\n                \"type\": \"uint64\"\n              },\n              {\n                \"internalType\": \"uint64\",\n                \"name\": \"max_contract_limit\",\n                \"type\": \"uint64\"\n              }\n            ],\n            \"internalType\": \"struct MetadataType.ConsensusConfig\",\n            \"name\": \"consensus_config\",\n            \"type\": \"tuple\"\n          }\n        ],\n        \"internalType\": \"struct MetadataType.Metadata\",\n        \"name\": \"metadata\",\n        \"type\": \"tuple\"\n      }\n    ],\n    \"name\": \"appendMetadata\",\n    \"outputs\": [],\n    \"stateMutability\": \"nonpayable\",\n    \"type\": \"function\"\n  },\n  {\n    \"inputs\": [\n      {\n        \"components\": [\n          {\n            \"internalType\": \"bytes32\",\n            \"name\": \"metadata_type_id\",\n            \"type\": \"bytes32\"\n          },\n          {\n            \"internalType\": \"bytes32\",\n            \"name\": \"checkpoint_type_id\",\n            \"type\": \"bytes32\"\n          },\n          {\n            \"internalType\": \"bytes32\",\n            \"name\": \"xudt_args\",\n            \"type\": \"bytes32\"\n          },\n          {\n            \"internalType\": \"bytes32\",\n            \"name\": \"stake_smt_type_id\",\n            \"type\": \"bytes32\"\n          },\n          {\n            \"internalType\": \"bytes32\",\n            \"name\": \"delegate_smt_type_id\",\n            \"type\": \"bytes32\"\n          },\n          {\n            \"internalType\": \"bytes32\",\n            \"name\": \"reward_smt_type_id\",\n            \"type\": \"bytes32\"\n          }\n        ],\n        \"internalType\": \"struct MetadataType.CkbRelatedInfo\",\n        \"name\": \"info\",\n        \"type\": \"tuple\"\n      }\n    ],\n    \"name\": \"setCkbRelatedInfo\",\n    \"outputs\": [],\n    \"stateMutability\": \"nonpayable\",\n    \"type\": \"function\"\n  },\n  {\n    \"inputs\": [\n      {\n        \"components\": [\n          {\n            \"internalType\": \"uint64\",\n            \"name\": \"propose_ratio\",\n            \"type\": \"uint64\"\n          },\n          {\n            \"internalType\": \"uint64\",\n            \"name\": \"prevote_ratio\",\n            \"type\": \"uint64\"\n          },\n          {\n            \"internalType\": \"uint64\",\n            \"name\": \"precommit_ratio\",\n            \"type\": \"uint64\"\n          },\n          {\n            \"internalType\": \"uint64\",\n            \"name\": \"brake_ratio\",\n            \"type\": \"uint64\"\n          },\n          {\n            \"internalType\": \"uint64\",\n            \"name\": \"tx_num_limit\",\n            \"type\": \"uint64\"\n          },\n          {\n            \"internalType\": \"uint64\",\n            \"name\": \"max_tx_size\",\n            \"type\": \"uint64\"\n          },\n          {\n            \"internalType\": \"uint64\",\n            \"name\": \"gas_limit\",\n            \"type\": \"uint64\"\n          },\n          {\n            \"internalType\": \"uint64\",\n            \"name\": \"interval\",\n            \"type\": \"uint64\"\n          },\n          {\n            \"internalType\": \"uint64\",\n            \"name\": \"max_contract_limit\",\n            \"type\": \"uint64\"\n          }\n        ],\n        \"internalType\": \"struct MetadataType.ConsensusConfig\",\n        \"name\": \"config\",\n        \"type\": \"tuple\"\n      }\n    ],\n    \"name\": \"updateConsensusConfig\",\n    \"outputs\": [],\n    \"stateMutability\": \"nonpayable\",\n    \"type\": \"function\"\n  }\n]\n";
+    const _: () = {
+        ::core::include_bytes!(
+            "/home/gao/dev/el-axon/core/executor/src/system_contract/metadata/abi/metadata_abi.json",
+        );
+    };
+    #[allow(deprecated)]
+    fn __abi() -> ::ethers::core::abi::Abi {
+        ::ethers::core::abi::ethabi::Contract {
+            constructor: ::core::option::Option::None,
+            functions:   ::core::convert::From::from([
+                (
+                    ::std::borrow::ToOwned::to_owned("appendMetadata"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name:             ::std::borrow::ToOwned::to_owned("appendMetadata"),
+                        inputs:           ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name:          ::std::borrow::ToOwned::to_owned("metadata"),
+                            kind:          ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                ::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ],),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                    ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(
+                                                        32usize
+                                                    ),
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(
+                                                        32usize
+                                                    ),
+                                                ],
+                                            ),
+                                        ),
+                                    ),
+                                    ::ethers::core::abi::ethabi::ParamType::Array(
+                                        ::std::boxed::Box::new(
+                                            ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                                ::std::vec![
+                                                    ::ethers::core::abi::ethabi::ParamType::Address,
+                                                    ::ethers::core::abi::ethabi::ParamType::Uint(
+                                                        64usize
+                                                    ),
+                                                ],
+                                            ),
+                                        ),
+                                    ),
+                                    ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                        ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ],),
+                                ],
+                            ),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned("struct MetadataType.Metadata",),
+                            ),
+                        },],
+                        outputs:          ::std::vec![],
+                        constant:         ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("setCkbRelatedInfo"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name:             ::std::borrow::ToOwned::to_owned("setCkbRelatedInfo"),
+                        inputs:           ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name:          ::std::borrow::ToOwned::to_owned("info"),
+                            kind:          ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                ::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                    ::ethers::core::abi::ethabi::ParamType::FixedBytes(32usize),
+                                ],
+                            ),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned(
+                                    "struct MetadataType.CkbRelatedInfo",
+                                ),
+                            ),
+                        },],
+                        outputs:          ::std::vec![],
+                        constant:         ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("updateConsensusConfig"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name:             ::std::borrow::ToOwned::to_owned("updateConsensusConfig",),
+                        inputs:           ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name:          ::std::borrow::ToOwned::to_owned("config"),
+                            kind:          ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                ::std::vec![
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                    ::ethers::core::abi::ethabi::ParamType::Uint(64usize),
+                                ],
+                            ),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned(
+                                    "struct MetadataType.ConsensusConfig",
+                                ),
+                            ),
+                        },],
+                        outputs:          ::std::vec![],
+                        constant:         ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
+                ),
+                (
+                    ::std::borrow::ToOwned::to_owned("updateValidatorList"),
+                    ::std::vec![::ethers::core::abi::ethabi::Function {
+                        name:             ::std::borrow::ToOwned::to_owned("updateValidatorList",),
+                        inputs:           ::std::vec![::ethers::core::abi::ethabi::Param {
+                            name:          ::std::borrow::ToOwned::to_owned("validators"),
+                            kind:          ::ethers::core::abi::ethabi::ParamType::Tuple(
+                                ::std::vec![::ethers::core::abi::ethabi::ParamType::Array(
+                                    ::std::boxed::Box::new(
+                                        ::ethers::core::abi::ethabi::ParamType::Tuple(::std::vec![
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                            ::ethers::core::abi::ethabi::ParamType::Bytes,
+                                            ::ethers::core::abi::ethabi::ParamType::Address,
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(32usize),
+                                            ::ethers::core::abi::ethabi::ParamType::Uint(32usize),
+                                        ],),
+                                    ),
+                                ),],
+                            ),
+                            internal_type: ::core::option::Option::Some(
+                                ::std::borrow::ToOwned::to_owned(
+                                    "struct MetadataType.ValidatorList",
+                                ),
+                            ),
+                        },],
+                        outputs:          ::std::vec![],
+                        constant:         ::core::option::Option::None,
+                        state_mutability: ::ethers::core::abi::ethabi::StateMutability::NonPayable,
+                    },],
+                ),
+            ]),
+            events:      ::std::collections::BTreeMap::new(),
+            errors:      ::std::collections::BTreeMap::new(),
+            receive:     false,
+            fallback:    false,
+        }
+    }
     /// The parsed JSON ABI of the contract.
     pub static METADATACONTRACT_ABI: ::ethers::contract::Lazy<::ethers::core::abi::Abi> =
-        ::ethers::contract::Lazy::new(|| {
-            ::ethers::core::utils::__serde_json::from_str(__ABI).expect("ABI is always valid")
-        });
+        ::ethers::contract::Lazy::new(__abi);
     pub struct MetadataContract<M>(::ethers::contract::Contract<M>);
     impl<M> ::core::clone::Clone for MetadataContract<M> {
         fn clone(&self) -> Self {
@@ -37,7 +201,7 @@ pub mod metadata_contract {
     }
     impl<M> ::core::fmt::Debug for MetadataContract<M> {
         fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-            f.debug_tuple(stringify!(MetadataContract))
+            f.debug_tuple(::core::stringify!(MetadataContract))
                 .field(&self.address())
                 .finish()
         }
@@ -84,6 +248,16 @@ pub mod metadata_contract {
         ) -> ::ethers::contract::builders::ContractCall<M, ()> {
             self.0
                 .method_hash([183, 111, 172, 1], (config,))
+                .expect("method not found (this should never happen)")
+        }
+
+        /// Calls the contract's `updateValidatorList` (0xa9f73eaf) function
+        pub fn update_validator_list(
+            &self,
+            validators: ValidatorList,
+        ) -> ::ethers::contract::builders::ContractCall<M, ()> {
+            self.0
+                .method_hash([169, 247, 62, 175], (validators,))
                 .expect("method not found (this should never happen)")
         }
     }
@@ -158,12 +332,34 @@ pub mod metadata_contract {
     pub struct UpdateConsensusConfigCall {
         pub config: ConsensusConfig,
     }
+    /// Container type for all input parameters for the `updateValidatorList`
+    /// function with signature
+    /// `updateValidatorList(((bytes,bytes,address,uint32,uint32)[]))` and
+    /// selector `0xa9f73eaf`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthCall,
+        ::ethers::contract::EthDisplay,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    #[ethcall(
+        name = "updateValidatorList",
+        abi = "updateValidatorList(((bytes,bytes,address,uint32,uint32)[]))"
+    )]
+    pub struct UpdateValidatorListCall {
+        pub validators: ValidatorList,
+    }
     /// Container type for all of the contract's call
     #[derive(Clone, ::ethers::contract::EthAbiType, Debug, PartialEq, Eq, Hash)]
     pub enum MetadataContractCalls {
         AppendMetadata(AppendMetadataCall),
         SetCkbRelatedInfo(SetCkbRelatedInfoCall),
         UpdateConsensusConfig(UpdateConsensusConfigCall),
+        UpdateValidatorList(UpdateValidatorListCall),
     }
     impl ::ethers::core::abi::AbiDecode for MetadataContractCalls {
         fn decode(
@@ -185,6 +381,11 @@ pub mod metadata_contract {
             {
                 return Ok(Self::UpdateConsensusConfig(decoded));
             }
+            if let Ok(decoded) =
+                <UpdateValidatorListCall as ::ethers::core::abi::AbiDecode>::decode(data)
+            {
+                return Ok(Self::UpdateValidatorList(decoded));
+            }
             Err(::ethers::core::abi::Error::InvalidData.into())
         }
     }
@@ -196,6 +397,9 @@ pub mod metadata_contract {
                 Self::UpdateConsensusConfig(element) => {
                     ::ethers::core::abi::AbiEncode::encode(element)
                 }
+                Self::UpdateValidatorList(element) => {
+                    ::ethers::core::abi::AbiEncode::encode(element)
+                }
             }
         }
     }
@@ -205,6 +409,7 @@ pub mod metadata_contract {
                 Self::AppendMetadata(element) => ::core::fmt::Display::fmt(element, f),
                 Self::SetCkbRelatedInfo(element) => ::core::fmt::Display::fmt(element, f),
                 Self::UpdateConsensusConfig(element) => ::core::fmt::Display::fmt(element, f),
+                Self::UpdateValidatorList(element) => ::core::fmt::Display::fmt(element, f),
             }
         }
     }
@@ -221,6 +426,11 @@ pub mod metadata_contract {
     impl ::core::convert::From<UpdateConsensusConfigCall> for MetadataContractCalls {
         fn from(value: UpdateConsensusConfigCall) -> Self {
             Self::UpdateConsensusConfig(value)
+        }
+    }
+    impl ::core::convert::From<UpdateValidatorListCall> for MetadataContractCalls {
+        fn from(value: UpdateValidatorListCall) -> Self {
+            Self::UpdateValidatorList(value)
         }
     }
     /// `CkbRelatedInfo(bytes32,bytes32,bytes32,bytes32,bytes32,bytes32)`
@@ -332,5 +542,19 @@ pub mod metadata_contract {
         pub address:        ::ethers::core::types::Address,
         pub propose_weight: u32,
         pub vote_weight:    u32,
+    }
+    /// `ValidatorList((bytes,bytes,address,uint32,uint32)[])`
+    #[derive(
+        Clone,
+        ::ethers::contract::EthAbiType,
+        ::ethers::contract::EthAbiCodec,
+        Default,
+        Debug,
+        PartialEq,
+        Eq,
+        Hash,
+    )]
+    pub struct ValidatorList {
+        pub verifier_list: ::std::vec::Vec<ValidatorExtend>,
     }
 }
