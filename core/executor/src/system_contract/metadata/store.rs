@@ -1,14 +1,15 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 
 use common_config_parser::types::spec::HardforkName;
 use protocol::trie::Trie as _;
 use protocol::types::{
     CkbRelatedInfo, ConsensusConfig, ConsensusConfigV0, HardforkInfo, HardforkInfoInner, Metadata,
-    MetadataInner, H256,
+    MetadataInner, ProposeCount, ValidatorExtend, H160, H256,
 };
 use protocol::{codec::ProtocolCodec, ProtocolResult};
 
+use crate::system_contract::metadata::metadata_abi::ValidatorList;
 use crate::system_contract::metadata::{
     segment::EpochSegment, CKB_RELATED_INFO_KEY, CONSENSUS_CONFIG, EPOCH_SEGMENT_KEY,
     HARDFORK_INFO, HARDFORK_KEY,
@@ -153,6 +154,44 @@ impl MetadataStore {
             metadata.encode()?.to_vec(),
         )?;
 
+        let new_root = self.trie.commit()?;
+        CURRENT_METADATA_ROOT.with(|r| *r.borrow_mut() = new_root);
+
+        Ok(())
+    }
+
+    pub fn update_validator_list(
+        &mut self,
+        block_number: u64,
+        validators: ValidatorList,
+    ) -> ProtocolResult<()> {
+        let epoch = self.get_epoch_by_block_number(block_number)?;
+        let mut metadata = self.get_metadata_inner(epoch)?;
+        let current_address = metadata
+            .verifier_list
+            .iter()
+            .map(|v| v.address)
+            .collect::<HashSet<_>>();
+        let mut validators = validators
+            .verifier_list
+            .into_iter()
+            .map(|v| {
+                let res = ValidatorExtend::from(v);
+                if !current_address.contains(&res.address) {
+                    metadata
+                        .propose_counter
+                        .push(ProposeCount::new(res.address, 0));
+                }
+                res
+            })
+            .collect::<Vec<_>>();
+        validators.sort_by_key(|v| v.address);
+        metadata.verifier_list = validators;
+
+        self.trie.insert(
+            metadata.epoch.to_be_bytes().to_vec(),
+            metadata.encode()?.to_vec(),
+        )?;
         let new_root = self.trie.commit()?;
         CURRENT_METADATA_ROOT.with(|r| *r.borrow_mut() = new_root);
 

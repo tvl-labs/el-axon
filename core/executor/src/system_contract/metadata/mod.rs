@@ -101,6 +101,13 @@ impl<Adapter: ExecutorAdapter + ApplyBackend> SystemContract<Adapter>
                     "[metadata] update consensus config"
                 );
             }
+            metadata_abi::MetadataContractCalls::UpdateValidatorList(c) => {
+                exec_try!(
+                    store.update_validator_list(block_number, c.validators),
+                    gas_limit,
+                    "[metadata] update validator list"
+                );
+            }
         }
 
         let sender = evm_types::H160(sender.into_array());
