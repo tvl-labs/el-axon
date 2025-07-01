@@ -42,6 +42,7 @@ members = [
     "devtools/abi-generator",
     "devtools/axon-tools",
     "devtools/metadata-cli",
+    "devtools/update-validator",
     "protocol",
 ]
 

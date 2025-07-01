@@ -1,0 +1,18 @@
+[package]
+name = "update-validator"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+jsonrpsee = { version = "0.20", features = ["client"] }
+common-crypto = { path = "../../common/crypto" }
+core-executor = { path = "../../core/executor" }
+protocol = { path = "../../protocol", package = "axon-protocol" }
+clap = { version = "=4.4", features = ["cargo"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.5"
+tokio = { version = "1.39", features = ["full"] }
+ethers = "2.0"
+rlp = "0.5.0"

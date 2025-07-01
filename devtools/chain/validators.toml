@@ -1,0 +1,17 @@
+[[validators]]
+bls_pub_key = "0xa26e3fe1cf51bd4822072c61bdc315ac32e3d3c2e2484bb92942666399e863b4bf56cf2926383cc706ffc15dfebc85c6"
+pub_key = "0x031ddc35212b7fc7ff6685b17d91f77c972535aee5c7ae5684d3e72b986f08834b"
+propose_weight = 1
+vote_weight = 1
+
+[[validators]]
+bls_pub_key = "0x80310fa9df724b5603d283b472ed3bf85254a8a4ceda8a274b421f6cf2be1d9184267cdfe9a199d36ff14e57668a55d0"
+pub_key = "0x02b77c74eb68af3d4d6cc7884ed6709f1a2a1af0f713382a4438ec2ea3a70d4d7f"
+propose_weight = 1
+vote_weight = 1
+
+[[validators]]
+bls_pub_key = "0xb75b39ba4ae8b4b25e19ddc578175cef276d9f33f7cf7abeb546081663efe5cc4fe7dc495f56869eed45dc417b0ceeee"
+pub_key = "0x02e729ccce8584fe570940a6de4515d76c77acc4f85897f2a2b6982e998cce1024"
+propose_weight = 1
+vote_weight = 1
