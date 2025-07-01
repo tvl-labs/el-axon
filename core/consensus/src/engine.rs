@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::sync::Arc;
 
+use core_executor::system_contract::METADATA_CONTRACT_ADDRESS;
 use json::JsonValue;
 use log::{error, info};
 use overlord::error::ConsensusError as OverlordError;
@@ -84,9 +85,21 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
         } else {
             RLP_NULL
         };
+        let call_system_script_count = txs.call_system_script_count;
+        let has_call_metadata_script =
+            signed_txs[0..call_system_script_count as usize]
+                .iter()
+                .any(|tx| {
+                    let to = tx.get_to().unwrap_or_default();
+                    to == METADATA_CONTRACT_ADDRESS
+                });
+
+        let mut extra_data = vec![ExtraData {
+            inner: vec![has_call_metadata_script as u8].into(),
+        }];
 
         let mut remove = false;
-        let extra_data_hardfork = {
+        let mut extra_data_hardfork = {
             let mut hardfork = self.node_info.hardfork_proposals.write().unwrap();
             match &*hardfork {
                 Some(v) => {
@@ -109,22 +122,24 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
             self.adapter.remove_hardfork_proposal(ctx.clone()).await?;
         }
 
+        extra_data.append(&mut extra_data_hardfork);
+
         let proposal = Proposal {
-            version:                  BlockVersion::V0,
-            prev_hash:                status.prev_hash,
-            proposer:                 self.node_info.self_address.into(),
-            prev_state_root:          self.status.inner().last_state_root,
-            transactions_root:        txs_root,
-            signed_txs_hash:          digest_signed_transactions(&signed_txs),
-            timestamp:                time_now(),
-            number:                   next_number,
-            gas_limit:                U64::from(MAX_BLOCK_GAS_LIMIT),
-            extra_data:               extra_data_hardfork,
-            base_fee_per_gas:         U64::from(BASE_FEE_PER_GAS),
-            proof:                    status.proof,
-            chain_id:                 self.node_info.chain_id,
+            version: BlockVersion::V0,
+            prev_hash: status.prev_hash,
+            proposer: self.node_info.self_address.0,
+            prev_state_root: self.status.inner().last_state_root,
+            transactions_root: txs_root,
+            signed_txs_hash: digest_signed_transactions(&signed_txs),
+            timestamp: time_now(),
+            number: next_number,
+            gas_limit: MAX_BLOCK_GAS_LIMIT.into(),
+            extra_data,
+            base_fee_per_gas: BASE_FEE_PER_GAS.into(),
+            proof: status.proof,
+            chain_id: self.node_info.chain_id,
             call_system_script_count: txs.call_system_script_count,
-            tx_hashes:                txs.hashes,
+            tx_hashes: txs.hashes,
         };
 
         if proposal.number != proposal.proof.number + 1 {
@@ -166,7 +181,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
             .into());
         }
 
-        if let Some(t) = proposal.extra_data.get(0) {
+        if let Some(t) = proposal.extra_data.get(1) {
             match HardforkInfoInner::decode(&t.inner) {
                 Ok(data) => {
                     if !self
@@ -706,15 +721,17 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             self.adapter.remove_hardfork_proposal(ctx.clone()).await?;
         }
 
+        let metadata = self
+            .adapter
+            .get_metadata_by_block_number(block_number + 1)
+            .await?;
+        self.update_overlord_crypto(metadata.clone())?;
+
         if self
             .adapter
             .is_last_block_in_current_epoch(block_number)
             .await?
         {
-            let metadata = self
-                .adapter
-                .get_metadata_by_block_number(block_number + 1)
-                .await?;
             let pub_keys = metadata
                 .verifier_list
                 .iter()

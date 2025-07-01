@@ -272,6 +272,7 @@ async fn start<K: KeyProvider>(
         consensus_adapter,
         status_agent.clone(),
         lock,
+        Arc::clone(&crypto),
     ));
 
     network_service.tag_consensus(&metadata.verifier_list)?;

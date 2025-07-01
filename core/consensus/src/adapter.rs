@@ -489,6 +489,12 @@ where
             return Err(ConsensusError::VerifyProof(block.header.number, HashMismatch).into());
         }
 
+        if let Some(flag) = block.header.extra_data.get(0) {
+            if flag.inner[0] == 1 {
+                return Ok(());
+            }
+        }
+
         // the auth_list for the target should comes from previous number
         let metadata = self
             .get_metadata_handle(ctx.clone())
