@@ -10,8 +10,9 @@ use protocol::traits::{Context, Synchronization, SynchronizationAdapter};
 use protocol::types::{Block, Proof, Proposal, Receipt, RichBlock, SignedTransaction, U256};
 use protocol::{async_trait, ProtocolResult};
 
+use crate::engine::generate_new_crypto_map;
 use crate::status::{CurrentStatus, StatusAgent};
-use crate::util::digest_signed_transactions;
+use crate::util::{digest_signed_transactions, OverlordCrypto};
 use crate::ConsensusError;
 
 const POLLING_BROADCAST: u64 = 2000;
@@ -26,6 +27,7 @@ pub struct OverlordSynchronization<Adapter: SynchronizationAdapter> {
     status:  StatusAgent,
     lock:    Arc<Mutex<()>>,
     syncing: Mutex<()>,
+    crypto:  Arc<OverlordCrypto>,
 
     sync_txs_chunk_size: usize,
 }
@@ -103,6 +105,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
         adapter: Arc<Adapter>,
         status: StatusAgent,
         lock: Arc<Mutex<()>>,
+        crypto: Arc<OverlordCrypto>,
     ) -> Self {
         let syncing = Mutex::new(());
 
@@ -111,6 +114,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             status,
             lock,
             syncing,
+            crypto,
 
             sync_txs_chunk_size,
         }
@@ -362,6 +366,7 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             rich_block.block.clone(),
         )
         .await?;
+        self.crypto.update(generate_new_crypto_map(metadata)?);
 
         status_agent.swap(new_status);
 
@@ -509,6 +514,14 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
             .adapter
             .get_metadata_by_block_number(sync_status.last_number + 1)
             .await?;
+
+        self.crypto
+            .update(generate_new_crypto_map(metadata.clone())?);
+
+        log::info!(
+            "update status of block number: {:?}",
+            sync_status.last_number
+        );
 
         self.adapter.update_status(
             ctx,
