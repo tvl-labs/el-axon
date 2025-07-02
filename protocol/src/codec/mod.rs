@@ -60,6 +60,12 @@ pub fn hex_decode(src: &str) -> ProtocolResult<Vec<u8>> {
         src
     };
 
+    let src = if src.len() % 2 == 1 {
+        format!("0{}", src)
+    } else {
+        src.to_string()
+    };
+
     let src = src.as_bytes();
     let mut ret = vec![0u8; src.len() / 2];
     faster_hex::hex_decode(src, &mut ret).map_err(TypesError::FromHex)?;
@@ -84,6 +90,18 @@ where
     } else {
         s.serialize_str(to_hex_raw(&mut slice, bytes, true))
     }
+}
+
+pub fn deserialize_uint<'de, D, U>(deserializer: D) -> Result<U, D::Error>
+where
+    D: Deserializer<'de>,
+    U: TryFrom<U256> + Copy + Debug,
+    <U as TryFrom<U256>>::Error: Debug,
+{
+    let s = String::deserialize(deserializer)?;
+    let bytes = hex_decode(&s).map_err(serde::de::Error::custom)?;
+    let val = U256::from_be_slice(&bytes);
+    Ok(val.try_into().unwrap())
 }
 
 pub fn decode_256bits_key(s: &str) -> Result<Key256Bits, String> {
@@ -165,6 +183,50 @@ mod tests {
             hex::decode(hex::encode(data)).unwrap()
         );
         assert!(hex_decode(String::new().as_str()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_hex_decode_odd_length() {
+        assert_eq!(hex_decode("0x0").unwrap(), vec![0u8]);
+        assert_eq!(hex_decode("0x1").unwrap(), vec![1u8]);
+        assert_eq!(hex_decode("0xf").unwrap(), vec![15u8]);
+        assert_eq!(hex_decode("0x123").unwrap(), vec![1u8, 35u8]);
+
+        assert_eq!(hex_decode("0x00").unwrap(), vec![0u8]);
+        assert_eq!(hex_decode("0x10").unwrap(), vec![16u8]);
+        assert_eq!(hex_decode("0xff").unwrap(), vec![255u8]);
+
+        assert_eq!(hex_decode("0").unwrap(), vec![0u8]);
+        assert_eq!(hex_decode("1").unwrap(), vec![1u8]);
+        assert_eq!(hex_decode("f").unwrap(), vec![15u8]);
+    }
+
+    #[test]
+    fn test_deserialize_uint_zero() {
+        use serde::Deserialize;
+        use serde_json;
+
+        #[derive(Deserialize)]
+        struct TestStruct {
+            #[serde(deserialize_with = "deserialize_uint")]
+            value: u64,
+        }
+
+        let json_str = r#"{"value": "0x0"}"#;
+        let result: Result<TestStruct, _> = serde_json::from_str(json_str);
+        assert_eq!(result.unwrap().value, 0u64);
+
+        let json_str = r#"{"value": "0x00"}"#;
+        let result: Result<TestStruct, _> = serde_json::from_str(json_str);
+        assert_eq!(result.unwrap().value, 0u64);
+
+        let json_str = r#"{"value": "0x1"}"#;
+        let result: Result<TestStruct, _> = serde_json::from_str(json_str);
+        assert_eq!(result.unwrap().value, 1u64);
+
+        let json_str = r#"{"value": "0xff"}"#;
+        let result: Result<TestStruct, _> = serde_json::from_str(json_str);
+        assert_eq!(result.unwrap().value, 255u64);
     }
 
     #[test]

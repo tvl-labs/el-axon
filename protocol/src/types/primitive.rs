@@ -15,7 +15,7 @@ use serde::{de, ser, Deserialize, Serialize};
 
 use common_hasher::keccak256;
 
-use crate::codec::{hex_decode, hex_encode, serialize_uint};
+use crate::codec::{deserialize_uint, hex_decode, hex_encode, serialize_uint};
 use crate::types::{BlockNumber, Bytes, BytesMut, TypesError};
 use crate::ProtocolError;
 
@@ -181,9 +181,21 @@ pub type Key256Bits = Zeroizing<[u8; 32]>;
     RlpEncodable, RlpDecodable, Serialize, Deserialize, Default, Clone, Debug, Copy, PartialEq, Eq,
 )]
 pub struct MetadataVersion {
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub start: BlockNumber,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub end:   BlockNumber,
 }
 
@@ -202,7 +214,13 @@ impl MetadataVersion {
 )]
 pub struct SpecMetadata {
     pub version:          MetadataVersion,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub epoch:            u64,
     pub verifier_list:    Vec<Validator>,
     #[serde(skip_deserializing)]
@@ -215,7 +233,13 @@ pub struct SpecMetadata {
 )]
 pub struct Metadata {
     pub version:          MetadataVersion,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub epoch:            u64,
     pub verifier_list:    Vec<ValidatorExtend>,
     #[serde(skip_deserializing)]
@@ -271,21 +295,69 @@ pub struct MetadataInner {
     RlpEncodable, RlpDecodable, Serialize, Deserialize, Default, Clone, Debug, PartialEq, Eq,
 )]
 pub struct ConsensusConfigV0 {
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub gas_limit:       u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub interval:        u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub propose_ratio:   u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub prevote_ratio:   u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub precommit_ratio: u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub brake_ratio:     u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub tx_num_limit:    u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub max_tx_size:     u64,
 }
 
@@ -309,23 +381,77 @@ impl From<ConsensusConfigV0> for ConsensusConfig {
     RlpEncodable, RlpDecodable, Serialize, Deserialize, Default, Clone, Debug, PartialEq, Eq,
 )]
 pub struct ConsensusConfig {
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub gas_limit:          u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub interval:           u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub propose_ratio:      u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub prevote_ratio:      u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub precommit_ratio:    u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub brake_ratio:        u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub tx_num_limit:       u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub max_tx_size:        u64,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     #[serde(default = "default_max_contract_limit")]
     pub max_contract_limit: u64,
 }
@@ -362,7 +488,13 @@ impl From<Metadata> for DurationConfig {
 #[derive(RlpEncodable, RlpDecodable, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProposeCount {
     pub address: Address,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub count:   u64,
 }
 
@@ -403,9 +535,21 @@ pub struct ConsensusValidator {
 pub struct Validator {
     pub bls_pub_key:    Hex,
     pub pub_key:        Hex,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub propose_weight: u32,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub vote_weight:    u32,
 }
 
@@ -424,9 +568,21 @@ pub struct ValidatorExtend {
     pub bls_pub_key:    Hex,
     pub pub_key:        Hex,
     pub address:        Address,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub propose_weight: u32,
-    #[cfg_attr(feature = "hex-serialize", serde(serialize_with = "serialize_uint"))]
+    #[cfg_attr(
+        feature = "hex-serialize",
+        serde(
+            serialize_with = "serialize_uint",
+            deserialize_with = "deserialize_uint"
+        )
+    )]
     pub vote_weight:    u32,
 }
 
