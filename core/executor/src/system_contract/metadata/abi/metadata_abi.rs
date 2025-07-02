@@ -10,11 +10,6 @@ pub use metadata_contract::*;
     non_camel_case_types
 )]
 pub mod metadata_contract {
-    const _: () = {
-        ::core::include_bytes!(
-            "/home/gao/dev/el-axon/core/executor/src/system_contract/metadata/abi/metadata_abi.json",
-        );
-    };
     #[allow(deprecated)]
     fn __abi() -> ::ethers::core::abi::Abi {
         ::ethers::core::abi::ethabi::Contract {
