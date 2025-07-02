@@ -437,7 +437,7 @@ fn run_overlord_consensus<M, N, S, DB>(
     tokio::spawn(async move {
         if let Err(e) = overlord_consensus
             .run(
-                current_block.header.number,
+                current_block.header.number + 1,
                 metadata.consensus_config.interval,
                 validators,
                 Some(timer_config),
