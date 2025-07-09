@@ -6,8 +6,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use protocol::codec::ProtocolCodec;
 use protocol::types::{
-    AccessList, Address, Block, Bloom, Bytes, Hash, Header, Hex, Public, Receipt,
-    SignedTransaction, H256, H64, MAX_PRIORITY_FEE_PER_GAS, U256, U64,
+    AccessList, Address, Block, Bloom, Bytes, Eip1559Transaction, Eip2930Transaction, Hash, Header,
+    Hex, LegacyTransaction, Public, Receipt, SignatureComponents, SignedTransaction, TxKind,
+    UnsignedTransaction, UnverifiedTransaction, H256, H64, MAX_PRIORITY_FEE_PER_GAS, U256, U64,
 };
 
 pub const EMPTY_UNCLE_HASH: H256 = H256::new([
@@ -17,22 +18,11 @@ pub const EMPTY_UNCLE_HASH: H256 = H256::new([
 
 use core_consensus::SyncStatus as InnerSyncStatus;
 
-#[derive(Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(untagged)]
 pub enum RichTransactionOrHash {
     Hash(Hash),
     Rich(Web3Transaction),
-}
-
-impl Serialize for RichTransactionOrHash {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            RichTransactionOrHash::Hash(h) => h.serialize(serializer),
-            RichTransactionOrHash::Rich(stx) => stx.serialize(serializer),
-        }
-    }
 }
 
 impl RichTransactionOrHash {
@@ -40,6 +30,13 @@ impl RichTransactionOrHash {
         match self {
             RichTransactionOrHash::Hash(hash) => *hash,
             RichTransactionOrHash::Rich(tx) => tx.hash,
+        }
+    }
+
+    pub fn get_rich_tx(&self) -> Option<Web3Transaction> {
+        match self {
+            RichTransactionOrHash::Rich(tx) => Some(tx.clone()),
+            _ => None,
         }
     }
 }
@@ -78,6 +75,66 @@ pub struct Web3Transaction {
     // Quantity for eth sig, hex bytes for interop sig.
     #[serde(with = "either::serde_untagged")]
     pub s:                        Either<U256, Hex>,
+}
+
+impl From<Web3Transaction> for SignedTransaction {
+    fn from(value: Web3Transaction) -> Self {
+        let convert_to = |opt: Option<Address>| -> TxKind {
+            if let Some(addr) = opt {
+                TxKind::Call(addr)
+            } else {
+                TxKind::Create
+            }
+        };
+
+        let type_ = value.type_.unwrap_or_default();
+        let unsigned = match type_.to::<u8>() {
+            0 => UnsignedTransaction::Legacy(LegacyTransaction {
+                chain_id:  value.chain_id.map(|id| id.to()),
+                nonce:     value.nonce.to(),
+                gas_price: value.gas_price.to(),
+                gas_limit: value.gas.to(),
+                to:        convert_to(value.to),
+                value:     value.value,
+                input:     value.input.as_bytes().into(),
+            }),
+            1 => UnsignedTransaction::Eip2930(Eip2930Transaction {
+                chain_id:    value.chain_id.map(|id| id.to()).unwrap(),
+                nonce:       value.nonce.to(),
+                gas_price:   value.gas_price.to(),
+                gas_limit:   value.gas.to(),
+                to:          convert_to(value.to),
+                value:       value.value,
+                input:       value.input.as_bytes().into(),
+                access_list: value.access_list.unwrap_or_default(),
+            }),
+            2 => UnsignedTransaction::Eip1559(Eip1559Transaction {
+                chain_id:                 value.chain_id.map(|id| id.to()).unwrap(),
+                nonce:                    value.nonce.to(),
+                max_fee_per_gas:          value.max_fee_per_gas.unwrap_or_default().to(),
+                max_priority_fee_per_gas: value.max_priority_fee_per_gas.unwrap_or_default().to(),
+                value:                    value.value,
+                input:                    value.input.as_bytes().into(),
+                gas_limit:                value.gas.to(),
+                to:                       convert_to(value.to),
+                access_list:              value.access_list.unwrap_or_default(),
+            }),
+            _ => unreachable!(),
+        };
+
+        let v = value.v.to::<u64>();
+        let unverified = UnverifiedTransaction {
+            unsigned,
+            hash: value.hash,
+            signature: Some(SignatureComponents {
+                r:          convert_either(value.r),
+                s:          convert_either(value.s),
+                standard_v: SignatureComponents::extract_standard_v(v).unwrap(),
+            }),
+        };
+
+        SignedTransaction::from_unverified(unverified).unwrap()
+    }
 }
 
 impl From<SignedTransaction> for Web3Transaction {
@@ -376,8 +433,8 @@ impl Serialize for BlockId {
         S: Serializer,
     {
         match *self {
-            BlockId::Num(ref x) => serializer.serialize_str(&format!("{:x}", x)),
-            BlockId::Hash(ref hash) => serializer.serialize_str(&format!("{:x}", hash)),
+            BlockId::Num(ref x) => serializer.serialize_str(&format!("0x{:x}", x.to::<u64>())),
+            BlockId::Hash(ref hash) => serializer.serialize_str(&format!("0x{:x}", hash)),
             BlockId::Latest => serializer.serialize_str("latest"),
             BlockId::Earliest => serializer.serialize_str("earliest"),
             BlockId::Pending => serializer.serialize_str("pending"),
@@ -460,9 +517,17 @@ impl<'a> Visitor<'a> for BlockIdVisitor {
             "latest" => Ok(BlockId::Latest),
             "earliest" => Ok(BlockId::Earliest),
             "pending" => Ok(BlockId::Pending),
-            _ if value.starts_with("0x") => u64::from_str_radix(&value[2..], 16)
-                .map(|n| BlockId::Num(U64::from(n)))
-                .map_err(|e| Error::custom(format!("Invalid block number: {}", e))),
+            _ if value.starts_with("0x") => {
+                if value.strip_prefix("0x").unwrap().len() == 64 {
+                    let hash = H256::from_str(value)
+                        .map_err(|e| Error::custom(format!("Invalid block hash: {}", e)))?;
+                    Ok(BlockId::Hash(hash))
+                } else {
+                    u64::from_str_radix(&value[2..], 16)
+                        .map(|n| BlockId::Num(U64::from(n)))
+                        .map_err(|e| Error::custom(format!("Invalid block number: {}", e)))
+                }
+            }
             _ => Err(Error::custom(
                 "Invalid block number: missing 0x prefix".to_string(),
             )),
@@ -869,8 +934,17 @@ pub enum HardforkStatus {
     Enabled,
 }
 
+fn convert_either(e: Either<U256, Hex>) -> Bytes {
+    match e {
+        Either::Left(u) => u.to_be_bytes_vec().into(),
+        Either::Right(h) => h.as_bytes().into(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::u8;
+
     use super::*;
     use protocol::{rand::random, types::UnverifiedTransaction};
 
@@ -910,5 +984,91 @@ mod tests {
             "0x8ba79925267b17403fdf3ab47641b4aa52322dc385429cc92a7003c5d7c2"
         );
         assert_eq!(tx_json["v"], "0x25");
+    }
+
+    #[test]
+    fn test_block_id_json() {
+        let block_id = BlockId::Num(U64::ONE);
+        let json = serde_json::to_value(&block_id).unwrap();
+        assert_eq!(json, "0x1");
+        let recover: BlockId = serde_json::from_value(json).unwrap();
+        assert_eq!(recover, block_id);
+
+        let block_id = BlockId::Num(U64::ZERO);
+        let json = serde_json::to_value(&block_id).unwrap();
+        assert_eq!(json, "0x0");
+        let recover: BlockId = serde_json::from_value(json).unwrap();
+        assert_eq!(recover, block_id);
+
+        let block_id = BlockId::Num(U64::MAX);
+        let json = serde_json::to_value(&block_id).unwrap();
+        assert_eq!(json, "0xffffffffffffffff");
+        let recover: BlockId = serde_json::from_value(json).unwrap();
+        assert_eq!(recover, block_id);
+
+        let hash = H256::random();
+        let block_id = BlockId::Hash(hash);
+        let json = serde_json::to_value(&block_id).unwrap();
+        let recover: BlockId = serde_json::from_value(json).unwrap();
+        assert_eq!(recover, block_id);
+    }
+
+    #[test]
+    fn test_rich_transaction_or_hash_json() {
+        let tx = Web3Transaction {
+            type_:                    Some(U64::ZERO),
+            block_number:             Some(U64::ZERO),
+            block_hash:               Some(H256::ZERO),
+            hash:                     Hash::ZERO,
+            nonce:                    U64::ZERO,
+            transaction_index:        Some(U64::ZERO),
+            from:                     Address::ZERO,
+            to:                       Some(Address::ZERO),
+            value:                    U256::ZERO,
+            gas:                      U64::ZERO,
+            gas_price:                U64::ZERO,
+            max_fee_per_gas:          Some(U64::ZERO),
+            max_priority_fee_per_gas: Some(U64::ZERO),
+            raw:                      Hex::empty(),
+            input:                    Hex::empty(),
+            public_key:               Some(Public::ZERO),
+            access_list:              Some(AccessList::default()),
+            chain_id:                 Some(U64::ZERO),
+            standard_v:               Some(U256::ZERO),
+            v:                        U256::ZERO,
+            r:                        Either::Left(U256::ZERO),
+            s:                        Either::Left(U256::ZERO),
+        };
+        let rich_tx = RichTransactionOrHash::Rich(tx);
+        let json = serde_json::to_value(&rich_tx).unwrap();
+        println!("json: {:?}", json);
+        let recover: RichTransactionOrHash = serde_json::from_value(json).unwrap();
+        assert_eq!(recover, rich_tx);
+
+        let hash = H256::random();
+        let rich_tx = RichTransactionOrHash::Hash(hash);
+        let json = serde_json::to_value(&rich_tx).unwrap();
+        println!("json: {:?}", json);
+        let recover: RichTransactionOrHash = serde_json::from_value(json).unwrap();
+        assert_eq!(recover, rich_tx);
+    }
+
+    #[test]
+    fn test_convert_either() {
+        let u = U256::from(random::<u64>());
+        let e: Either<U256, Hex> = Either::Left(u);
+        let bytes = convert_either(e);
+        assert_eq!(U256::from_be_slice(&bytes), u);
+
+        let e = Either::Right(Hex::from_str("0x1234").unwrap());
+        let bytes = convert_either(e);
+        assert_eq!(bytes, Hex::from_str("0x1234").unwrap().as_bytes());
+    }
+
+    #[test]
+    fn test_convert_u256() {
+        let u = U256::from(u8::MAX);
+        let s = u.to::<u8>();
+        assert_eq!(s, u8::MAX);
     }
 }
