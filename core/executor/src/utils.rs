@@ -1,4 +1,3 @@
-use protocol::codec::hex_encode;
 use protocol::types::{Address, Hasher, U256};
 
 use crate::FeeAllocate;
@@ -21,12 +20,24 @@ pub struct DefaultFeeAllocator;
 impl FeeAllocate for DefaultFeeAllocator {
     fn allocate(
         &self,
-        _block_number: U256,
-        _fee_collect: U256,
+        block_number: U256,
+        fee_collect: U256,
         _proposer: Address,
-        _validators: &[protocol::types::ValidatorExtend],
+        validators: &[protocol::types::ValidatorExtend],
     ) -> Vec<FeeInlet> {
-        vec![]
+        if fee_collect.is_zero() || block_number.is_zero() {
+            return Vec::new();
+        }
+
+        let weight_sum = U256::from(validators.iter().map(|v| v.vote_weight).sum::<u32>());
+
+        validators
+            .iter()
+            .map(|v| FeeInlet {
+                address: v.address,
+                amount:  (fee_collect / weight_sum) * U256::from(v.vote_weight),
+            })
+            .collect()
     }
 }
 
@@ -37,17 +48,22 @@ pub fn code_address(sender: &evm_types::H160, nonce: &evm_types::U256) -> evm_ty
     evm_types::H256(Hasher::digest(&stream.out()).0)
 }
 
-pub fn decode_revert_msg(input: &[u8]) -> String {
-    if input.len() < REVERT_EFFECT_MSG_OFFSET {
+pub fn decode_revert_msg(bytes: &[u8]) -> String {
+    if bytes.len() < REVERT_EFFECT_MSG_OFFSET {
         return EXEC_REVERT.to_string();
     }
 
-    let decode_reason = |i: &[u8]| -> String {
-        let reason = hex_encode(i);
-        EXEC_REVERT.to_string() + &reason
-    };
+    let len_offset = 4 + 32;
+    let len_bytes = &bytes[len_offset .. len_offset + 32];
+    let str_len = u32::from_be_bytes(
+        len_bytes[28..32].try_into().unwrap()
+    ) as usize;
 
-    decode_reason(&input[REVERT_EFFECT_MSG_OFFSET..])
+    let str_start = len_offset + 32;
+    let str_end = str_start + str_len;
+    let string_bytes = &bytes[str_start .. str_end];
+
+    std::str::from_utf8(string_bytes).unwrap().to_string()
 }
 
 #[cfg(test)]

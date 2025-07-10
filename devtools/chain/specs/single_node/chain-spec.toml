@@ -60,24 +60,24 @@ balance = "0x04ee2d6d415b85acef8100000000"
 #
 
 [params]
-epoch = 0
+epoch = "0x0"
 
 [params.version]
-start = 1
-end = 100000000
+start = "0x1"
+end = "0x5f5e100"
 
 [params.consensus_config]
-propose_ratio = 15
-prevote_ratio = 10
-precommit_ratio = 10
-brake_ratio = 10
-tx_num_limit = 20000
-max_tx_size = 409600000
-gas_limit = 4294967295000
-interval = 3000
+propose_ratio = "0xf"
+prevote_ratio = "0xa"
+precommit_ratio = "0xa"
+brake_ratio = "0xa"
+tx_num_limit = "0x4e20"
+max_tx_size = "0x186a0000"
+gas_limit = "0x3e7fffffc18"
+interval = "0xbb8"
 
 [[params.verifier_list]]
 bls_pub_key = "0xa26e3fe1cf51bd4822072c61bdc315ac32e3d3c2e2484bb92942666399e863b4bf56cf2926383cc706ffc15dfebc85c6"
 pub_key = "0x031ddc35212b7fc7ff6685b17d91f77c972535aee5c7ae5684d3e72b986f08834b"
-propose_weight = 1
-vote_weight = 1
+propose_weight = "0x1"
+vote_weight = "0x1"

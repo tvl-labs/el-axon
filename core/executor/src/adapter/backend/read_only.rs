@@ -109,9 +109,7 @@ where
     }
 
     fn exists(&self, address: evm_types::H160) -> bool {
-        self.trie
-            .contains(&Bytes::from(address.as_bytes().to_vec()))
-            .unwrap_or(false)
+        self.trie.contains(address.as_bytes()).unwrap_or(false)
     }
 
     fn basic(&self, address: evm_types::H160) -> Basic {

@@ -2,6 +2,7 @@ pub use alloy::primitives::{
     Address, Bloom, Signature, B128 as H128, B256 as H256, B512 as H512, B64 as H64, U128, U256,
     U512, U64,
 };
+use secp256k1::PublicKey;
 use zeroize::Zeroizing;
 
 use std::cmp::Ordering;
@@ -588,10 +589,9 @@ pub struct ValidatorExtend {
 
 impl From<Validator> for ValidatorExtend {
     fn from(value: Validator) -> Self {
-        let address = Hasher::digest(&value.pub_key.as_bytes())[12..].to_vec();
         ValidatorExtend {
             bls_pub_key:    value.bls_pub_key,
-            address:        Address::from_slice(&address),
+            address:        pub_key_to_address(&value.pub_key.as_bytes()),
             pub_key:        value.pub_key,
             propose_weight: value.propose_weight,
             vote_weight:    value.vote_weight,
@@ -711,6 +711,16 @@ pub fn checksum(address: &str) -> String {
 
             acc
         })
+}
+
+fn pub_key_to_address(raw_pub_key: &[u8]) -> Address {
+    if raw_pub_key.len() == 65 {
+        return Address::from_slice(&Hasher::digest(&raw_pub_key[1..])[12..]);
+    }
+    let public = PublicKey::from_slice(&raw_pub_key)
+        .unwrap()
+        .serialize_uncompressed();
+    Address::from_slice(&Hasher::digest(&public[1..])[12..])
 }
 
 #[cfg(test)]

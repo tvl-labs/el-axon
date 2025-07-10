@@ -240,11 +240,11 @@ impl From<HardforkInput> for HardforkInfoInner {
         let convert_fn = |hardforks: Vec<HardforkName>| -> H256 {
             let r = hardforks.into_iter().fold(0, |acc, s| acc | s as u64);
 
-            H256::left_padding_from(&r.to_be_bytes())
+            H256::left_padding_from(&r.to_be().to_be_bytes())
         };
 
         let flags = if value.hardforks.is_empty() {
-            H256::left_padding_from(&HardforkName::all().to_be_bytes())
+            H256::left_padding_from(&HardforkName::all().to_be().to_be_bytes())
         } else if value.hardforks.len() == 1 {
             if value.hardforks[0] == HardforkName::None {
                 H256::ZERO

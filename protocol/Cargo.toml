@@ -26,6 +26,7 @@ hasher.workspace = true
 lazy_static.workspace = true
 overlord.workspace = true
 rand.workspace = true
+secp256k1.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
