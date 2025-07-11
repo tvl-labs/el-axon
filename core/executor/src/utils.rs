@@ -54,14 +54,12 @@ pub fn decode_revert_msg(bytes: &[u8]) -> String {
     }
 
     let len_offset = 4 + 32;
-    let len_bytes = &bytes[len_offset .. len_offset + 32];
-    let str_len = u32::from_be_bytes(
-        len_bytes[28..32].try_into().unwrap()
-    ) as usize;
+    let len_bytes = &bytes[len_offset..len_offset + 32];
+    let str_len = u32::from_be_bytes(len_bytes[28..32].try_into().unwrap()) as usize;
 
     let str_start = len_offset + 32;
     let str_end = str_start + str_len;
-    let string_bytes = &bytes[str_start .. str_end];
+    let string_bytes = &bytes[str_start..str_end];
 
     std::str::from_utf8(string_bytes).unwrap().to_string()
 }

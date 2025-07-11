@@ -79,60 +79,7 @@ pub struct Web3Transaction {
 
 impl From<Web3Transaction> for SignedTransaction {
     fn from(value: Web3Transaction) -> Self {
-        let convert_to = |opt: Option<Address>| -> TxKind {
-            if let Some(addr) = opt {
-                TxKind::Call(addr)
-            } else {
-                TxKind::Create
-            }
-        };
-
-        let type_ = value.type_.unwrap_or_default();
-        let unsigned = match type_.to::<u8>() {
-            0 => UnsignedTransaction::Legacy(LegacyTransaction {
-                chain_id:  value.chain_id.map(|id| id.to()),
-                nonce:     value.nonce.to(),
-                gas_price: value.gas_price.to(),
-                gas_limit: value.gas.to(),
-                to:        convert_to(value.to),
-                value:     value.value,
-                input:     value.input.as_bytes().into(),
-            }),
-            1 => UnsignedTransaction::Eip2930(Eip2930Transaction {
-                chain_id:    value.chain_id.map(|id| id.to()).unwrap(),
-                nonce:       value.nonce.to(),
-                gas_price:   value.gas_price.to(),
-                gas_limit:   value.gas.to(),
-                to:          convert_to(value.to),
-                value:       value.value,
-                input:       value.input.as_bytes().into(),
-                access_list: value.access_list.unwrap_or_default(),
-            }),
-            2 => UnsignedTransaction::Eip1559(Eip1559Transaction {
-                chain_id:                 value.chain_id.map(|id| id.to()).unwrap(),
-                nonce:                    value.nonce.to(),
-                max_fee_per_gas:          value.max_fee_per_gas.unwrap_or_default().to(),
-                max_priority_fee_per_gas: value.max_priority_fee_per_gas.unwrap_or_default().to(),
-                value:                    value.value,
-                input:                    value.input.as_bytes().into(),
-                gas_limit:                value.gas.to(),
-                to:                       convert_to(value.to),
-                access_list:              value.access_list.unwrap_or_default(),
-            }),
-            _ => unreachable!(),
-        };
-
-        let v = value.v.to::<u64>();
-        let unverified = UnverifiedTransaction {
-            unsigned,
-            hash: value.hash,
-            signature: Some(SignatureComponents {
-                r:          convert_either(value.r),
-                s:          convert_either(value.s),
-                standard_v: SignatureComponents::extract_standard_v(v).unwrap(),
-            }),
-        };
-
+        let unverified = UnverifiedTransaction::decode(value.raw.as_ref()).unwrap();
         SignedTransaction::from_unverified(unverified).unwrap()
     }
 }
