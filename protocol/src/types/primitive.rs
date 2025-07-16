@@ -500,7 +500,7 @@ pub struct ProposeCount {
 }
 
 impl ProposeCount {
-    pub fn new(address: H160, count: u64) -> Self {
+    pub fn new(address: Address, count: u64) -> Self {
         ProposeCount { address, count }
     }
 

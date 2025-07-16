@@ -5,7 +5,7 @@ use common_config_parser::types::spec::HardforkName;
 use protocol::trie::Trie as _;
 use protocol::types::{
     CkbRelatedInfo, ConsensusConfig, ConsensusConfigV0, HardforkInfo, HardforkInfoInner, Metadata,
-    MetadataInner, ProposeCount, ValidatorExtend, H160, H256,
+    MetadataInner, ProposeCount, ValidatorExtend, H256,
 };
 use protocol::{codec::ProtocolCodec, ProtocolResult};
 

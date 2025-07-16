@@ -91,7 +91,7 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
                 .iter()
                 .any(|tx| {
                     let to = tx.get_to().unwrap_or_default();
-                    to == METADATA_CONTRACT_ADDRESS
+                    to.as_slice() == METADATA_CONTRACT_ADDRESS.as_bytes()
                 });
 
         let mut extra_data = vec![ExtraData {
@@ -127,15 +127,15 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
         let proposal = Proposal {
             version: BlockVersion::V0,
             prev_hash: status.prev_hash,
-            proposer: self.node_info.self_address.0,
+            proposer: self.node_info.self_address.into(),
             prev_state_root: self.status.inner().last_state_root,
             transactions_root: txs_root,
             signed_txs_hash: digest_signed_transactions(&signed_txs),
             timestamp: time_now(),
             number: next_number,
-            gas_limit: MAX_BLOCK_GAS_LIMIT.into(),
+            gas_limit: U64::from(MAX_BLOCK_GAS_LIMIT),
             extra_data,
-            base_fee_per_gas: BASE_FEE_PER_GAS.into(),
+            base_fee_per_gas: U64::from(BASE_FEE_PER_GAS),
             proof: status.proof,
             chain_id: self.node_info.chain_id,
             call_system_script_count: txs.call_system_script_count,
