@@ -205,14 +205,14 @@ mod tests {
 
     #[test]
     fn test_blst() {
-        let private_keys = vec![
+        let private_keys = [
             hex_decode("37aa0f893d05914a4def0460c0a984d3611546cfb26924d7a7ca6e0db9950a2d").unwrap(),
             hex_decode("383fcff8683b8115e31613949be24254b4204ffbe43c227408a76334a2e3fb32").unwrap(),
             hex_decode("51ce21643b911347c5d5c85c323d9d5421810dc89f46b688720b2715f5e8e936").unwrap(),
             hex_decode("69ff51f4c22f30615f68b88efa740f8f1b9169e88842b83d189748d06f1a948e").unwrap(),
         ];
 
-        let public_keys = vec![
+        let public_keys = [
             hex_decode("ac85bbb40347b6e06ac2dc2da1f75eece029cdc0ed2d456c457d27e288bfbfbcd4c5c19716e9b250134a0e76ce50fa22").unwrap(),
             hex_decode("91ed9f3c51c580e56948b1bda9d00c2159665f8a6e284191ab816ee64ef2487d78453a547a0f14efbf842bba5b5a3b4f").unwrap(),
             hex_decode("92e5d0856fb20ea9cb5ab5da2d3331c38d32cc96507f6ad902fa3da9400096a485fb4e09834bc93de55db224f26c229c").unwrap(),
@@ -245,7 +245,7 @@ mod tests {
 
     #[test]
     fn test_aggregate_pubkeys_order() {
-        let public_keys = vec![
+        let public_keys = [
             hex_decode("ac85bbb40347b6e06ac2dc2da1f75eece029cdc0ed2d456c457d27e288bfbfbcd4c5c19716e9b250134a0e76ce50fa22").unwrap(),
             hex_decode("91ed9f3c51c580e56948b1bda9d00c2159665f8a6e284191ab816ee64ef2487d78453a547a0f14efbf842bba5b5a3b4f").unwrap(),
             hex_decode("92e5d0856fb20ea9cb5ab5da2d3331c38d32cc96507f6ad902fa3da9400096a485fb4e09834bc93de55db224f26c229c").unwrap(),

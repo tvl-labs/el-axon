@@ -19,8 +19,8 @@ use protocol::types::{
 use protocol::ProtocolResult;
 
 use crate::jsonrpc::web3_types::{
-    BlockCount, BlockId, FilterChanges, HardforkStatus, RawLoggerFilter, Web3Block,
-    Web3CallRequest, Web3FeeHistory, Web3Filter, Web3Log, Web3Receipt, Web3SyncStatus,
+    BlockCount, BlockId, FilterChanges, HardforkStatus, RawLoggerFilter, TraceCall, TraceConfig,
+    Web3Block, Web3CallRequest, Web3FeeHistory, Web3Filter, Web3Log, Web3Receipt, Web3SyncStatus,
     Web3Transaction,
 };
 use crate::jsonrpc::ws_subscription::{ws_subscription_module, HexIdProvider};
@@ -154,6 +154,9 @@ pub trait Web3Rpc {
         storage_position: Vec<U256>,
         number: BlockId,
     ) -> RpcResult<EthAccountProof>;
+
+    #[method(name = "debug_traceTransaction")]
+    async fn trace_transaction(&self, hash: H256, config: TraceConfig) -> RpcResult<TraceCall>;
 }
 
 #[rpc(server)]

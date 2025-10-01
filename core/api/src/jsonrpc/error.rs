@@ -1,6 +1,6 @@
 use jsonrpsee::types::{error::ErrorObject, ErrorObjectOwned};
 
-use protocol::types::{ExitReason, TxResp};
+use protocol::types::{ExitReason, TxResp, H256};
 use protocol::{codec::hex_encode, Display};
 
 use core_executor::decode_revert_msg;
@@ -51,6 +51,10 @@ pub enum RpcError {
     CannotFindFilterId(u64),
     #[display(fmt = "Not allow to call system contract address")]
     CallSystemContract,
+    #[display(fmt = "Cannot find transaction {}", _0)]
+    CannotFindTransaction(H256),
+    #[display(fmt = "Cannot trace transaction {}", _0)]
+    CannotTraceTransaction(H256),
 
     #[display(fmt = "EVM error {}", "decode_revert_msg(&_0.ret)")]
     Evm(TxResp),
@@ -88,6 +92,8 @@ impl RpcError {
             RpcError::InvalidFromBlockAndToBlockUnion => -40021,
             RpcError::CannotFindFilterId(_) => -40022,
             RpcError::CallSystemContract => -40023,
+            RpcError::CannotFindTransaction(_) => -40024,
+            RpcError::CannotTraceTransaction(_) => -40025,
 
             RpcError::Evm(_) => -49998,
             RpcError::Internal(_) => -49999,
@@ -129,7 +135,8 @@ impl From<RpcError> for ErrorObjectOwned {
             }
             RpcError::CannotFindFilterId(_) => ErrorObject::owned(err_code, err, none_data),
             RpcError::CallSystemContract => ErrorObject::owned(err_code, err, none_data),
-
+            RpcError::CannotFindTransaction(_) => ErrorObject::owned(err_code, err, none_data),
+            RpcError::CannotTraceTransaction(_) => ErrorObject::owned(err_code, err, none_data),
             RpcError::Evm(resp) => {
                 ErrorObject::owned(err_code, err.clone(), Some(vm_err(resp.clone())))
             }

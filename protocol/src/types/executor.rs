@@ -1,3 +1,4 @@
+use bytes::Bytes;
 pub use ethereum::{AccessList, AccessListItem, Account};
 pub use evm::{backend::Log, Config, ExitError, ExitFatal, ExitReason, ExitRevert, ExitSucceed};
 pub use hasher::HasherKeccak;
@@ -5,8 +6,9 @@ pub use hasher::HasherKeccak;
 use rlp_derive::{RlpDecodable, RlpEncodable};
 use serde::{Deserialize, Serialize};
 
-use crate::types::{
-    Bloom, ExtraData, Hash, Hasher, Header, MerkleRoot, Proposal, H160, H256, U256, U64,
+use crate::{
+    codec::hex_encode,
+    types::{Bloom, ExtraData, Hash, Hasher, Header, MerkleRoot, Proposal, H160, H256, U256, U64},
 };
 
 use super::Hex;
@@ -94,6 +96,113 @@ impl From<&Header> for ExecutorContext {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub enum CallType {
+    Call,
+    StaticCall,
+    DelegateCall,
+    CallCode,
+    Create,
+    Create2,
+    SelfDestruct,
+}
+
+impl CallType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CallType::Call => "CALL",
+            CallType::StaticCall => "STATICCALL",
+            CallType::DelegateCall => "DELEGATECALL",
+            CallType::CallCode => "CALLCODE",
+            CallType::Create => "CREATE",
+            CallType::Create2 => "CREATE2",
+            CallType::SelfDestruct => "SELFDESTRUCT",
+        }
+    }
+}
+
+/// Represents a single call frame in the execution trace
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct CallFrame {
+    /// Type of call: CALL, STATICCALL, DELEGATECALL, CALLCODE, CREATE, CREATE2,
+    /// SELFDESTRUCT
+    #[serde(rename = "type")]
+    pub type_:         CallType,
+    /// Caller address
+    pub from:          H160,
+    /// Callee address (None for CREATE before address is determined)
+    pub to:            Option<H160>,
+    /// Value transferred
+    pub value:         U256,
+    /// Gas provided for this call
+    pub gas:           u64,
+    /// Actual gas used by this call (updated on exit)
+    pub gas_used:      Option<u64>,
+    /// Input data
+    pub input:         Bytes,
+    /// Output data (updated on exit)
+    pub output:        Bytes,
+    /// Error message if call failed
+    pub error:         Option<String>,
+    /// Revert reason if available
+    pub revert_reason: Option<String>,
+    /// Nested calls made during this call
+    pub calls:         Vec<CallFrame>,
+    /// Logs emitted by this call
+    pub logs:          Vec<Log>,
+}
+
+impl CallFrame {
+    pub fn new(
+        call_type: CallType,
+        from: H160,
+        to: Option<H160>,
+        value: U256,
+        gas: u64,
+        input: Bytes,
+    ) -> Self {
+        Self {
+            type_: call_type,
+            from,
+            to,
+            value,
+            gas,
+            gas_used: None,
+            input,
+            output: Bytes::new(),
+            error: None,
+            revert_reason: None,
+            calls: Vec::new(),
+            logs: Vec::new(),
+        }
+    }
+
+    /// Update the frame with exit information
+    pub fn on_exit(&mut self, return_value: &[u8], reason: &ExitReason) {
+        self.output = Bytes::from(return_value.to_vec());
+
+        match reason {
+            ExitReason::Succeed(_) => {
+                self.error = None;
+                self.revert_reason = None;
+            }
+            ExitReason::Revert(_) => {
+                self.error = Some("revert".to_string());
+                self.revert_reason = Some(decode_revert_msg(return_value));
+            }
+            _ => {
+                self.error = Some(format!("{:?}", reason));
+                self.revert_reason = None;
+            }
+        }
+    }
+
+    /// Add a child call
+    pub fn add_call(&mut self, call: CallFrame) {
+        self.calls.push(call);
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct EthAccountProof {
     pub address:       H160,
@@ -134,4 +243,23 @@ fn m3_2048(bloom: &mut Bloom, x: &[u8]) {
         let bit = (hash[i + 1] as usize + ((hash[i] as usize) << 8)) & 0x7FF;
         bloom.0[BLOOM_BYTE_LENGTH - 1 - bit / 8] |= 1 << (bit % 8);
     }
+}
+
+fn decode_revert_msg(input: &[u8]) -> String {
+    const FUNC_SELECTOR_LEN: usize = 4;
+    const U256_BE_BYTES_LEN: usize = 32;
+    const REVERT_MSG_LEN_OFFSET: usize = FUNC_SELECTOR_LEN + U256_BE_BYTES_LEN;
+    const REVERT_EFFECT_MSG_OFFSET: usize = REVERT_MSG_LEN_OFFSET + U256_BE_BYTES_LEN;
+    const EXEC_REVERT: &str = "execution reverted: ";
+
+    if input.len() < REVERT_EFFECT_MSG_OFFSET {
+        return EXEC_REVERT.to_string();
+    }
+
+    let decode_reason = |i: &[u8]| -> String {
+        let reason = hex_encode(i);
+        EXEC_REVERT.to_string() + &reason
+    };
+
+    decode_reason(&input[REVERT_EFFECT_MSG_OFFSET..])
 }

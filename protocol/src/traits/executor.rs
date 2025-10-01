@@ -1,8 +1,8 @@
 pub use evm::backend::{ApplyBackend, Backend, MemoryBackend};
 
 use crate::types::{
-    Account, Bytes, ExecResp, ExecutorContext, Log, MerkleRoot, SignedTransaction, TxResp,
-    ValidatorExtend, H160, U256, U64,
+    executor::CallFrame, Account, Bytes, ExecResp, ExecutorContext, Log, MerkleRoot,
+    SignedTransaction, TxResp, ValidatorExtend, H160, U256, U64,
 };
 
 pub trait ExecutorReadOnlyAdapter: Backend {
@@ -43,6 +43,12 @@ pub trait Executor: Send + Sync {
         txs: &[SignedTransaction],
         validators: &[ValidatorExtend],
     ) -> ExecResp;
+
+    fn trace_exec<Adapter: ExecutorAdapter>(
+        &self,
+        adapter: &mut Adapter,
+        tx: &SignedTransaction,
+    ) -> (TxResp, Option<CallFrame>);
 }
 
 /// This implementation is only used for test.

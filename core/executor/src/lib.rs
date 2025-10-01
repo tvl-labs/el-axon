@@ -5,6 +5,7 @@ mod precompiles;
 pub mod system_contract;
 #[cfg(test)]
 mod tests;
+pub mod tracing;
 mod utils;
 
 pub use crate::adapter::{
@@ -28,8 +29,8 @@ use evm::CreateScheme;
 use common_merkle::TrieMerkle;
 use protocol::traits::{Backend, Executor, ExecutorAdapter};
 use protocol::types::{
-    logs_bloom, Config, ExecResp, SignedTransaction, TransactionAction, TxResp, ValidatorExtend,
-    H160, H256, RLP_NULL, U256,
+    logs_bloom, CallFrame, Config, ExecResp, SignedTransaction, TransactionAction, TxResp,
+    ValidatorExtend, H160, H256, RLP_NULL, U256,
 };
 
 use crate::precompiles::build_precompile_set;
@@ -205,6 +206,14 @@ impl Executor for AxonExecutor {
             gas_used: gas,
             tx_resp: res,
         }
+    }
+
+    fn trace_exec<Adapter: ExecutorAdapter>(
+        &self,
+        adapter: &mut Adapter,
+        tx: &SignedTransaction,
+    ) -> (TxResp, Option<CallFrame>) {
+        Self::evm_exec_with_tracing(adapter, &self.config(), tx)
     }
 }
 
@@ -390,6 +399,117 @@ impl AxonExecutor {
             code_address: code_addr,
             removed:      false,
         }
+    }
+
+    /// Execute a transaction with call tracing enabled
+    /// Returns both the transaction response and the call trace
+    pub fn evm_exec_with_tracing<Adapter: ExecutorAdapter>(
+        adapter: &mut Adapter,
+        config: &Config,
+        tx: &SignedTransaction,
+    ) -> (TxResp, Option<CallFrame>) {
+        use crate::tracing::CallTracer;
+        use evm::tracing::using as tracing_using;
+
+        // Deduct pre-pay gas
+        let sender = tx.sender;
+        let tx_gas_price = adapter.gas_price();
+        let gas_limit = tx.transaction.unsigned.gas_limit().low_u64();
+        let prepay_gas = tx_gas_price * U256::from(gas_limit);
+
+        let mut account = adapter.get_account(&sender);
+        let old_nonce = account.nonce;
+
+        account.balance = account.balance.saturating_sub(prepay_gas);
+        adapter.save_account(&sender, &account);
+
+        let metadata = StackSubstateMetadata::new(gas_limit, config);
+        let precompiles = build_precompile_set();
+        let mut executor = StackExecutor::new_with_precompiles(
+            MemoryStackState::new(metadata, adapter),
+            config,
+            &precompiles,
+        );
+
+        let access_list = tx
+            .transaction
+            .unsigned
+            .access_list()
+            .into_iter()
+            .map(|x| (x.address, x.storage_keys))
+            .collect::<Vec<_>>();
+
+        // Create tracer
+        let mut tracer = CallTracer::new();
+
+        // Execute with tracing
+        let (exit, res) = match tx.transaction.unsigned.action() {
+            TransactionAction::Call(addr) => tracing_using(&mut tracer, || {
+                executor.transact_call(
+                    tx.sender,
+                    *addr,
+                    *tx.transaction.unsigned.value(),
+                    tx.transaction.unsigned.data().to_vec(),
+                    gas_limit,
+                    access_list,
+                )
+            }),
+            TransactionAction::Create => tracing_using(&mut tracer, || {
+                executor.transact_create(
+                    tx.sender,
+                    *tx.transaction.unsigned.value(),
+                    tx.transaction.unsigned.data().to_vec(),
+                    gas_limit,
+                    access_list,
+                )
+            }),
+        };
+
+        let remained_gas = executor.gas();
+        let used_gas = executor.used_gas();
+
+        let code_addr = if tx.transaction.unsigned.action() == &TransactionAction::Create
+            && exit.is_succeed()
+        {
+            Some(code_address(&tx.sender, &old_nonce))
+        } else {
+            None
+        };
+
+        if exit.is_succeed() {
+            let (values, logs) = executor.into_state().deconstruct();
+            adapter.apply(values, logs, true);
+        }
+
+        let mut account = adapter.get_account(&tx.sender);
+        account.nonce = old_nonce + U256::one();
+
+        // Add remain gas
+        if remained_gas != 0 {
+            let remain_gas = U256::from(remained_gas) * tx_gas_price;
+            account.balance = account
+                .balance
+                .checked_add(remain_gas)
+                .unwrap_or_else(U256::max_value);
+        }
+
+        adapter.save_account(&tx.sender, &account);
+
+        let tx_resp = TxResp {
+            exit_reason:  exit,
+            ret:          res,
+            remain_gas:   remained_gas,
+            gas_used:     used_gas,
+            fee_cost:     tx_gas_price * U256::from(used_gas),
+            logs:         vec![],
+            code_address: code_addr,
+            removed:      false,
+        };
+
+        // Extract the call trace
+        let call_frame = tracer.into_result();
+
+        (tx_resp, call_frame)
     }
 
     /// The `exec()` function is run in `tokio::task::block_in_place()` and all

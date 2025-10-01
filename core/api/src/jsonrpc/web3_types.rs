@@ -6,8 +6,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use protocol::codec::ProtocolCodec;
 use protocol::types::{
-    AccessList, Block, Bloom, Bytes, Hash, Header, Hex, Public, Receipt, SignedTransaction, H160,
-    H256, H64, MAX_PRIORITY_FEE_PER_GAS, U256, U64,
+    AccessList, Block, Bloom, Bytes, CallFrame, CallType, Hash, Header, Hex, Public, Receipt,
+    SignedTransaction, H160, H256, H64, MAX_PRIORITY_FEE_PER_GAS, U256, U64,
 };
 
 pub const EMPTY_UNCLE_HASH: H256 = H256([
@@ -846,6 +846,124 @@ pub enum HardforkStatus {
     Proposed,
     Determined,
     Enabled,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TraceConfig {
+    /// Optional timeout string (e.g. `"5s"`).
+    pub timeout:            Option<String>,
+    /// Optional tracer choice. Defaults to Blockscout's parity compatible
+    /// configuration when `None`.
+    pub tracer:             Option<Tracer>,
+    /// Whether to include memory snapshots in the trace output.
+    pub enable_memory:      Option<bool>,
+    /// Whether to disable stack capture.
+    pub disable_stack:      Option<bool>,
+    /// Whether to disable storage capture.
+    pub disable_storage:    Option<bool>,
+    /// Whether to include return data in the trace output.
+    pub enable_return_data: Option<bool>,
+}
+
+/// Supported tracer strategies.
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+pub enum Tracer {
+    /// Use the built-in `callTracer` implementation provided by geth.
+    CallTracer,
+    /// Embed a custom JavaScript tracer in the request payload.
+    JavaScript(String),
+}
+
+impl<'de> Deserialize<'de> for Tracer {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        if value == "callTracer" {
+            Ok(Tracer::CallTracer)
+        } else {
+            Ok(Tracer::JavaScript(value))
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct TraceCall {
+    #[serde(rename = "type")]
+    pub call_type: String,
+    #[serde(default)]
+    pub dispatch_type: Option<String>,
+    #[serde(default)]
+    pub from: Option<H160>,
+    #[serde(default)]
+    pub to: Option<H160>,
+    #[serde(default)]
+    pub created_contract_address_hash: Option<H160>,
+    #[serde(default)]
+    pub trace_address: Option<Vec<u64>>,
+    #[serde(default)]
+    pub gas: Option<U256>,
+    #[serde(default)]
+    pub gas_used: Option<U256>,
+    #[serde(default)]
+    pub value: Option<U256>,
+    #[serde(default)]
+    pub input: Option<Hex>,
+    #[serde(default)]
+    pub init: Option<Hex>,
+    #[serde(default)]
+    pub output: Option<Hex>,
+    #[serde(default)]
+    pub error: Option<String>,
+    #[serde(default)]
+    pub calls: Option<Vec<TraceCall>>,
+}
+
+impl From<CallFrame> for TraceCall {
+    fn from(frame: CallFrame) -> Self {
+        let call_type = frame.type_.as_str().to_string();
+
+        let (created_contract_address_hash, dispatch_type) = match frame.type_ {
+            CallType::Create | CallType::Create2 => {
+                (frame.to, Some(frame.type_.as_str().to_string()))
+            }
+            CallType::StaticCall
+            | CallType::DelegateCall
+            | CallType::CallCode
+            | CallType::SelfDestruct => (None, Some(frame.type_.as_str().to_string())),
+            _ => (None, None),
+        };
+
+        let calls = if frame.calls.is_empty() {
+            None
+        } else {
+            Some(frame.calls.into_iter().map(TraceCall::from).collect())
+        };
+
+        TraceCall {
+            call_type,
+            dispatch_type,
+            from: Some(frame.from),
+            to: frame.to,
+            created_contract_address_hash,
+            trace_address: None,
+            gas: Some(frame.gas.into()),
+            gas_used: frame.gas_used.map(|g| g.into()),
+            value: Some(frame.value),
+            input: Some(Hex::encode(&frame.input)),
+            init: None,
+            output: if frame.output.is_empty() {
+                None
+            } else {
+                Some(Hex::encode(&frame.output))
+            },
+            error: frame.error,
+            calls,
+        }
+    }
 }
 
 #[cfg(test)]

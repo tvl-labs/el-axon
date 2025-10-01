@@ -1,11 +1,13 @@
 use std::sync::Arc;
 
+use core_executor::AxonExecutorApplyAdapter;
 use protocol::traits::{
     APIAdapter, Context, Executor, ExecutorReadOnlyAdapter, MemPool, Network, ReadOnlyStorage,
+    Storage,
 };
 use protocol::trie::Trie as _;
 use protocol::types::{
-    Account, BigEndianHash, Block, BlockNumber, Bytes, CkbRelatedInfo, EthAccountProof,
+    Account, BigEndianHash, Block, BlockNumber, Bytes, CallFrame, CkbRelatedInfo, EthAccountProof,
     EthStorageProof, ExecutorContext, HardforkInfo, HardforkInfoInner, Hash, Header, Hex, Metadata,
     Proposal, Receipt, SignedTransaction, TxResp, H160, H256, NIL_DATA, RLP_NULL, U256, U64,
 };
@@ -30,7 +32,7 @@ pub struct DefaultAPIAdapter<M, S, DB, Net> {
 impl<M, S, DB, Net> DefaultAPIAdapter<M, S, DB, Net>
 where
     M: MemPool + 'static,
-    S: ReadOnlyStorage + 'static,
+    S: ReadOnlyStorage + Storage + 'static,
     DB: trie::DB + Send + Sync + 'static,
     Net: Network + 'static,
 {
@@ -65,7 +67,7 @@ where
 impl<M, S, DB, Net> APIAdapter for DefaultAPIAdapter<M, S, DB, Net>
 where
     M: MemPool + 'static,
-    S: ReadOnlyStorage + 'static,
+    S: ReadOnlyStorage + Storage + 'static,
     DB: trie::DB + Send + Sync + 'static,
     Net: Network + 'static,
 {
@@ -219,6 +221,22 @@ where
             .unwrap_or(MAX_BLOCK_GAS_LIMIT);
 
         Ok(AxonExecutor.call(&backend, gas_limit, from, to, value, data, estimate))
+    }
+
+    async fn evm_trace_call(
+        &self,
+        ctx: Context,
+        stx: &SignedTransaction,
+    ) -> ProtocolResult<(TxResp, Option<CallFrame>)> {
+        let latest_header = self.storage.get_latest_block_header(ctx).await?;
+        let mut backend = AxonExecutorApplyAdapter::from_root(
+            latest_header.state_root,
+            Arc::clone(&self.trie_db),
+            Arc::clone(&self.storage),
+            ExecutorContext::from(&latest_header),
+        )?;
+        let (tx_resp, call_frame) = AxonExecutor.trace_exec(&mut backend, stx);
+        Ok((tx_resp, call_frame))
     }
 
     async fn get_code_by_hash(&self, ctx: Context, hash: &Hash) -> ProtocolResult<Option<Bytes>> {

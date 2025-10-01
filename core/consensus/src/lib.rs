@@ -62,7 +62,10 @@ pub enum ConsensusError {
         expect,
         actual
     )]
-    InvalidPrevhash { expect: Hash, actual: Hash },
+    InvalidPrevhash {
+        expect: Hash,
+        actual: Hash,
+    },
 
     #[display(
         fmt = "Check invalid order root, expect {:#x} get {:#x}",
@@ -99,7 +102,10 @@ pub enum ConsensusError {
         expect,
         actual
     )]
-    InvalidOrderSignedTransactionsHash { expect: Hash, actual: Hash },
+    InvalidOrderSignedTransactionsHash {
+        expect: Hash,
+        actual: Hash,
+    },
 
     #[display(fmt = "Check invalid status vec")]
     InvalidStatusVec,
@@ -122,7 +128,10 @@ pub enum ConsensusError {
         expect,
         actual
     )]
-    InvalidProof { expect: u64, actual: u64 },
+    InvalidProof {
+        expect: u64,
+        actual: u64,
+    },
 
     /// Consensus missed the pill.
     #[display(fmt = "Consensus missed pill cooresponding {:#x}", _0)]
@@ -149,11 +158,9 @@ pub enum ConsensusError {
     #[display(fmt = "Synchronization/Consensus {} block error : {}", _0, _1)]
     VerifyProof(u64, BlockProofField),
 
-    ///
     #[display(fmt = "Execute transactions error {:?}", _0)]
     ExecuteErr(String),
 
-    ///
     WALErr(std::io::Error),
 
     #[display(fmt = "Call EVM error {:?}", _0)]

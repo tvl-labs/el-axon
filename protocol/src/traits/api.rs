@@ -1,5 +1,5 @@
 use crate::types::{
-    Account, Block, BlockNumber, Bytes, CkbRelatedInfo, EthAccountProof, HardforkInfo,
+    Account, Block, BlockNumber, Bytes, CallFrame, CkbRelatedInfo, EthAccountProof, HardforkInfo,
     HardforkInfoInner, Hash, Header, Metadata, Proposal, Receipt, SignedTransaction, TxResp, H160,
     H256, U256, U64,
 };
@@ -87,6 +87,12 @@ pub trait APIAdapter: Send + Sync {
         state_root: Hash,
         proposal: Proposal,
     ) -> ProtocolResult<TxResp>;
+
+    async fn evm_trace_call(
+        &self,
+        ctx: Context,
+        stx: &SignedTransaction,
+    ) -> ProtocolResult<(TxResp, Option<CallFrame>)>;
 
     async fn get_code_by_hash(&self, ctx: Context, hash: &Hash) -> ProtocolResult<Option<Bytes>>;
 

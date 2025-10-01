@@ -19,8 +19,8 @@ use protocol::{
 
 use crate::jsonrpc::web3_types::{
     BlockCount, BlockId, FeeHistoryEmpty, FeeHistoryWithReward, FeeHistoryWithoutReward,
-    RichTransactionOrHash, Web3Block, Web3CallRequest, Web3FeeHistory, Web3Filter, Web3Log,
-    Web3Receipt, Web3Transaction,
+    RichTransactionOrHash, TraceCall, TraceConfig, Web3Block, Web3CallRequest, Web3FeeHistory,
+    Web3Filter, Web3Log, Web3Receipt, Web3Transaction,
 };
 use crate::jsonrpc::{error::RpcError, Web3RpcServer};
 use crate::APIError;
@@ -1041,6 +1041,30 @@ impl<Adapter: APIAdapter + 'static> Web3RpcServer for Web3RpcImpl<Adapter> {
             .await
             .map_err(|e| RpcError::Internal(e.to_string()).into())
     }
+
+    async fn trace_transaction(&self, hash: H256, _config: TraceConfig) -> RpcResult<TraceCall> {
+        let ctx = Context::new();
+        let stx = self
+            .adapter
+            .get_transaction_by_hash(ctx.clone(), hash)
+            .await
+            .map_err(|e| RpcError::Internal(e.to_string()))?;
+        if stx.is_none() {
+            return Err(RpcError::CannotFindTransaction(hash).into());
+        }
+
+        let (_resp, trace_opt) = self
+            .adapter
+            .evm_trace_call(ctx, &stx.unwrap())
+            .await
+            .map_err(|e| RpcError::Internal(e.to_string()))?;
+
+        if trace_opt.is_none() {
+            return Err(RpcError::CannotTraceTransaction(hash).into());
+        }
+
+        Ok(TraceCall::from(trace_opt.unwrap()))
+    }
 }
 
 // 1. checks for rewardPercentile's sorted-ness
@@ -1072,7 +1096,7 @@ fn calculate_gas_used_ratio(block: &Block) -> f64 {
 // vector.
 fn calculate_effective_priority_fees_index(
     percentile: &f64,
-    effective_priority_fees: &Vec<U64>,
+    effective_priority_fees: &[U64],
 ) -> usize {
     ((percentile * effective_priority_fees.len() as f64 / 100f64).floor() as usize)
         .saturating_sub(1)
