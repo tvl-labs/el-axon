@@ -208,12 +208,12 @@ impl Executor for AxonExecutor {
         }
     }
 
-    fn trace_exec<Adapter: ExecutorAdapter>(
+    fn trace_debug<Adapter: ExecutorAdapter>(
         &self,
         adapter: &mut Adapter,
         tx: &SignedTransaction,
     ) -> (TxResp, Option<CallFrame>) {
-        Self::evm_exec_with_tracing(adapter, &self.config(), tx)
+        Self::evm_debug_with_tracing(adapter, &self.config(), tx)
     }
 }
 
@@ -403,7 +403,7 @@ impl AxonExecutor {
 
     /// Execute a transaction with call tracing enabled
     /// Returns both the transaction response and the call trace
-    pub fn evm_exec_with_tracing<Adapter: ExecutorAdapter>(
+    pub fn evm_debug_with_tracing<Adapter: ExecutorAdapter>(
         adapter: &mut Adapter,
         config: &Config,
         tx: &SignedTransaction,
@@ -465,9 +465,6 @@ impl AxonExecutor {
             }),
         };
 
-        let remained_gas = executor.gas();
-        let used_gas = executor.used_gas();
-
         let code_addr = if tx.transaction.unsigned.action() == &TransactionAction::Create
             && exit.is_succeed()
         {
@@ -476,40 +473,18 @@ impl AxonExecutor {
             None
         };
 
-        if exit.is_succeed() {
-            let (values, logs) = executor.into_state().deconstruct();
-            adapter.apply(values, logs, true);
-        }
-
-        let mut account = adapter.get_account(&tx.sender);
-        account.nonce = old_nonce + U256::one();
-
-        // Add remain gas
-        if remained_gas != 0 {
-            let remain_gas = U256::from(remained_gas) * tx_gas_price;
-            account.balance = account
-                .balance
-                .checked_add(remain_gas)
-                .unwrap_or_else(U256::max_value);
-        }
-
-        adapter.save_account(&tx.sender, &account);
-
         let tx_resp = TxResp {
             exit_reason:  exit,
             ret:          res,
-            remain_gas:   remained_gas,
-            gas_used:     used_gas,
-            fee_cost:     tx_gas_price * U256::from(used_gas),
+            remain_gas:   executor.gas(),
+            gas_used:     executor.used_gas(),
+            fee_cost:     tx_gas_price * U256::from(executor.used_gas()),
             logs:         vec![],
             code_address: code_addr,
             removed:      false,
         };
 
-        // Extract the call trace
-        let call_frame = tracer.into_result();
-
-        (tx_resp, call_frame)
+        (tx_resp, tracer.into_result())
     }
 
     /// The `exec()` function is run in `tokio::task::block_in_place()` and all

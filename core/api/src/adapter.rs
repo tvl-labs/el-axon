@@ -235,7 +235,7 @@ where
             Arc::clone(&self.storage),
             ExecutorContext::from(&latest_header),
         )?;
-        let (tx_resp, call_frame) = AxonExecutor.trace_exec(&mut backend, stx);
+        let (tx_resp, call_frame) = AxonExecutor.trace_debug(&mut backend, stx);
         Ok((tx_resp, call_frame))
     }
 

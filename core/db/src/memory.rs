@@ -91,9 +91,7 @@ impl StorageAdapter for MemoryAdapter {
         let val = val.encode()?.to_vec();
 
         let mut db = self.db.write();
-        let db = db
-            .entry(S::category().to_string())
-            .or_insert_with(HashMap::new);
+        let db = db.entry(S::category().to_string()).or_default();
 
         db.insert(key, val);
 
@@ -107,9 +105,7 @@ impl StorageAdapter for MemoryAdapter {
         let key = key.encode()?;
 
         let mut db = self.db.write();
-        let db = db
-            .entry(S::category().to_string())
-            .or_insert_with(HashMap::new);
+        let db = db.entry(S::category().to_string()).or_default();
 
         let opt_bytes = db.get(&key.to_vec()).cloned();
 
@@ -126,9 +122,7 @@ impl StorageAdapter for MemoryAdapter {
         let key = key.encode()?.to_vec();
 
         let mut db = self.db.write();
-        let db = db
-            .entry(S::category().to_string())
-            .or_insert_with(HashMap::new);
+        let db = db.entry(S::category().to_string()).or_default();
 
         db.remove(&key);
 
@@ -139,9 +133,7 @@ impl StorageAdapter for MemoryAdapter {
         let key = key.encode()?.to_vec();
 
         let mut db = self.db.write();
-        let db = db
-            .entry(S::category().to_string())
-            .or_insert_with(HashMap::new);
+        let db = db.entry(S::category().to_string()).or_default();
 
         Ok(db.get(&key).is_some())
     }
@@ -169,9 +161,7 @@ impl StorageAdapter for MemoryAdapter {
         }
 
         let mut db = self.db.write();
-        let db = db
-            .entry(S::category().to_string())
-            .or_insert_with(HashMap::new);
+        let db = db.entry(S::category().to_string()).or_default();
 
         for (key, value) in pairs.into_iter() {
             match value {
@@ -191,7 +181,7 @@ impl StorageAdapter for MemoryAdapter {
             self.db
                 .write()
                 .entry(S::category().to_string())
-                .or_insert_with(HashMap::new);
+                .or_default();
         }
 
         Ok(Box::new(MemoryIntoIterator {

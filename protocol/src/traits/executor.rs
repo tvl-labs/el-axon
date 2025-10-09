@@ -44,7 +44,7 @@ pub trait Executor: Send + Sync {
         validators: &[ValidatorExtend],
     ) -> ExecResp;
 
-    fn trace_exec<Adapter: ExecutorAdapter>(
+    fn trace_debug<Adapter: ExecutorAdapter>(
         &self,
         adapter: &mut Adapter,
         tx: &SignedTransaction,
