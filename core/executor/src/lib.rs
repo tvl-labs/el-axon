@@ -213,6 +213,7 @@ impl Executor for AxonExecutor {
         adapter: &mut Adapter,
         tx: &SignedTransaction,
     ) -> (TxResp, Option<CallFrame>) {
+        self.init_local_system_contract_roots(adapter);
         Self::evm_debug_with_tracing(adapter, &self.config(), tx)
     }
 }
@@ -411,17 +412,10 @@ impl AxonExecutor {
         use crate::tracing::CallTracer;
         use evm::tracing::using as tracing_using;
 
-        // Deduct pre-pay gas
         let sender = tx.sender;
         let tx_gas_price = adapter.gas_price();
         let gas_limit = tx.transaction.unsigned.gas_limit().low_u64();
-        let prepay_gas = tx_gas_price * U256::from(gas_limit);
-
-        let mut account = adapter.get_account(&sender);
-        let old_nonce = account.nonce;
-
-        account.balance = account.balance.saturating_sub(prepay_gas);
-        adapter.save_account(&sender, &account);
+        let old_nonce = adapter.get_account(&sender).nonce;
 
         let metadata = StackSubstateMetadata::new(gas_limit, config);
         let precompiles = build_precompile_set();
