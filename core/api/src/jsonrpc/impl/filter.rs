@@ -246,7 +246,7 @@ where
             sender.send(res).unwrap()
         } else {
             sender
-                .send(Err(RpcError::CannotFindFilterId(id.as_u64()).into()))
+                .send(Err(RpcError::CannotFindFilterId(id).into()))
                 .unwrap()
         }
     }

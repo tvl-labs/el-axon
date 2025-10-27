@@ -1,6 +1,6 @@
 use jsonrpsee::types::{error::ErrorObject, ErrorObjectOwned};
 
-use protocol::types::{ExitReason, TxResp, H256};
+use protocol::types::{ExitReason, TxResp, H256, U256};
 use protocol::{codec::hex_encode, Display};
 
 use core_executor::decode_revert_msg;
@@ -48,7 +48,7 @@ pub enum RpcError {
     #[display(fmt = "Invalid from block number and to block number union")]
     InvalidFromBlockAndToBlockUnion,
     #[display(fmt = "Invalid filter id {}", _0)]
-    CannotFindFilterId(u64),
+    CannotFindFilterId(U256),
     #[display(fmt = "Not allow to call system contract address")]
     CallSystemContract,
     #[display(fmt = "Cannot find transaction {}", _0)]
