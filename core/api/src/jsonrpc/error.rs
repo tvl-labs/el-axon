@@ -35,6 +35,8 @@ pub enum RpcError {
     InvalidBlockHash,
     #[display(fmt = "Invalid from block number {}", _0)]
     InvalidFromBlockNumber(u64),
+    #[display(fmt = "Invalid to block number {}", _0)]
+    InvalidToBlockNumber(u64),
     #[display(fmt = "Invalid block range from {} to {} limit to {}", _0, _1, _2)]
     InvalidBlockRange(u64, u64, u64),
     #[display(fmt = "Invalid newest block {:?}", _0)]
@@ -84,6 +86,7 @@ impl RpcError {
             RpcError::CannotGetLatestBlock => -40013,
             RpcError::InvalidBlockHash => -40014,
             RpcError::InvalidFromBlockNumber(_) => -40015,
+            RpcError::InvalidToBlockNumber(_) => -40026,
             RpcError::InvalidBlockRange(_, _, _) => -40016,
             RpcError::InvalidNewestBlock(_) => -40017,
             RpcError::InvalidPosition(_) => -40018,
@@ -123,6 +126,7 @@ impl From<RpcError> for ErrorObjectOwned {
             RpcError::CannotGetLatestBlock => ErrorObject::owned(err_code, err, none_data),
             RpcError::InvalidBlockHash => ErrorObject::owned(err_code, err, none_data),
             RpcError::InvalidFromBlockNumber(_) => ErrorObject::owned(err_code, err, none_data),
+            RpcError::InvalidToBlockNumber(_) => ErrorObject::owned(err_code, err, none_data),
             RpcError::InvalidBlockRange(_, _, _) => ErrorObject::owned(err_code, err, none_data),
             RpcError::InvalidNewestBlock(_) => ErrorObject::owned(err_code, err, none_data),
             RpcError::InvalidPosition(_) => ErrorObject::owned(err_code, err, none_data),
