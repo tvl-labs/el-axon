@@ -689,15 +689,16 @@ impl<Adapter: APIAdapter + 'static> Web3RpcServer for Web3RpcImpl<Adapter> {
 
                     (
                         filter.from_block.map(convert).unwrap_or(latest_number),
-                        std::cmp::min(
-                            filter.to_block.map(convert).unwrap_or(latest_number),
-                            latest_number,
-                        ),
+                        filter.to_block.map(convert).unwrap_or(latest_number),
                     )
                 };
 
                 if start > latest_number {
                     return Err(RpcError::InvalidFromBlockNumber(start).into());
+                }
+
+                if end > latest_number {
+                    return Err(RpcError::InvalidToBlockNumber(end).into());
                 }
 
                 if end.saturating_sub(start) > self.log_filter_max_block_range {
