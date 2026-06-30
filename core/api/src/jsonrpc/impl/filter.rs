@@ -314,17 +314,17 @@ where
                     .as_ref()
                     .map(convert)
                     .unwrap_or(latest_number),
-                std::cmp::min(
-                    filter
-                        .to_block
-                        .as_ref()
-                        .map(convert)
-                        .unwrap_or(latest_number),
-                    latest_number,
-                ),
+                filter
+                    .to_block
+                    .as_ref()
+                    .map(convert)
+                    .unwrap_or(latest_number),
             )
         };
 
+        if end > latest_number {
+            return Err(RpcError::InvalidToBlockNumber(end).into());
+        }
         if start > latest_number {
             return Ok(Vec::new());
         }
