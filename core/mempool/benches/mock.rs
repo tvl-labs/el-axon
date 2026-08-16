@@ -75,6 +75,14 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         Ok(U64::zero())
     }
 
+    async fn get_account_nonces(
+        &self,
+        _ctx: Context,
+        addresses: &[H160],
+    ) -> ProtocolResult<Vec<U64>> {
+        Ok(vec![U64::zero(); addresses.len()])
+    }
+
     async fn check_transaction(&self, _ctx: Context, tx: &SignedTransaction) -> ProtocolResult<()> {
         check_hash(tx)?;
         check_sig(tx)

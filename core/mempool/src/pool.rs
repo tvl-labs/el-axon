@@ -1,4 +1,4 @@
-use std::collections::{hash_map::Entry, BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -9,6 +9,7 @@ use crossbeam_queue::ArrayQueue;
 use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 
+use core_executor::is_call_system_script;
 use protocol::tokio::{self, time::sleep};
 use protocol::types::{
     BlockNumber, Bytes, Hash, PackedTxHashes, SignedTransaction, H160, U256, U64,
@@ -235,11 +236,29 @@ impl PriorityPool {
         }
     }
 
-    pub fn flush(&self, hashes: &[Hash], number: BlockNumber) {
+    pub fn get_flush_senders(&self, hashes: &[Hash]) -> ProtocolResult<(Vec<H160>, Vec<Hash>)> {
+        let _flushing = self.flush_lock.read();
+        let mut senders = Vec::with_capacity(hashes.len());
+        let mut missing_hashes = Vec::new();
+
+        for hash in hashes {
+            if let Some(tx) = self.tx_map.get(hash) {
+                if !is_call_system_script(tx.action())? {
+                    senders.push(tx.sender());
+                }
+            } else if !self.sys_tx_bucket.contains(hash) {
+                missing_hashes.push(*hash);
+            }
+        }
+
+        Ok((senders, missing_hashes))
+    }
+
+    pub fn flush(&self, hashes: &[Hash], number: BlockNumber, account_nonces: &HashMap<H160, U64>) {
         let _flushing = self.flush_lock.write();
         self.flush_to_pending_queue();
         let mut reduce_len = 0;
-        self.flush_inner(hashes, &mut reduce_len, number);
+        self.flush_inner(hashes, &mut reduce_len, number, account_nonces);
         self.sys_tx_bucket.flush(hashes, &mut reduce_len);
 
         if reduce_len != 0 {
@@ -247,30 +266,26 @@ impl PriorityPool {
         }
     }
 
-    fn flush_inner(&self, hashes: &[Hash], reduce_len: &mut usize, number: BlockNumber) {
+    fn flush_inner(
+        &self,
+        hashes: &[Hash],
+        reduce_len: &mut usize,
+        number: BlockNumber,
+        account_nonces: &HashMap<H160, U64>,
+    ) {
         let mut q = self.real_queue.lock();
         let mut timeout_gap = self.timeout_gap.lock();
 
-        let mut remove_tip_nonce: HashMap<H160, U64> = HashMap::new();
         for hash in hashes {
             if let Some((_, ptr)) = self.tx_map.remove(hash) {
-                match remove_tip_nonce.entry(ptr.sender()) {
-                    Entry::Occupied(mut v) => {
-                        if v.get() < ptr.nonce() {
-                            v.insert(*ptr.nonce());
-                        }
-                    }
-                    Entry::Vacant(v) => {
-                        v.insert(*ptr.nonce());
-                    }
-                }
+                ptr.set_dropped();
                 *reduce_len += 1;
             }
         }
 
-        for (k, v) in remove_tip_nonce {
-            if let Some(mut value) = self.pending_queue.get_mut(&k) {
-                value.value_mut().set_drop_by_nonce_tip(v);
+        for (sender, nonce) in account_nonces {
+            if let Some(mut pending) = self.pending_queue.get_mut(sender) {
+                pending.value_mut().set_account_nonce(*nonce);
             }
         }
 
@@ -296,10 +311,9 @@ impl PriorityPool {
 
         timeout_gap.entry(number).or_default().extend(retain_keys);
 
-        q.retain(|ptr| !ptr.is_dropped());
-
+        q.clear();
         self.pending_queue.retain(|_, v| {
-            v.clear_droped();
+            v.rebuild_package_list(&mut q);
             !v.need_remove()
         })
     }

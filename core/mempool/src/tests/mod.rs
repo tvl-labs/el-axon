@@ -1,6 +1,9 @@
 mod mempool;
 
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc,
+};
 
 use dashmap::DashMap;
 
@@ -30,14 +33,42 @@ const TIMEOUT_GAP: u64 = 100;
 const NATIVE_TOKEN_ISSUE_ADDRESS: H160 = system_contract_address(0x0);
 
 pub struct HashMemPoolAdapter {
-    network_txs: DashMap<Hash, SignedTransaction>,
+    network_txs:               DashMap<Hash, SignedTransaction>,
+    account_nonces:            DashMap<H160, U64>,
+    account_nonce_queries:     DashMap<H160, usize>,
+    account_nonce_batches:     AtomicUsize,
+    fail_account_nonce_lookup: AtomicBool,
 }
 
 impl HashMemPoolAdapter {
     fn new() -> HashMemPoolAdapter {
         HashMemPoolAdapter {
-            network_txs: DashMap::new(),
+            network_txs:               DashMap::new(),
+            account_nonces:            DashMap::new(),
+            account_nonce_queries:     DashMap::new(),
+            account_nonce_batches:     AtomicUsize::new(0),
+            fail_account_nonce_lookup: AtomicBool::new(false),
         }
+    }
+
+    fn set_account_nonce(&self, sender: H160, nonce: U64) {
+        self.account_nonces.insert(sender, nonce);
+    }
+
+    fn account_nonce_queries(&self, sender: H160) -> usize {
+        self.account_nonce_queries
+            .get(&sender)
+            .map(|count| *count)
+            .unwrap_or_default()
+    }
+
+    fn account_nonce_batches(&self) -> usize {
+        self.account_nonce_batches.load(Ordering::Acquire)
+    }
+
+    fn fail_account_nonce_lookup(&self) {
+        self.fail_account_nonce_lookup
+            .store(true, Ordering::Release);
     }
 }
 
@@ -74,6 +105,27 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         _tx: &SignedTransaction,
     ) -> ProtocolResult<U64> {
         Ok(U64::zero())
+    }
+
+    async fn get_account_nonces(
+        &self,
+        _ctx: Context,
+        addresses: &[H160],
+    ) -> ProtocolResult<Vec<U64>> {
+        self.account_nonce_batches.fetch_add(1, Ordering::AcqRel);
+        if self.fail_account_nonce_lookup.load(Ordering::Acquire) {
+            return Err(AdapterError::Internal.into());
+        }
+        Ok(addresses
+            .iter()
+            .map(|address| {
+                *self.account_nonce_queries.entry(*address).or_default() += 1;
+                self.account_nonces
+                    .get(address)
+                    .map(|nonce| *nonce)
+                    .unwrap_or_default()
+            })
+            .collect())
     }
 
     async fn check_transaction(&self, _ctx: Context, tx: &SignedTransaction) -> ProtocolResult<()> {

@@ -69,6 +69,12 @@ pub trait MemPoolAdapter: Send + Sync {
         tx: &SignedTransaction,
     ) -> ProtocolResult<U64>;
 
+    async fn get_account_nonces(
+        &self,
+        ctx: Context,
+        addresses: &[H160],
+    ) -> ProtocolResult<Vec<U64>>;
+
     async fn check_transaction(&self, ctx: Context, tx: &SignedTransaction) -> ProtocolResult<()>;
 
     async fn check_storage_exist(&self, ctx: Context, tx_hash: &Hash) -> ProtocolResult<()>;

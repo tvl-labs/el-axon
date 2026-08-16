@@ -438,6 +438,23 @@ where
         Ok(tx.transaction.unsigned.nonce() - account.nonce.low_u64())
     }
 
+    async fn get_account_nonces(
+        &self,
+        ctx: Context,
+        addresses: &[H160],
+    ) -> ProtocolResult<Vec<U64>> {
+        let backend = self.executor_backend(ctx).await?;
+        Ok(addresses
+            .iter()
+            .map(|address| {
+                let account = backend.basic(*address);
+                let nonce = account.nonce.low_u64().into();
+                self.addr_nonce.insert(*address, (nonce, account.balance));
+                nonce
+            })
+            .collect())
+    }
+
     async fn check_transaction(&self, ctx: Context, stx: &SignedTransaction) -> ProtocolResult<()> {
         if stx.transaction.signature.is_none() {
             return Err(AdapterError::VerifySignature("missing signature".to_string()).into());

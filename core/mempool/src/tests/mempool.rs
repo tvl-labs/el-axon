@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use protocol::types::Hasher;
@@ -209,7 +209,7 @@ async fn test_repeat_insertion_with_timout_gap() {
         .or_default()
         .insert(txs[2].transaction.hash);
 
-    pool.flush(&[], 20);
+    pool.flush(&[], 20, &HashMap::new());
 
     let list = pool.package(1000.into(), 3);
 
@@ -220,6 +220,197 @@ async fn test_repeat_insertion_with_timout_gap() {
             .map(|tx| tx.transaction.hash)
             .collect::<Vec<_>>()
     )
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_timeout_rebuilds_nonce_cursor() {
+    let mempool = Arc::new(new_mempool(1024, 0, 0, 0).await);
+
+    let priv_key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
+    let pub_key = priv_key.pub_key();
+    let txs: Vec<SignedTransaction> = (0..3)
+        .map(|i| mock_signed_tx(&priv_key, &pub_key, 0, i as u64, true))
+        .collect();
+
+    let pool = mempool.get_tx_cache();
+    for (nonce, tx) in txs.iter().enumerate() {
+        pool.insert(tx.clone(), false, nonce.into()).unwrap();
+    }
+
+    pool.timeout_gap
+        .lock()
+        .entry(0)
+        .or_default()
+        .insert(txs[1].transaction.hash);
+
+    pool.flush(&[], 20, &HashMap::new());
+
+    assert_eq!(pool.package(1000.into(), 3).hashes, vec![
+        txs[0].transaction.hash
+    ]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_flush_uses_post_execution_account_nonce() {
+    let mempool = Arc::new(new_mempool(1024, 0, 0, 0).await);
+
+    let priv_key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
+    let pub_key = priv_key.pub_key();
+    let txs: Vec<SignedTransaction> = [0, 10, 11]
+        .into_iter()
+        .map(|nonce| mock_signed_tx(&priv_key, &pub_key, 0, nonce, true))
+        .collect();
+
+    let pool = mempool.get_tx_cache();
+    for tx in &txs {
+        pool.insert(tx.clone(), false, *tx.transaction.unsigned.nonce())
+            .unwrap();
+    }
+
+    mempool
+        .get_adapter()
+        .set_account_nonce(txs[0].sender, 1.into());
+    mempool
+        .flush(Context::new(), &[txs[1].transaction.hash], 1)
+        .await
+        .unwrap();
+
+    assert_eq!(pool.package(1000.into(), 3).hashes, Vec::<Hash>::new());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_flush_queries_account_nonce_once_per_sender() {
+    let mempool = Arc::new(new_mempool(1024, 0, 0, 0).await);
+
+    let priv_key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
+    let pub_key = priv_key.pub_key();
+    let txs: Vec<SignedTransaction> = (0..3)
+        .map(|nonce| mock_signed_tx(&priv_key, &pub_key, 0, nonce, true))
+        .collect();
+    let sender = txs[0].sender;
+
+    let pool = mempool.get_tx_cache();
+    for tx in &txs {
+        pool.insert(tx.clone(), false, *tx.transaction.unsigned.nonce())
+            .unwrap();
+    }
+
+    mempool.get_adapter().set_account_nonce(sender, 2.into());
+    mempool
+        .flush(
+            Context::new(),
+            &[txs[0].transaction.hash, txs[1].transaction.hash],
+            1,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(mempool.get_adapter().account_nonce_queries(sender), 1);
+    assert_eq!(pool.package(1000.into(), 3).hashes, vec![
+        txs[2].transaction.hash
+    ]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_flush_queries_account_nonces_in_one_batch() {
+    let mempool = Arc::new(new_mempool(1024, 0, 0, 0).await);
+
+    let first_key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
+    let first_tx = mock_signed_tx(&first_key, &first_key.pub_key(), 0, 0, true);
+    let second_key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
+    let second_tx = mock_signed_tx(&second_key, &second_key.pub_key(), 0, 0, true);
+
+    let pool = mempool.get_tx_cache();
+    pool.insert(first_tx.clone(), false, 0.into()).unwrap();
+    pool.insert(second_tx.clone(), false, 0.into()).unwrap();
+    mempool
+        .get_adapter()
+        .set_account_nonce(first_tx.sender, 1.into());
+    mempool
+        .get_adapter()
+        .set_account_nonce(second_tx.sender, 1.into());
+
+    mempool
+        .flush(
+            Context::new(),
+            &[first_tx.transaction.hash, second_tx.transaction.hash],
+            1,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(mempool.get_adapter().account_nonce_batches(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_flush_rebuilds_cursor_for_normal_tx_with_same_sender_system_tx() {
+    let priv_key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
+    let pub_key = priv_key.pub_key();
+    let system_tx = mock_system_script_signed_tx(&priv_key, &pub_key, 0, 0, true);
+    let committed_tx = mock_signed_tx(&priv_key, &pub_key, 0, 5, true);
+    let pending_tx = mock_signed_tx(&priv_key, &pub_key, 0, 6, true);
+    let sender = committed_tx.sender;
+
+    let adapter = HashMemPoolAdapter::new();
+    adapter.set_account_nonce(sender, 6.into());
+    let mempool = MemPoolImpl::new(1024, 20, adapter, vec![
+        system_tx.clone(),
+        committed_tx.clone(),
+    ])
+    .await;
+    let pool = mempool.get_tx_cache();
+    pool.insert(pending_tx.clone(), false, 1.into()).unwrap();
+
+    mempool
+        .flush(
+            Context::new(),
+            &[system_tx.transaction.hash, committed_tx.transaction.hash],
+            1,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(mempool.get_adapter().account_nonce_queries(sender), 1);
+    assert_eq!(mempool.get_adapter().account_nonce_batches(), 1);
+    assert_eq!(pool.package(1000.into(), 1).hashes, vec![
+        pending_tx.transaction.hash
+    ]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[should_panic(expected = "failed to load account nonces during mempool flush")]
+async fn test_flush_panics_when_account_nonce_lookup_fails() {
+    let mempool = Arc::new(new_mempool(1024, 0, 0, 0).await);
+    let tx = default_mock_txs(1).pop().unwrap();
+    mempool
+        .get_tx_cache()
+        .insert(tx.clone(), false, 0.into())
+        .unwrap();
+    mempool.get_adapter().fail_account_nonce_lookup();
+
+    let _ = mempool
+        .flush(Context::new(), &[tx.transaction.hash], 1)
+        .await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_flush_retains_nonce_cursor_for_inflight_insert() {
+    let mempool = Arc::new(new_mempool(1024, 0, 0, 0).await);
+    let priv_key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
+    let pub_key = priv_key.pub_key();
+    let committed_tx = mock_signed_tx(&priv_key, &pub_key, 0, 5, true);
+    let inflight_tx = mock_signed_tx(&priv_key, &pub_key, 0, 5, true);
+    let pool = mempool.get_tx_cache();
+
+    pool.insert(committed_tx.clone(), false, 0.into()).unwrap();
+    pool.flush(
+        &[committed_tx.transaction.hash],
+        1,
+        &HashMap::from([(committed_tx.sender, 6.into())]),
+    );
+    pool.insert(inflight_tx, false, 0.into()).unwrap();
+
+    assert!(pool.package(1000.into(), 1).hashes.is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -275,9 +466,10 @@ async fn test_nonce_insert() {
             .collect::<Vec<_>>()
     );
 
-    pool.flush(&list.hashes, 1);
+    let mut account_nonces = HashMap::from([(txs[0].sender, 2.into())]);
+    pool.flush(&list.hashes, 1, &account_nonces);
     assert_eq!(1, pool.real_queue_len());
-    // here db nonce = 1, so nonce diff = 1
+    // Here db nonce = 2, so nonce diff = 1.
     pool.insert(txs[3].clone(), false, 1.into()).unwrap();
     assert_eq!(2, pool.len());
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
@@ -293,9 +485,10 @@ async fn test_nonce_insert() {
             .collect::<Vec<_>>()
     );
 
-    pool.flush(&list.hashes, 2);
+    account_nonces.insert(txs[0].sender, 4.into());
+    pool.flush(&list.hashes, 2, &account_nonces);
     assert_eq!(0, pool.real_queue_len());
-    // here db nonce = 4, so nonce diff = 1
+    // Here db nonce = 4, so nonce diff = 0.
     pool.insert(txs[4].clone(), false, 0.into()).unwrap();
     assert_eq!(1, pool.len());
     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
@@ -309,7 +502,8 @@ async fn test_nonce_insert() {
     let list = pool.package(1000.into(), 2);
     assert_eq!(list.hashes, vec![replace_tx.transaction.hash]);
 
-    pool.flush(&list.hashes, 3);
+    account_nonces.insert(txs[0].sender, 5.into());
+    pool.flush(&list.hashes, 3, &account_nonces);
     assert_eq!(0, pool.len());
     assert_eq!(0, pool.real_queue_len());
 }

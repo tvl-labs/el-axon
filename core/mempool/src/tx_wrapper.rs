@@ -4,7 +4,7 @@ use std::ops::Bound::{Included, Unbounded};
 use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
 use std::sync::Arc;
 
-use protocol::types::{Hash, SignedTransaction, H160, U64};
+use protocol::types::{Hash, SignedTransaction, TransactionAction, H160, U64};
 
 pub type TxPtr = Arc<TxWrapper>;
 
@@ -62,6 +62,10 @@ impl TxWrapper {
         self.tx.sender
     }
 
+    pub fn action(&self) -> &TransactionAction {
+        self.tx.transaction.unsigned.action()
+    }
+
     pub fn gas_price(&self) -> U64 {
         self.tx.transaction.unsigned.gas_price()
     }
@@ -80,6 +84,10 @@ impl TxWrapper {
 
     fn set_package(&self) {
         self.state.fetch_or(0x01, AtomicOrdering::AcqRel);
+    }
+
+    fn clear_package(&self) {
+        self.state.fetch_and(!0x01, AtomicOrdering::AcqRel);
     }
 
     fn is_package(&self) -> bool {
@@ -148,19 +156,23 @@ impl PendingQueue {
         self.pop_tip_nonce = current;
     }
 
-    pub fn clear_droped(&mut self) {
-        if self.queue.is_empty() {
-            self.need_remove = true
-        }
+    pub fn rebuild_package_list(&mut self, list: &mut Vec<TxPtr>) {
+        let was_empty = self.queue.is_empty();
         self.queue.retain(|_, v| !v.is_dropped());
+        self.need_remove = was_empty;
+        self.pop_tip_nonce = self.current_tip_nonce;
+        for tx in self.queue.values() {
+            tx.clear_package();
+        }
+        self.try_search_package_list(list);
     }
 
-    pub fn set_drop_by_nonce_tip(&mut self, nonce: U64) {
-        for (_, v) in self.queue.range((Included(0.into()), Included(nonce))) {
+    pub fn set_account_nonce(&mut self, nonce: U64) {
+        for (_, v) in self.queue.range(..nonce) {
             v.set_dropped();
         }
-        self.pop_tip_nonce = nonce + 1;
-        self.current_tip_nonce = self.pop_tip_nonce;
+        self.pop_tip_nonce = nonce;
+        self.current_tip_nonce = nonce;
     }
 
     pub fn count(&self) -> usize {

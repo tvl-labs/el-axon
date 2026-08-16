@@ -8,7 +8,7 @@ mod tx_wrapper;
 pub use adapter::message::{MsgPullTxs, NewTxsHandler, PullTxsHandler};
 pub use adapter::{AdapterError, DefaultMemPoolAdapter};
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::Arc;
 
@@ -224,7 +224,7 @@ where
 
     async fn flush(
         &self,
-        _ctx: Context,
+        ctx: Context,
         tx_hashes: &[Hash],
         current_number: BlockNumber,
     ) -> ProtocolResult<()> {
@@ -233,7 +233,55 @@ where
             tx_hashes.len(),
         );
         self.adapter.clear_nonce_cache();
-        self.pool.flush(tx_hashes, current_number);
+
+        let (mut senders, missing_hashes) = self
+            .pool
+            .get_flush_senders(tx_hashes)
+            .expect("failed to identify local system transaction during mempool flush");
+
+        if !missing_hashes.is_empty() {
+            let stored_txs = self
+                .adapter
+                .get_transactions_from_storage(ctx.clone(), Some(current_number), &missing_hashes)
+                .await
+                .expect("failed to load flushed transactions from storage");
+            let unresolved_count = missing_hashes.len().saturating_sub(stored_txs.len())
+                + stored_txs.iter().filter(|tx| tx.is_none()).count();
+            if unresolved_count != 0 {
+                log::warn!(
+                    "[core_mempool]: failed to resolve {} flushed transactions from storage",
+                    unresolved_count
+                );
+            }
+
+            for tx in stored_txs.into_iter().flatten() {
+                if !is_call_system_script(tx.transaction.unsigned.action())
+                    .expect("failed to identify system transaction during mempool flush")
+                {
+                    senders.push(tx.sender);
+                }
+            }
+        }
+
+        let mut seen_senders = HashSet::with_capacity(senders.len());
+        senders.retain(|sender| seen_senders.insert(*sender));
+        let account_nonces = if senders.is_empty() {
+            HashMap::new()
+        } else {
+            let nonces = self
+                .adapter
+                .get_account_nonces(ctx, &senders)
+                .await
+                .expect("failed to load account nonces during mempool flush");
+            assert_eq!(
+                senders.len(),
+                nonces.len(),
+                "mempool adapter returned an unexpected account nonce count"
+            );
+            senders.into_iter().zip(nonces).collect()
+        };
+
+        self.pool.flush(tx_hashes, current_number, &account_nonces);
         Ok(())
     }
 
