@@ -18,6 +18,11 @@ min_write_buffer_number_to_merge=1
 max_write_buffer_number=2
 max_write_buffer_size_to_maintain=-1
 
+# Column families without a section of their own inherit these options, so every
+# column family gets a bloom filter. All of them are looked up by an exact key
+# (block hash, transaction hash, trie node hash), never by prefix.
 [TableOptions/BlockBasedTable "default"]
 cache_index_and_filter_blocks=true
 pin_l0_filter_and_index_blocks_in_cache=true
+filter_policy=bloomfilter:10:false
+whole_key_filtering=true

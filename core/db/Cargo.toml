@@ -13,3 +13,6 @@ common-apm-derive = { path = "../../common/apm-derive" }
 common-config-parser = { path = "../../common/config-parser" }
 protocol = { path = "../../protocol", package = "axon-protocol" }
 
+[dev-dependencies]
+tempfile = "3.8"
+

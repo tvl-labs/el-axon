@@ -78,11 +78,63 @@ impl From<reqwest::Error> for ParseError {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_file, types::Config};
+    use super::{
+        parse_file, parse_reader,
+        types::{Config, ConfigRocksDB},
+    };
 
     #[test]
     fn test_parse_config() {
         let file_path = "../../devtools/chain/config.toml";
-        let _config: Config = parse_file(file_path, false).unwrap();
+        let config: Config = parse_file(file_path, false).unwrap();
+
+        assert_eq!(config.executor.triedb_cache_size, 50_000);
+        assert_eq!(config.rocksdb.block_cache_bytes, 1_073_741_824);
+        assert_eq!(config.rocksdb.storage_cache_entries, 1_000);
+        assert_eq!(config.rocksdb.max_open_files, 4096);
+    }
+
+    #[test]
+    fn parse_rocksdb_cache_sizes_with_distinct_units() {
+        let mut input = r#"
+max_open_files = 2048
+block_cache_bytes = 536870912
+storage_cache_entries = 25000
+options_file = "default.db-options"
+"#
+        .as_bytes();
+
+        let config: ConfigRocksDB = parse_reader(&mut input).unwrap();
+
+        assert_eq!(config.block_cache_bytes, 536_870_912);
+        assert_eq!(config.storage_cache_entries, 25_000);
+    }
+
+    #[test]
+    fn parse_default_storage_cache_entries() {
+        let mut input = r#"
+max_open_files = 2048
+options_file = "default.db-options"
+"#
+        .as_bytes();
+
+        let config: ConfigRocksDB = parse_reader(&mut input).unwrap();
+
+        assert_eq!(config.storage_cache_entries, 1_000);
+    }
+
+    #[test]
+    fn parse_legacy_cache_size_as_storage_cache_entries() {
+        let mut input = r#"
+max_open_files = 64
+cache_size = 321
+options_file = "default.db-options"
+"#
+        .as_bytes();
+
+        let config: ConfigRocksDB = parse_reader(&mut input).unwrap();
+
+        assert_eq!(config.block_cache_bytes, 1_073_741_824);
+        assert_eq!(config.storage_cache_entries, 321);
     }
 }

@@ -17,7 +17,7 @@ pub struct StorageCache {
 
 impl StorageCache {
     pub fn new(size: usize) -> Self {
-        let size = NonZeroUsize::new(size).unwrap();
+        let size = NonZeroUsize::new(size.max(1)).unwrap();
         StorageCache {
             blocks:        Mutex::new(LruCache::new(size)),
             block_numbers: Mutex::new(LruCache::new(size)),
@@ -26,5 +26,22 @@ impl StorageCache {
             codes:         Mutex::new(LruCache::new(size)),
             receipts:      Mutex::new(LruCache::new(size)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StorageCache;
+
+    #[test]
+    fn zero_size_uses_minimum_capacity() {
+        let cache = StorageCache::new(0);
+
+        assert_eq!(cache.blocks.lock().cap().get(), 1);
+        assert_eq!(cache.block_numbers.lock().cap().get(), 1);
+        assert_eq!(cache.headers.lock().cap().get(), 1);
+        assert_eq!(cache.transactions.lock().cap().get(), 1);
+        assert_eq!(cache.codes.lock().cap().get(), 1);
+        assert_eq!(cache.receipts.lock().cap().get(), 1);
     }
 }

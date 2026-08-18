@@ -1,4 +1,5 @@
 pub mod message;
+mod single_flight;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::{collections::HashMap, error::Error, marker::PhantomData, sync::Arc, time::Duration};
@@ -36,6 +37,7 @@ use core_executor::{
 use core_interoperation::InteroperationImpl;
 
 use crate::adapter::message::MsgPullTxs;
+use crate::adapter::single_flight::SingleFlight;
 use crate::context::TxContext;
 use crate::MemPoolError;
 
@@ -123,6 +125,7 @@ pub struct DefaultMemPoolAdapter<C, N, S, DB, I> {
     trie_db: Arc<DB>,
 
     addr_nonce:  DashMap<H160, (U64, U256)>,
+    nonce_fetch: SingleFlight<H160>,
     max_tx_size: AtomicUsize,
     chain_id:    u64,
 
@@ -167,6 +170,7 @@ where
             trie_db,
 
             addr_nonce: DashMap::new(),
+            nonce_fetch: SingleFlight::default(),
             max_tx_size: AtomicUsize::new(max_tx_size),
             chain_id,
 
@@ -334,6 +338,31 @@ where
     }
 }
 
+/// Checks a transaction against the state of its sender, returning by how much
+/// the transaction nonce is ahead of the account nonce.
+fn check_account(tx: &SignedTransaction, nonce: U64, balance: U256) -> ProtocolResult<U64> {
+    let tx_nonce = tx.transaction.unsigned.nonce();
+
+    if tx_nonce < &nonce {
+        return Err(MemPoolError::InvalidNonce {
+            current:  nonce.low_u64(),
+            tx_nonce: tx_nonce.low_u64(),
+        }
+        .into());
+    }
+
+    if balance < tx.transaction.unsigned.may_cost()? {
+        return Err(MemPoolError::ExceedBalance {
+            tx_hash:         tx.transaction.hash,
+            account_balance: balance,
+            tx_gas_limit:    *tx.transaction.unsigned.gas_limit(),
+        }
+        .into());
+    }
+
+    Ok(tx_nonce - nonce)
+}
+
 #[async_trait]
 impl<C, N, S, DB, I> MemPoolAdapter for DefaultMemPoolAdapter<C, N, S, DB, I>
 where
@@ -393,49 +422,26 @@ where
             return self.check_system_script_tx_authorization(ctx, tx).await;
         }
 
-        let addr = &tx.sender;
-        if let Some(res) = self.addr_nonce.get(addr) {
-            if tx.transaction.unsigned.nonce() < &res.value().0 {
-                return Err(MemPoolError::InvalidNonce {
-                    current:  res.value().0.low_u64(),
-                    tx_nonce: tx.transaction.unsigned.nonce().low_u64(),
-                }
-                .into());
-            } else if res.value().1 < tx.transaction.unsigned.may_cost()? {
-                return Err(MemPoolError::ExceedBalance {
-                    tx_hash:         tx.transaction.hash,
-                    account_balance: res.value().1,
-                    tx_gas_limit:    *tx.transaction.unsigned.gas_limit(),
-                }
-                .into());
-            } else {
-                return Ok(tx.transaction.unsigned.nonce() - res.value().0);
-            }
+        let addr = tx.sender;
+        if let Some(res) = self.addr_nonce.get(&addr) {
+            let (nonce, balance) = *res.value();
+            return check_account(tx, nonce, balance);
         }
 
-        let backend = self.executor_backend(ctx).await?;
-        let account = backend.basic(*addr);
-        self.addr_nonce
-            .insert(*addr, (account.nonce.low_u64().into(), account.balance));
-
-        if account.nonce.low_u64() > tx.transaction.unsigned.nonce().low_u64() {
-            return Err(MemPoolError::InvalidNonce {
-                current:  account.nonce.as_u64(),
-                tx_nonce: tx.transaction.unsigned.nonce().low_u64(),
-            }
-            .into());
+        // Without this a burst of transactions from one account would have every
+        // one of them walk the state trie, so only the first one reads the state
+        // and the others wait for the cache to be filled.
+        let _fetch_guard = self.nonce_fetch.acquire(addr).await;
+        if let Some(res) = self.addr_nonce.get(&addr) {
+            let (nonce, balance) = *res.value();
+            return check_account(tx, nonce, balance);
         }
 
-        if account.balance < tx.transaction.unsigned.may_cost()? {
-            return Err(MemPoolError::ExceedBalance {
-                tx_hash:         tx.transaction.hash,
-                account_balance: account.balance,
-                tx_gas_limit:    *tx.transaction.unsigned.gas_limit(),
-            }
-            .into());
-        }
+        let account = self.executor_backend(ctx).await?.basic(addr);
+        let nonce = account.nonce.low_u64().into();
+        self.addr_nonce.insert(addr, (nonce, account.balance));
 
-        Ok(tx.transaction.unsigned.nonce() - account.nonce.low_u64())
+        check_account(tx, nonce, account.balance)
     }
 
     async fn get_account_nonces(
@@ -512,11 +518,13 @@ where
     ) {
         self.max_tx_size
             .store(max_tx_size as usize, Ordering::Release);
-        self.addr_nonce.clear();
+        self.clear_nonce_cache();
     }
 
     fn clear_nonce_cache(&self) {
-        self.addr_nonce.clear()
+        self.addr_nonce.clear();
+        // Bounds the lock map to the accounts seen since the last block.
+        self.nonce_fetch.clear();
     }
 
     fn report_good(&self, ctx: Context) {

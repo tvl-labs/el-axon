@@ -18,7 +18,8 @@ use crate::parse_file;
 pub const DEFAULT_BROADCAST_TXS_SIZE: usize = 200;
 pub const DEFAULT_BROADCAST_TXS_INTERVAL: u64 = 200; // milliseconds
 pub const DEFAULT_SYNC_TXS_CHUNK_SIZE: usize = 5000;
-pub const DEFAULT_CACHE_SIZE: usize = 100;
+pub const DEFAULT_BLOCK_CACHE_BYTES: usize = 1024 * 1024 * 1024;
+pub const DEFAULT_STORAGE_CACHE_ENTRIES: usize = 1_000;
 
 /// The configuration for Axon clients.
 ///
@@ -246,24 +247,31 @@ pub struct ConfigExecutor {
     pub triedb_cache_size: usize,
 }
 
-fn default_cache_size() -> usize {
-    DEFAULT_CACHE_SIZE
+fn default_block_cache_bytes() -> usize {
+    DEFAULT_BLOCK_CACHE_BYTES
+}
+
+fn default_storage_cache_entries() -> usize {
+    DEFAULT_STORAGE_CACHE_ENTRIES
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigRocksDB {
-    pub max_open_files: i32,
-    #[serde(default = "default_cache_size")]
-    pub cache_size:     usize,
-    pub options_file:   Option<PathBuf>,
+    pub max_open_files:        i32,
+    #[serde(default = "default_block_cache_bytes")]
+    pub block_cache_bytes:     usize,
+    #[serde(default = "default_storage_cache_entries", alias = "cache_size")]
+    pub storage_cache_entries: usize,
+    pub options_file:          Option<PathBuf>,
 }
 
 impl Default for ConfigRocksDB {
     fn default() -> Self {
         Self {
-            max_open_files: 64,
-            cache_size:     default_cache_size(),
-            options_file:   None,
+            max_open_files:        4096,
+            block_cache_bytes:     default_block_cache_bytes(),
+            storage_cache_entries: default_storage_cache_entries(),
+            options_file:          None,
         }
     }
 }

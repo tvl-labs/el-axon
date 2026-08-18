@@ -41,28 +41,16 @@ impl RocksAdapter {
             fs::create_dir_all(&path).map_err(RocksDBError::CreateDB)?;
         }
 
-        let categories = [
-            map_category(StorageCategory::Block),
-            map_category(StorageCategory::BlockHeader),
-            map_category(StorageCategory::Receipt),
-            map_category(StorageCategory::SignedTransaction),
-            map_category(StorageCategory::Wal),
-            map_category(StorageCategory::HashHeight),
-            map_category(StorageCategory::Code),
-            map_category(StorageCategory::EvmState),
-            map_category(StorageCategory::MetadataState),
-            map_category(StorageCategory::CkbLightClientState),
-            map_category(StorageCategory::Version),
-        ];
+        let categories = ALL_CATEGORIES.map(map_category);
 
         let (mut opts, cf_descriptors) = if let Some(ref file) = config.options_file {
-            let cache_size = match config.cache_size {
+            let block_cache_bytes = match config.block_cache_bytes {
                 0 => None,
                 size => Some(size),
             };
 
-            let mut full_opts =
-                FullOptions::load_from_file(file, cache_size, false).map_err(RocksDBError::from)?;
+            let mut full_opts = FullOptions::load_from_file(file, block_cache_bytes, false)
+                .map_err(RocksDBError::from)?;
 
             full_opts
                 .complete_column_families(&categories, false)
@@ -307,6 +295,20 @@ const C_EVM_STATE: &str = "c8";
 const C_METADATA_STATE: &str = "c9";
 const C_CKB_LIGHT_CLIENT_STATE: &str = "c10";
 
+const ALL_CATEGORIES: [StorageCategory; 11] = [
+    StorageCategory::Block,
+    StorageCategory::BlockHeader,
+    StorageCategory::Receipt,
+    StorageCategory::SignedTransaction,
+    StorageCategory::Wal,
+    StorageCategory::HashHeight,
+    StorageCategory::Code,
+    StorageCategory::EvmState,
+    StorageCategory::MetadataState,
+    StorageCategory::CkbLightClientState,
+    StorageCategory::Version,
+];
+
 pub fn map_category(c: StorageCategory) -> &'static str {
     match c {
         StorageCategory::Block => C_BLOCKS,
@@ -331,4 +333,81 @@ pub fn get_column<S: StorageSchema>(db: &DB) -> Result<&ColumnFamily, RocksDBErr
         .ok_or(RocksDBError::CategoryNotFound(category))?;
 
     Ok(column)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::path::PathBuf;
+
+    use rocksdb::ops::{CompactRangeCF, GetPropertyCF};
+
+    // The shipped options file is what deployments actually load, so an invalid
+    // option in it would otherwise only show up when a node starts.
+    fn shipped_options_file() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../devtools/chain/default.db-options")
+    }
+
+    fn filter_block_size(properties: &str) -> u64 {
+        properties
+            .split(';')
+            .filter_map(|property| property.split_once('='))
+            .find(|(name, _)| name.trim() == "filter block size")
+            .map(|(_, size)| size.trim().parse().expect("filter block size is a number"))
+            .unwrap_or_else(|| panic!("no filter block size in table properties: {}", properties))
+    }
+
+    // Writes one key into every column family and reports how many bytes of bloom
+    // filter each of them ended up with.
+    fn filter_block_sizes(config: ConfigRocksDB) -> Vec<(&'static str, u64)> {
+        let dir = tempfile::tempdir().unwrap();
+        let db = RocksAdapter::new(dir.path(), config).unwrap().inner_db();
+
+        let sizes = ALL_CATEGORIES
+            .map(map_category)
+            .into_iter()
+            .map(|name| {
+                let column = db.cf_handle(name).unwrap();
+
+                // Table properties are only reported for SST files, not for
+                // memtables, and compacting the range flushes the memtable first.
+                db.put_cf(column, b"key", b"value").unwrap();
+                db.compact_range_cf(column, None, None);
+
+                let properties = db
+                    .property_value_cf(column, "rocksdb.aggregated-table-properties")
+                    .unwrap()
+                    .unwrap();
+
+                (name, filter_block_size(&properties))
+            })
+            .collect();
+
+        // Closing the database before removing its directory keeps RocksDB from
+        // writing into a path that is already gone.
+        drop(db);
+        dir.close().unwrap();
+        sizes
+    }
+
+    #[test]
+    fn test_shipped_options_file_enables_bloom_filter_for_every_category() {
+        let with_options_file = filter_block_sizes(ConfigRocksDB {
+            options_file: Some(shipped_options_file()),
+            ..Default::default()
+        });
+
+        for (name, size) in with_options_file {
+            assert!(size > 0, "column family {} is missing a bloom filter", name);
+        }
+
+        // Without the options file no column family has a filter at all, which is
+        // what makes the assertion above meaningful.
+        let with_defaults = filter_block_sizes(ConfigRocksDB::default());
+
+        for (name, size) in with_defaults {
+            assert_eq!(size, 0, "column family {} has an unexpected filter", name);
+        }
+    }
 }

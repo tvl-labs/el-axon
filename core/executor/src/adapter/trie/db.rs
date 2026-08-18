@@ -1,19 +1,20 @@
-use std::{collections::HashMap, io, sync::Arc};
+use std::{io, num::NonZeroUsize, sync::Arc};
 
-use parking_lot::RwLock;
+use lru::LruCache;
+use parking_lot::Mutex;
 use rocksdb::ops::{GetCF, GetColumnFamilys, PutCF, WriteOps};
 use rocksdb::{ColumnFamily, WriteBatch, DB};
 
 use common_apm::metrics::storage::{on_storage_get_state, on_storage_put_state};
 use common_apm::Instant;
-use protocol::rand::{rngs::SmallRng, Rng, SeedableRng};
 use protocol::traits::StateStorageCategory;
 use protocol::trie;
 
 use core_db::map_category;
 
-// 49999 is the largest prime number within 50000.
-const RAND_SEED: u64 = 49999;
+// The node cache is sharded so that concurrent trie reads don't serialize on a
+// single lock. Keys are node hashes, so the leading byte spreads them evenly.
+const CACHE_SHARD_NUM: usize = 16;
 
 macro_rules! db {
     ($db:expr, $op:ident, $column:expr$ (, $args: expr)*) => {
@@ -27,41 +28,38 @@ macro_rules! db {
 }
 
 pub struct RocksTrieDB {
-    db:         Arc<DB>,
-    category:   StateStorageCategory,
-    cache:      RwLock<HashMap<Vec<u8>, Vec<u8>>>,
-    cache_size: usize,
+    db:       Arc<DB>,
+    category: StateStorageCategory,
+    cache:    Vec<Mutex<LruCache<Vec<u8>, Vec<u8>>>>,
 }
 
 impl trie::DB for RocksTrieDB {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, io::Error> {
-        let res = { self.cache.read().get(key).cloned() };
-
-        if res.is_none() {
-            let inst = Instant::now();
-            let ret = db!(self.db, get_cf, self.get_column(), key);
-            on_storage_get_state(inst.elapsed(), 1.0);
-
-            if let Some(val) = &ret {
-                {
-                    self.cache.write().insert(key.to_owned(), val.to_vec());
-                }
-                self.flush()?;
-            }
-
-            return Ok(ret.map(|r| r.to_vec()));
+        if let Some(val) = self.cache_shard(key).lock().get(key).cloned() {
+            return Ok(Some(val));
         }
 
-        Ok(res)
+        let inst = Instant::now();
+        let ret = db!(self.db, get_cf, self.get_column(), key);
+        on_storage_get_state(inst.elapsed(), 1.0);
+
+        let ret = ret.map(|r| r.to_vec());
+        if let Some(val) = &ret {
+            self.cache_shard(key)
+                .lock()
+                .put(key.to_owned(), val.clone());
+        }
+
+        Ok(ret)
     }
 
     fn contains(&self, key: &[u8]) -> Result<bool, io::Error> {
-        let res = { self.cache.read().contains_key(key) };
-
-        if res {
+        if self.cache_shard(key).lock().get(key).is_some() {
             Ok(true)
         } else if let Some(val) = db!(self.db, get_cf, self.get_column(), key) {
-            self.cache.write().insert(key.to_owned(), val.to_vec());
+            self.cache_shard(key)
+                .lock()
+                .put(key.to_owned(), val.to_vec());
             Ok(true)
         } else {
             Ok(false)
@@ -73,13 +71,10 @@ impl trie::DB for RocksTrieDB {
         let size = key.len() + value.len();
 
         db!(self.db, put_cf, self.get_column(), &key, &value);
-
-        {
-            self.cache.write().insert(key, value);
-        }
+        self.cache_shard(&key).lock().put(key, value);
 
         on_storage_put_state(inst.elapsed(), size as f64);
-        self.flush()
+        Ok(())
     }
 
     fn insert_batch(&self, keys: Vec<Vec<u8>>, values: Vec<Vec<u8>>) -> Result<(), io::Error> {
@@ -92,17 +87,13 @@ impl trie::DB for RocksTrieDB {
 
         let mut total_size = 0;
         let mut batch = WriteBatch::default();
+        let column = self.get_column();
 
-        {
-            let mut cache = self.cache.write();
-            for (key, val) in keys.into_iter().zip(values.into_iter()) {
-                total_size += key.len();
-                total_size += val.len();
+        for (key, val) in keys.iter().zip(values.iter()) {
+            total_size += key.len();
+            total_size += val.len();
 
-                let column = self.get_column();
-                db!(batch, put_cf, column, &key, &val);
-                cache.insert(key, val);
-            }
+            db!(batch, put_cf, column, key, val);
         }
 
         let inst = Instant::now();
@@ -111,7 +102,12 @@ impl trie::DB for RocksTrieDB {
             .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("rocksdb error: {:?}", e)))?;
         on_storage_put_state(inst.elapsed(), total_size as f64);
 
-        self.flush()
+        // Cache the nodes only once they are known to be persisted.
+        for (key, val) in keys.into_iter().zip(values.into_iter()) {
+            self.cache_shard(&key).lock().put(key, val);
+        }
+
+        Ok(())
     }
 
     fn remove(&self, _key: &[u8]) -> Result<(), io::Error> {
@@ -123,23 +119,8 @@ impl trie::DB for RocksTrieDB {
     }
 
     fn flush(&self) -> Result<(), io::Error> {
-        let mut cache = self.cache.write();
-
-        let len = cache.len();
-
-        if len <= self.cache_size * 2 {
-            return Ok(());
-        }
-
-        let remove_list = {
-            let keys = cache.iter().map(|(k, _)| k).collect::<Vec<_>>();
-            rand_remove_list(keys, len - self.cache_size)
-        };
-
-        for item in remove_list {
-            cache.remove(&item);
-        }
-
+        // Writes go straight to RocksDB and the node cache evicts on insert, so
+        // there is nothing left to flush.
         Ok(())
     }
 }
@@ -158,13 +139,23 @@ impl RocksTrieDB {
     }
 
     fn new(db: Arc<DB>, category: StateStorageCategory, cache_size: usize) -> Self {
-        let cache = RwLock::new(HashMap::with_capacity(cache_size));
+        // `cache_size` is the total node count, spread over the shards.
+        let shard_size = NonZeroUsize::new(cache_size.div_ceil(CACHE_SHARD_NUM).max(1))
+            .expect("shard size is never zero");
+        let cache = (0..CACHE_SHARD_NUM)
+            .map(|_| Mutex::new(LruCache::new(shard_size)))
+            .collect();
+
         RocksTrieDB {
             db,
             category,
             cache,
-            cache_size,
         }
+    }
+
+    fn cache_shard(&self, key: &[u8]) -> &Mutex<LruCache<Vec<u8>, Vec<u8>>> {
+        let idx = key.first().copied().unwrap_or_default() as usize % CACHE_SHARD_NUM;
+        &self.cache[idx]
     }
 
     fn get_column(&self) -> &ColumnFamily {
@@ -173,20 +164,68 @@ impl RocksTrieDB {
             .cf_handle(category)
             .unwrap_or_else(|| panic!("Column Family {:?} not found", category))
     }
+
+    #[cfg(test)]
+    fn cache_len(&self) -> usize {
+        self.cache.iter().map(|shard| shard.lock().len()).sum()
+    }
 }
 
-fn rand_remove_list<T: Clone>(keys: Vec<&T>, num: usize) -> impl Iterator<Item = T> {
-    let mut len = keys.len() - 1;
-    let mut idx_list = (0..len).collect::<Vec<_>>();
-    let mut rng = SmallRng::seed_from_u64(RAND_SEED);
-    let mut ret = Vec::with_capacity(num);
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    for _ in 0..num {
-        let tmp = rng.gen_range(0, len);
-        let idx = idx_list.remove(tmp);
-        ret.push(keys[idx].clone());
-        len -= 1;
+    use core_db::RocksAdapter;
+    use protocol::trie::DB as _;
+
+    const SHARD_CAPACITY: usize = 4;
+    const KEYS_PER_SHARD: usize = 64;
+
+    // The leading byte selects the shard, the rest keeps the key unique.
+    fn node_key(shard: usize, seq: usize) -> Vec<u8> {
+        vec![shard as u8, seq as u8]
     }
 
-    ret.into_iter()
+    #[test]
+    fn test_node_cache_is_bounded_by_cache_size() {
+        let dir = tempfile::tempdir().unwrap();
+        let inner_db =
+            Arc::new(RocksAdapter::new(dir.path(), Default::default()).unwrap()).inner_db();
+        let db = RocksTrieDB::new_evm(inner_db, CACHE_SHARD_NUM * SHARD_CAPACITY);
+
+        for seq in 0..KEYS_PER_SHARD {
+            for shard in 0..CACHE_SHARD_NUM {
+                db.insert(node_key(shard, seq), vec![seq as u8]).unwrap();
+            }
+        }
+
+        assert_eq!(db.cache_len(), CACHE_SHARD_NUM * SHARD_CAPACITY);
+
+        // Evicted nodes are still served from RocksDB, and reading them back
+        // must not push the cache over its capacity either.
+        assert_eq!(db.get(&node_key(0, 0)).unwrap(), Some(vec![0]));
+        assert_eq!(
+            db.get(&node_key(0, KEYS_PER_SHARD - 1)).unwrap(),
+            Some(vec![(KEYS_PER_SHARD - 1) as u8])
+        );
+        assert_eq!(db.cache_len(), CACHE_SHARD_NUM * SHARD_CAPACITY);
+
+        dir.close().unwrap();
+    }
+
+    #[test]
+    fn test_node_cache_keeps_at_least_one_entry_per_shard() {
+        let dir = tempfile::tempdir().unwrap();
+        let inner_db =
+            Arc::new(RocksAdapter::new(dir.path(), Default::default()).unwrap()).inner_db();
+        let db = RocksTrieDB::new_evm(inner_db, 0);
+
+        db.insert_batch(vec![node_key(0, 0), node_key(0, 1)], vec![vec![0], vec![1]])
+            .unwrap();
+
+        assert_eq!(db.cache_len(), 1);
+        assert_eq!(db.get(&node_key(0, 0)).unwrap(), Some(vec![0]));
+
+        dir.close().unwrap();
+    }
 }

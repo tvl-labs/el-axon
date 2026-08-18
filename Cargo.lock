@@ -1853,6 +1853,7 @@ dependencies = [
  "common-apm-derive",
  "common-config-parser",
  "parking_lot 0.12.1",
+ "tempfile",
 ]
 
 [[package]]

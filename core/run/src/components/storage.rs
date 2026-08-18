@@ -34,7 +34,7 @@ impl DatabaseGroup {
         let adapter = Arc::new(adapter_inner);
         let inner_db = adapter.inner_db();
         let trie_db = Arc::new(RocksTrieDB::new_evm(adapter.inner_db(), triedb_cache_size));
-        let storage = Arc::new(ImplStorage::new(adapter, config.cache_size));
+        let storage = Arc::new(ImplStorage::new(adapter, config.storage_cache_entries));
         Ok(Self {
             storage,
             trie_db,
