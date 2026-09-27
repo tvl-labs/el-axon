@@ -24,7 +24,8 @@ impl<K: Eq + Hash> Default for SingleFlight<K> {
 
 impl<K: Eq + Hash> SingleFlight<K> {
     pub async fn acquire(&self, key: K) -> OwnedMutexGuard<()> {
-        // The dashmap guard is not `Send` and must not be held across the await.
+        // The dashmap guard is not `Send` and must not be held across the
+        // await.
         let lock = Arc::clone(self.locks.entry(key).or_default().value());
         lock.lock_owned().await
     }
@@ -52,8 +53,8 @@ mod tests {
 
     const CONCURRENCY: usize = 16;
 
-    // Mimics `check_authorization`: read the cache, and on a miss load the value
-    // under the single flight lock after re-reading the cache.
+    // Mimics `check_authorization`: read the cache, and on a miss load the
+    // value under the single flight lock after re-reading the cache.
     async fn load_through_cache(
         flight: &SingleFlight<u8>,
         cache: &DashMap<u8, u64>,
@@ -72,8 +73,8 @@ mod tests {
             return *value;
         }
 
-        // Stands in for the state read, whose await point is what lets the other
-        // requests run into the same miss.
+        // Stands in for the state read, whose await point is what lets the
+        // other requests run into the same miss.
         tokio::task::yield_now().await;
 
         let value = loads.fetch_add(1, Ordering::SeqCst) as u64;

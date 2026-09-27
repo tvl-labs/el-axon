@@ -51,10 +51,6 @@ pub trait IntoIteratorByRef<S: StorageSchema> {
     fn ref_to_iter<'a, 'b: 'a>(&'b self) -> StorageIterator<'a, S>;
 }
 
-pub trait TrieStorage: trie::DB {
-    fn category(&self) -> StateStorageCategory;
-}
-
 #[async_trait]
 pub trait ReadOnlyStorage: Sync + Send {
     async fn get_block(&self, ctx: Context, height: u64) -> ProtocolResult<Option<Block>>;

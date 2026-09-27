@@ -8,7 +8,7 @@ use tentacle::{
     secio::{error::SecioError, KeyProvider, PeerId},
     service::{
         HandshakeType, ProtocolHandle, Service, ServiceAsyncControl, ServiceError, ServiceEvent,
-        SessionType, TargetProtocol, TcpSocket,
+        SessionType, TargetProtocol,
     },
     traits::ServiceHandle,
     utils::{extract_peer_id, is_reachable, multiaddr_to_socketaddr},
@@ -276,7 +276,7 @@ where
         #[cfg(target_os = "linux")]
         let service_builder = {
             let addr = multiaddr_to_socketaddr(&config.default_listen).unwrap();
-            service_builder.tcp_config(move |socket: TcpSocket| {
+            service_builder.tcp_config(move |socket: tentacle::service::TcpSocket| {
                 let socket_ref = socket2::SockRef::from(&socket);
 
                 #[cfg(all(unix, not(target_os = "solaris"), not(target_os = "illumos")))]

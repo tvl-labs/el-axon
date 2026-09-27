@@ -858,7 +858,8 @@ mod tests {
         });
         assert_eq!(a.inner.len(), 2);
 
-        // The insertion height is lower than the known height and will be rejected
+        // The insertion height is lower than the known height and will be
+        // rejected
         a.push(HardforkInfoInner {
             block_number: 20,
             flags:        {

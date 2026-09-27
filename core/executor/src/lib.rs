@@ -150,8 +150,8 @@ impl Executor for AxonExecutor {
             adapter.set_gas_price(tx.transaction.unsigned.gas_price());
             adapter.set_origin(tx.sender);
 
-            // Execute a transaction, if system contract dispatch return None, means the
-            // transaction called EVM
+            // Execute a transaction, if system contract dispatch return None,
+            // means the transaction called EVM
             let mut r = system_contract_dispatch(adapter, tx)
                 .unwrap_or_else(|| Self::evm_exec(adapter, &config, &precompiles, tx));
 
@@ -312,8 +312,8 @@ impl AxonExecutor {
         // Deduct pre-pay gas
         let sender = tx.sender;
         // The `Backend` trait is imply in
-        // `core/executor/src/adapter/backend/read_only.rs`. The `gas_price` is never
-        // larger than u64::MAX.
+        // `core/executor/src/adapter/backend/read_only.rs`. The `gas_price` is
+        // never larger than u64::MAX.
         let tx_gas_price = adapter.gas_price();
         let gas_limit = tx.transaction.unsigned.gas_limit().low_u64();
         // The overflow check is done in the `check_authorization` function
@@ -530,8 +530,8 @@ impl AxonExecutor {
             adapter.set_gas_price(tx.transaction.unsigned.gas_price());
             adapter.set_origin(tx.sender);
 
-            // Execute a transaction, if system contract dispatch return None, means the
-            // transaction called EVM
+            // Execute a transaction, if system contract dispatch return None,
+            // means the transaction called EVM
             let mut r = system_contract_dispatch(adapter, tx)
                 .unwrap_or_else(|| Self::evm_exec(adapter, &config, &precompiles, tx));
 

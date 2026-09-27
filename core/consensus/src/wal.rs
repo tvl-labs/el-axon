@@ -44,6 +44,7 @@ impl SignedTxsWAL {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(wal_path)
         {
             Ok(file) => file,
@@ -199,6 +200,7 @@ impl ConsensusWal {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(data_path)
         {
             Ok(file) => file,
@@ -444,7 +446,8 @@ mod tests {
         // write a old correct one and a new wrong one, read old
 
         // old one
-        // fs::remove_dir_all(PathBuf::from_str(FULL_CONSENSUS_PATH).unwrap()).unwrap();
+        // fs::remove_dir_all(PathBuf::from_str(FULL_CONSENSUS_PATH).unwrap()).
+        // unwrap();
 
         let info = get_random_bytes(1000);
         wal.update_overlord_wal(Context::new(), info.clone())
@@ -464,6 +467,7 @@ mod tests {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(false)
             .open(to)
             .unwrap();
 

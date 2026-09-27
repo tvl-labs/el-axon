@@ -167,10 +167,11 @@ pub fn init_system_contract_db<Adapter: ExecutorAdapter + ApplyBackend>(
     let current_light_client_root =
         adapter.storage(CKB_LIGHT_CLIENT_CONTRACT_ADDRESS, *HEADER_CELL_ROOT_KEY);
 
-    // Current cell root is zero means there is no image cell and header contains in
-    // the MPT. Because of the empty cell root is zero rather than NLP_NULL, it is
-    // necessary to init the ckb light client and image account in state MPT. The
-    // initial process is set the storage root of the two accounts as H256::zero().
+    // Current cell root is zero means there is no image cell and header
+    // contains in the MPT. Because of the empty cell root is zero rather
+    // than NLP_NULL, it is necessary to init the ckb light client and image
+    // account in state MPT. The initial process is set the storage root of
+    // the two accounts as H256::zero().
     if current_light_client_root.is_zero() {
         let changes = generate_mpt_root_changes(adapter, CKB_LIGHT_CLIENT_CONTRACT_ADDRESS);
         adapter.apply(changes, vec![], false);
@@ -341,6 +342,22 @@ pub fn is_call_system_script(action: &TransactionAction) -> ProtocolResult<bool>
 
     // The address is not a system contract address.
     Ok(false)
+}
+
+/// The account whose nonce may change when a transaction executes.
+/// System transactions retain their existing nonce semantics, including
+/// reverts.
+pub fn nonce_affected_address(tx: &SignedTransaction) -> protocol::ProtocolResult<Option<H160>> {
+    if tx.get_to() == Some(NATIVE_TOKEN_CONTRACT_ADDRESS) {
+        let data = tx.transaction.unsigned.data();
+        return Ok(if data.len() >= 21 && data[0] <= 1 {
+            Some(H160::from_slice(&data[1..21]))
+        } else {
+            None
+        });
+    }
+    is_call_system_script(tx.transaction.unsigned.action())?;
+    Ok(Some(tx.sender))
 }
 
 #[cfg(test)]

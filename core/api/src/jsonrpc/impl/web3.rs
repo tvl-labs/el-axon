@@ -229,8 +229,9 @@ impl<Adapter: APIAdapter + 'static> Web3RpcServer for Web3RpcImpl<Adapter> {
             .await
             .map_err(|e| RpcError::Internal(e.to_string()))?;
 
-        // TODO `eth_getTransactionCount(..., "pending")` should be synchronous with
-        // `eth_sendRawTransaction`. Temporary solution for axonweb3/axon#1544.
+        // TODO `eth_getTransactionCount(..., "pending")` should be synchronous
+        // with `eth_sendRawTransaction`. Temporary solution for
+        // axonweb3/axon#1544.
         sleep(Duration::from_millis(MEMPOOL_REFRESH_TIMEOUT)).await;
 
         Ok(hash)

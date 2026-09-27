@@ -358,8 +358,8 @@ mod tests {
             .unwrap_or_else(|| panic!("no filter block size in table properties: {}", properties))
     }
 
-    // Writes one key into every column family and reports how many bytes of bloom
-    // filter each of them ended up with.
+    // Writes one key into every column family and reports how many bytes of
+    // bloom filter each of them ended up with.
     fn filter_block_sizes(config: ConfigRocksDB) -> Vec<(&'static str, u64)> {
         let dir = tempfile::tempdir().unwrap();
         let db = RocksAdapter::new(dir.path(), config).unwrap().inner_db();
@@ -371,7 +371,8 @@ mod tests {
                 let column = db.cf_handle(name).unwrap();
 
                 // Table properties are only reported for SST files, not for
-                // memtables, and compacting the range flushes the memtable first.
+                // memtables, and compacting the range flushes the memtable
+                // first.
                 db.put_cf(column, b"key", b"value").unwrap();
                 db.compact_range_cf(column, None, None);
 
@@ -402,8 +403,8 @@ mod tests {
             assert!(size > 0, "column family {} is missing a bloom filter", name);
         }
 
-        // Without the options file no column family has a filter at all, which is
-        // what makes the assertion above meaningful.
+        // Without the options file no column family has a filter at all, which
+        // is what makes the assertion above meaningful.
         let with_defaults = filter_block_sizes(ConfigRocksDB::default());
 
         for (name, size) in with_defaults {

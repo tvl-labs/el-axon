@@ -5,7 +5,10 @@ import Config from "../config";
 import createTransactionData from "../src/create_test_data/createTestDataManage";
 
 export const MetaMaskOptions = {
-  metaMaskVersion: RECOMMENDED_METAMASK_VERSION,
+  // A local build avoids dappeteer's unpaginated GitHub release lookup.
+  ...(process.env.METAMASK_PATH
+    ? { metaMaskPath: process.env.METAMASK_PATH }
+    : { metaMaskVersion: RECOMMENDED_METAMASK_VERSION }),
   automation: "puppeteer",
   // https://developer.chrome.com/articles/new-headless/
   headless: process.env.HEADLESS ? 'new' : false,

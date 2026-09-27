@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Cache of Cargo
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/bin/
@@ -70,13 +70,13 @@ jobs:
           node-version: 16
       - name: Get yarn cache directory
         id: yarn-cache-dir
-        run: echo "dir=$(yarn cache dir)" >> ${GITHUB_OUTPUT}
+        run: echo "dir=$(yarn cache dir)" >> "$GITHUB_OUTPUT"
       - name: Get npm cache directory
         id: npm-cache-dir
         shell: bash
-        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
+        run: echo "dir=$(npm config get cache)" >> "$GITHUB_OUTPUT"
       - name: Node Cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         id: npm-and-yarn-cache # use this to check for `cache-hit` (`steps.yarn-cache.outputs.cache-hit != 'true'`)
         with:
           path: |
@@ -90,9 +90,21 @@ jobs:
         working-directory: tests/e2e
         run: yarn && yarn lint
 
+      - name: Download the supported MetaMask release
+        working-directory: tests/e2e
+        run: |
+          # dappeteer only searches the first page of GitHub releases.
+          version=$(node -p 'require("dappeteer-new").RECOMMENDED_METAMASK_VERSION.replace(/^v/, "")')
+          metamask_dir=$(mktemp -d "${RUNNER_TEMP}/metamask.XXXXXX")
+          curl --fail --location --retry 3 \
+            "https://github.com/MetaMask/metamask-extension/releases/download/v${version}/metamask-chrome-${version}.zip" \
+            --output "${metamask_dir}/metamask.zip"
+          unzip -q "${metamask_dir}/metamask.zip" -d "${metamask_dir}/extension"
+          echo "METAMASK_PATH=${metamask_dir}/extension" >> "$GITHUB_ENV"
+
       - name: Serve files in tests/e2e/src by http-server
         working-directory: tests/e2e
-        run: echo '\n' | yarn http-server
+        run: printf '\n' | yarn http-server
 
       - name: E2E Tests in tests/e2e
         working-directory: tests/e2e

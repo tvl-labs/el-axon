@@ -1,10 +1,9 @@
-use std::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
-use std::collections::{btree_map::Entry, BTreeMap};
+use std::collections::{btree_map::Entry, BTreeMap, VecDeque};
 use std::ops::Bound::{Included, Unbounded};
 use std::sync::atomic::{AtomicU8, Ordering as AtomicOrdering};
 use std::sync::Arc;
 
-use protocol::types::{Hash, SignedTransaction, TransactionAction, H160, U64};
+use protocol::types::{Hash, SignedTransaction, H160, U64};
 
 pub type TxPtr = Arc<TxWrapper>;
 
@@ -26,29 +25,6 @@ impl From<SignedTransaction> for TxWrapper {
     }
 }
 
-impl Ord for TxWrapper {
-    fn cmp(&self, other: &Self) -> Ordering {
-        if self.sender() != other.sender() {
-            return self.gas_price().cmp(&other.gas_price());
-        }
-        self.nonce().cmp(other.nonce())
-    }
-}
-
-impl PartialEq for TxWrapper {
-    fn eq(&self, other: &Self) -> bool {
-        self.hash() == other.hash()
-    }
-}
-
-impl Eq for TxWrapper {}
-
-impl PartialOrd for TxWrapper {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
 impl TxWrapper {
     pub fn hash(&self) -> Hash {
         self.tx.transaction.hash
@@ -60,10 +36,6 @@ impl TxWrapper {
 
     pub fn sender(&self) -> H160 {
         self.tx.sender
-    }
-
-    pub fn action(&self) -> &TransactionAction {
-        self.tx.transaction.unsigned.action()
     }
 
     pub fn gas_price(&self) -> U64 {
@@ -173,6 +145,22 @@ impl PendingQueue {
         }
         self.pop_tip_nonce = nonce;
         self.current_tip_nonce = nonce;
+    }
+
+    pub fn package_transactions(&self) -> VecDeque<TxPtr> {
+        let mut expected = self.current_tip_nonce;
+        let mut transactions = VecDeque::new();
+        for (nonce, tx) in self.queue.range(expected..) {
+            if *nonce != expected || tx.is_dropped() {
+                break;
+            }
+            transactions.push_back(Arc::clone(tx));
+            let Some(next) = expected.checked_add(U64::one()) else {
+                break;
+            };
+            expected = next;
+        }
+        transactions
     }
 
     pub fn count(&self) -> usize {

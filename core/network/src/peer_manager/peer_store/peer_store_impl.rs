@@ -243,13 +243,15 @@ impl PeerStore {
             return Ok(());
         }
 
-        // Evicting invalid data in the peer store is a relatively rare operation
-        // There are certain cleanup strategies here:
+        // Evicting invalid data in the peer store is a relatively rare
+        // operation There are certain cleanup strategies here:
         // 1. First evict the nodes that have reached the eviction condition
-        // 2. If the first step is unsuccessful, enter the network segment grouping mode
+        // 2. If the first step is unsuccessful, enter the network segment
+        //    grouping mode
         //  2.1. Group current data according to network segment
-        //  2.2. Sort according to the amount of data in the same network segment
-        //  2.3. In the network segment with more than 4 peer, randomly evict 2 peer
+        //  2.2. Sort according to the amount of data in the same network
+        // segment  2.3. In the network segment with more than 4 peer,
+        // randomly evict 2 peer
 
         let now_ms = faketime::unix_time_as_millis();
         let candidate_peers: Vec<_> = self
