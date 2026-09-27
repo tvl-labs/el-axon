@@ -428,9 +428,10 @@ where
             return check_account(tx, nonce, balance);
         }
 
-        // Without this a burst of transactions from one account would have every
-        // one of them walk the state trie, so only the first one reads the state
-        // and the others wait for the cache to be filled.
+        // Without this a burst of transactions from one account would have
+        // every one of them walk the state trie, so only the first one
+        // reads the state and the others wait for the cache to be
+        // filled.
         let _fetch_guard = self.nonce_fetch.acquire(addr).await;
         if let Some(res) = self.addr_nonce.get(&addr) {
             let (nonce, balance) = *res.value();

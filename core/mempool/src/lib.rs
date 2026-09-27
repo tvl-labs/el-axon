@@ -22,14 +22,16 @@ use protocol::types::{
 };
 use protocol::{async_trait, tokio, Display, ProtocolError, ProtocolErrorKind, ProtocolResult};
 
-use core_executor::is_call_system_script;
+use core_executor::{is_call_system_script, system_contract::nonce_affected_address};
 use core_network::NetworkContext;
 
 use crate::{context::TxContext, pool::PriorityPool};
 
 pub struct MemPoolImpl<Adapter> {
-    pool:    PriorityPool,
-    adapter: Arc<Adapter>,
+    pool:       PriorityPool,
+    adapter:    Arc<Adapter>,
+    // Authorization and insertion must observe the same committed state as flush.
+    state_lock: Arc<tokio::sync::RwLock<()>>,
 }
 
 impl<Adapter> MemPoolImpl<Adapter>
@@ -43,8 +45,9 @@ where
         initial_txs: Vec<SignedTransaction>,
     ) -> Self {
         let mempool = MemPoolImpl {
-            pool:    PriorityPool::new(pool_size, timeout_gap).await,
-            adapter: Arc::new(adapter),
+            pool:       PriorityPool::new(pool_size, timeout_gap).await,
+            adapter:    Arc::new(adapter),
+            state_lock: Arc::new(tokio::sync::RwLock::new(())),
         };
 
         for tx in initial_txs.into_iter() {
@@ -86,10 +89,16 @@ where
     }
 
     async fn initial_insert(&self, ctx: Context, stx: SignedTransaction) -> ProtocolResult<()> {
+        let nonce_diff = self.adapter.check_authorization(ctx.clone(), &stx).await?;
+        self.adapter.check_transaction(ctx.clone(), &stx).await?;
         self.adapter
-            .check_storage_exist(ctx.clone(), &stx.transaction.hash)
+            .check_storage_exist(ctx, &stx.transaction.hash)
             .await?;
-        self.pool.insert(stx, true, U64::zero())
+        if is_call_system_script(stx.transaction.unsigned.action())? {
+            self.pool.insert_system_script_tx(stx)
+        } else {
+            self.pool.insert(stx, true, nonce_diff)
+        }
     }
 
     async fn insert_tx(
@@ -98,6 +107,7 @@ where
         tx: SignedTransaction,
         is_system_script: bool,
     ) -> ProtocolResult<()> {
+        let admission = self.state_lock.read().await;
         let tx_hash = &tx.transaction.hash;
         if let Err(i) = self.pool.reach_limit() {
             return Err(MemPoolError::ReachLimit(i).into());
@@ -118,6 +128,7 @@ where
                 self.pool.insert(tx.clone(), true, check_nonce)?;
             }
 
+            drop(admission);
             if !ctx.is_network_origin_txs() {
                 self.adapter.broadcast_tx(ctx, None, tx).await?;
             } else {
@@ -136,6 +147,7 @@ where
         &self,
         ctx: Context,
         txs: Vec<SignedTransaction>,
+        admission: Arc<tokio::sync::OwnedRwLockReadGuard<()>>,
     ) -> ProtocolResult<Vec<U64>> {
         let inst = Instant::now();
         let len = txs.len();
@@ -145,8 +157,13 @@ where
             .map(|tx| {
                 let adapter = Arc::clone(&self.adapter);
                 let ctx = ctx.clone();
+                let admission = Arc::clone(&admission);
 
                 tokio::spawn(async move {
+                    // A cancelled caller can detach this task. Keep flush
+                    // behind its cache reads until
+                    // validation finishes.
+                    let _admission = admission;
                     let check_nonce = adapter.check_authorization(ctx.clone(), &tx).await?;
                     adapter.check_transaction(ctx.clone(), &tx).await?;
                     adapter
@@ -210,6 +227,7 @@ where
             "[core_mempool]: {:?} txs in map while package",
             self.pool.len(),
         );
+        let _snapshot = self.state_lock.read().await;
         let inst = Instant::now();
         let txs = self.pool.package(gas_limit, tx_num_limit as usize);
 
@@ -232,6 +250,7 @@ where
             "[core_mempool]: flush mempool with {:?} tx_hashes",
             tx_hashes.len(),
         );
+        let _flushing = self.state_lock.write().await;
         self.adapter.clear_nonce_cache();
 
         let (mut senders, missing_hashes) = self
@@ -255,10 +274,10 @@ where
             }
 
             for tx in stored_txs.into_iter().flatten() {
-                if !is_call_system_script(tx.transaction.unsigned.action())
-                    .expect("failed to identify system transaction during mempool flush")
+                if let Some(address) = nonce_affected_address(&tx)
+                    .expect("failed to identify transaction nonce effects during mempool flush")
                 {
-                    senders.push(tx.sender);
+                    senders.push(address);
                 }
             }
         }
@@ -298,34 +317,57 @@ where
         let mut full_txs = Vec::with_capacity(len);
 
         for tx_hash in tx_hashes.iter() {
-            if let Some(tx) = self.pool.get_by_hash(tx_hash) {
-                full_txs.push(tx);
-            } else {
+            let tx = self.pool.get_by_hash(tx_hash);
+            if tx.is_none() {
                 missing_hashes.push(*tx_hash);
+            }
+            full_txs.push(tx);
+        }
+
+        // Keep each transaction in its requested slot, even if flush moves it
+        // to storage.
+        if !missing_hashes.is_empty() {
+            let stored_txs = self
+                .adapter
+                .get_transactions_from_storage(ctx, height, &missing_hashes)
+                .await?;
+            if stored_txs.len() != missing_hashes.len() {
+                return Err(MemPoolError::MisMatch {
+                    require:  len,
+                    response: len - missing_hashes.len() + stored_txs.len(),
+                }
+                .into());
+            }
+
+            for (slot, tx) in full_txs
+                .iter_mut()
+                .filter(|tx| tx.is_none())
+                .zip(stored_txs)
+            {
+                *slot = tx;
             }
         }
 
-        // for push txs when local mempool is flushed, but the remote node still fetch
-        // full block
-        if !missing_hashes.is_empty() {
-            full_txs.extend(
-                self.adapter
-                    .get_transactions_from_storage(ctx, height, &missing_hashes)
-                    .await?
-                    .into_iter()
-                    .flatten(),
-            );
-        }
-
+        let full_txs: Vec<_> = full_txs.into_iter().flatten().collect();
         if full_txs.len() != len {
-            Err(MemPoolError::MisMatch {
+            return Err(MemPoolError::MisMatch {
                 require:  len,
                 response: full_txs.len(),
             }
-            .into())
-        } else {
-            Ok(full_txs)
+            .into());
         }
+
+        for (tx, expected) in full_txs.iter().zip(tx_hashes) {
+            if tx.transaction.hash != *expected {
+                return Err(MemPoolError::CheckHash {
+                    expect: *expected,
+                    actual: tx.transaction.hash,
+                }
+                .into());
+            }
+        }
+
+        Ok(full_txs)
     }
 
     async fn ensure_order_txs(
@@ -353,7 +395,10 @@ where
                 .into());
             }
 
-            let check_nonces = self.verify_tx_in_parallel(ctx.clone(), txs.clone()).await?;
+            let admission = Arc::new(Arc::clone(&self.state_lock).read_owned().await);
+            let check_nonces = self
+                .verify_tx_in_parallel(ctx.clone(), txs.clone(), Arc::clone(&admission))
+                .await?;
 
             for (signed_tx, check_nonce) in txs.into_iter().zip(check_nonces.into_iter()) {
                 let is_call_system_script =

@@ -279,8 +279,8 @@ impl ServiceProtocol for IdentifyProtocol {
         if context.session.ty.is_outbound() {
             // why don't set inbound here?
             // because inbound address can't feeler during staying connected
-            // and if set it to peer store, it will be broadcast to the entire network,
-            // but this is an unverified address
+            // and if set it to peer store, it will be broadcast to the entire
+            // network, but this is an unverified address
             self.peer_manager.with_peer_store_mut(|peer_store| {
                 peer_store.add_outbound_addr(context.session.address.clone());
             });
@@ -324,9 +324,10 @@ impl ServiceProtocol for IdentifyProtocol {
 
         if context.session.ty.is_outbound() {
             // Due to the filtering strategy of the peer store, if the node is
-            // disconnected after a long connection is maintained for more than seven days,
-            // it is possible that the node will be accidentally evicted, so it is necessary
-            // to reset the information of the node when disconnected.
+            // disconnected after a long connection is maintained for more than
+            // seven days, it is possible that the node will be
+            // accidentally evicted, so it is necessary to reset the
+            // information of the node when disconnected.
             self.peer_manager.with_peer_store_mut(|peer_store| {
                 if !peer_store.is_addr_banned(&context.session.address) {
                     peer_store.add_outbound_addr(context.session.address.clone());

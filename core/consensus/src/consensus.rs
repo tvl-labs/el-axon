@@ -170,7 +170,8 @@ impl<Adapter: ConsensusAdapter + 'static> OverlordConsensus<Adapter> {
         validators: Vec<ConsensusValidator>,
         timer_config: Option<DurationConfig>,
     ) -> ProtocolResult<()> {
-        // The address field of Node struct should use the node's secp256k1 public key
+        // The address field of Node struct should use the node's secp256k1
+        // public key
         let authority_list = validators
             .into_iter()
             .map(|v| Node {
@@ -198,7 +199,8 @@ pub fn gen_overlord_status(
     brake_ratio: u64,
     validators: Vec<ConsensusValidator>,
 ) -> Status {
-    // The address field of Node struct should use the node's secp256k1 public key
+    // The address field of Node struct should use the node's secp256k1 public
+    // key
     let mut authority_list = validators
         .into_iter()
         .map(|v| Node {

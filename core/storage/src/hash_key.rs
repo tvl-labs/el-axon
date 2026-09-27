@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fmt, str::FromStr};
 
 use protocol::types::{Bytes, Hash, Hasher};
 use protocol::{codec::ProtocolCodec, ProtocolResult};
@@ -106,9 +106,9 @@ impl ProtocolCodec for CommonHashKey {
     }
 }
 
-impl ToString for CommonHashKey {
-    fn to_string(&self) -> String {
-        format!("{}:{}", self.prefix.height(), self.hash)
+impl fmt::Display for CommonHashKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.prefix.height(), self.hash)
     }
 }
 

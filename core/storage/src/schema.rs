@@ -40,7 +40,6 @@ impl_storage_schema_for!(ReceiptBytesSchema, CommonHashKey, DBBytes, Receipt);
 impl_storage_schema_for!(TxHashNumberSchema, Hash, u64, HashHeight);
 impl_storage_schema_for!(LatestBlockSchema, Hash, Block, Block);
 impl_storage_schema_for!(LatestProofSchema, Hash, Proof, Block);
-impl_storage_schema_for!(OverlordWalSchema, Hash, Bytes, Wal);
 impl_storage_schema_for!(EvmCodeSchema, Hash, Bytes, Code);
 impl_storage_schema_for!(EvmCodeAddressSchema, Hash, Hash, Code);
 impl_storage_schema_for!(HardforkSchema, Hash, HardforkInfoInner, Version);

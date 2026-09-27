@@ -187,8 +187,8 @@ pub mod process {
                         .map(|value| value * *page_size)
                         .map_err(|_| io::Error::from(io::ErrorKind::InvalidData))
                 })?;
-            // ignore the size of the library in the virtual memory space of the task being
-            // imaged
+            // ignore the size of the library in the virtual memory space of the
+            // task being imaged
             let _lrs = parts.next();
             let _data = parts
                 .next()

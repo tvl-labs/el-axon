@@ -2,6 +2,10 @@
 name = "core-consensus"
 version = "0.1.0"
 edition = "2021"
+
+[features]
+default = []
+random_leader = ["overlord/random_leader"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -33,10 +37,6 @@ protocol = { path = "../../protocol", package = "axon-protocol" }
 bit-vec = "0.6"
 criterion = "0.5"
 num-traits = "0.2"
-
-[features]
-default = []
-random_leader = ["overlord/random_leader"]
 
 [[bench]]
 harness = false

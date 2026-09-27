@@ -52,8 +52,8 @@ impl Encodable for Proof {
 }
 /// A standalone function to verify the ckb-merkle-binary-tree proof.
 pub fn verify_proof(payload: VerifyProofPayload) -> Result<(), String> {
-    // Firstly, verify the transactions_root is consist of the raw_transactions_root
-    // and witnesses_root
+    // Firstly, verify the transactions_root is consist of the
+    // raw_transactions_root and witnesses_root
     let transactions_root: packed::Byte32 = payload.transactions_root.pack();
     let raw_transactions_root: packed::Byte32 = payload.raw_transactions_root.pack();
     let witnesses_root: packed::Byte32 = payload.witnesses_root.pack();
@@ -62,10 +62,10 @@ pub fn verify_proof(payload: VerifyProofPayload) -> Result<(), String> {
         return Err(String::from("verify transactions_root fail"));
     }
 
-    // Then, verify the given indices and lemmas can prove the leaves contains in
-    // the raw_transactions_root or the witnesses_root.
-    // If the verify_type is 0, the leaves should be in the raw_transactions_root,
-    // otherwise in the witnesses_root.
+    // Then, verify the given indices and lemmas can prove the leaves contains
+    // in the raw_transactions_root or the witnesses_root.
+    // If the verify_type is 0, the leaves should be in the
+    // raw_transactions_root, otherwise in the witnesses_root.
     let lemmas = payload
         .proof
         .lemmas

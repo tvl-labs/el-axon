@@ -46,14 +46,14 @@ async fn main() {
         .get_matches();
 
     let private_key = Secp256k1RecoverablePrivateKey::try_from(
-        read_private_key(&matches.get_one::<String>("private_key").unwrap()).as_slice(),
+        read_private_key(matches.get_one::<String>("private_key").unwrap()).as_slice(),
     )
     .unwrap();
     let address = Address::from_pubkey_bytes(private_key.pub_key().to_bytes())
         .unwrap()
         .0;
     let validators =
-        parse_reader::<ValidatorInfo>(&matches.get_one::<String>("validators").unwrap());
+        parse_reader::<ValidatorInfo>(matches.get_one::<String>("validators").unwrap());
 
     let client = HttpClientBuilder::default()
         .build(matches.get_one::<String>("url").unwrap())
@@ -94,12 +94,12 @@ fn read_private_key(path: &str) -> Key256Bits {
             let mut buffer = Vec::new();
             f.read_to_end(&mut buffer).map(|_| buffer)
         })
-        .and_then(|bytes| {
+        .map(|bytes| {
             const LEN: usize = 32;
             if bytes.len() == LEN {
                 let mut v = [0u8; 32];
                 v.copy_from_slice(&bytes);
-                Ok(Key256Bits::from(v))
+                Key256Bits::from(v)
             } else {
                 panic!("Invalid private key file");
             }
@@ -114,18 +114,16 @@ fn build_update_validator_tx(
     private_key: Secp256k1RecoverablePrivateKey,
 ) -> UnverifiedTransaction {
     let unsigned = UnsignedTransaction::Legacy(LegacyTransaction {
-        nonce:     nonce.into(),
+        nonce,
         gas_price: 8u64.into(),
         gas_limit: MAX_BLOCK_GAS_LIMIT.into(),
-        action:    TransactionAction::Call(METADATA_CONTRACT_ADDRESS),
-        value:     U256::zero(),
-        data:      metadata_abi::MetadataContractCalls::UpdateValidatorList(
-            UpdateValidatorListCall {
-                validators: ValidatorList {
-                    verifier_list: validators.into_iter().map(Into::into).collect(),
-                },
+        action: TransactionAction::Call(METADATA_CONTRACT_ADDRESS),
+        value: U256::zero(),
+        data: metadata_abi::MetadataContractCalls::UpdateValidatorList(UpdateValidatorListCall {
+            validators: ValidatorList {
+                verifier_list: validators.into_iter().map(Into::into).collect(),
             },
-        )
+        })
         .encode()
         .into(),
     });

@@ -35,9 +35,8 @@ jobs:
       run: make check-fmt
 
     - name: Install cargo-sort
-      run: |
-        which cargo-sort >/dev/null && echo "cargo-sort is installed" \
-        || (echo "cargo-sort is not installed" && cargo install cargo-sort)
+      # The project stays on Rust 1.78; cargo-sort needs a newer compiler.
+      run: cargo +nightly install cargo-sort --version 2.1.4 --locked
 
     - name: Ensure Cargo.toml dependency tables are sorted
       run: make check-sort

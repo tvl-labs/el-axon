@@ -157,8 +157,8 @@ where
     // ### Notes
     //
     // - If a MPT tree is empty, the root should be `RLP_NULL`.
-    // - In this function, when returns `H256::default()`, that means the tree is
-    //   not initialized.
+    // - In this function, when returns `H256::default()`, that means the tree
+    //   is not initialized.
     fn storage(&self, address: H160, index: H256) -> H256 {
         if let Ok(raw) = self.trie.get(address.as_bytes()) {
             if raw.is_none() {

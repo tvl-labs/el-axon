@@ -9,7 +9,7 @@ use protocol::{
     codec::ProtocolCodec,
     traits::{Context, Storage},
     trie::{self, Trie},
-    types::{Account, Block, ExecResp, HasherKeccak, RichBlock, NIL_DATA, RLP_NULL},
+    types::{Account, ExecResp, HasherKeccak, RichBlock, NIL_DATA, RLP_NULL},
     ProtocolResult,
 };
 
@@ -57,16 +57,6 @@ impl DatabaseGroup {
 
 #[async_trait]
 pub(crate) trait StorageExt: Storage {
-    async fn try_load_genesis(&self) -> ProtocolResult<Option<Block>> {
-        self.get_block(Context::new(), 0).await.or_else(|e| {
-            if e.to_string().contains("GetNone") {
-                Ok(None)
-            } else {
-                Err(e)
-            }
-        })
-    }
-
     async fn save_block(&self, rich: &RichBlock, resp: &ExecResp) -> ProtocolResult<()> {
         self.update_latest_proof(Context::new(), rich.block.header.proof.clone())
             .await?;

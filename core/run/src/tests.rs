@@ -337,3 +337,116 @@ fn sort_metadata(mut metadata: Metadata) -> Metadata {
     metadata.propose_counter = map.into_iter().map(Into::into).collect();
     metadata
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn wal_recovery_uses_chain_transaction_size_limit() {
+    use common_crypto::{
+        Crypto, PrivateKey, Secp256k1Recoverable, Secp256k1RecoverablePrivateKey, Signature,
+        ToPublicKey, UncompressedPublicKey,
+    };
+    use core_db::MemoryAdapter;
+    use core_storage::ImplStorage;
+    use protocol::traits::{Context, ExecutorAdapter, MemPool, Storage};
+    use protocol::types::{
+        public_to_address, Account, Block, Eip1559Transaction, Public, SignedTransaction,
+        TransactionAction, UnsignedTransaction, UnverifiedTransaction, H160, NIL_DATA, U256,
+    };
+
+    let key = Secp256k1RecoverablePrivateKey::generate(&mut protocol::rand::rngs::OsRng);
+    let public = Public::from_slice(&key.pub_key().to_uncompressed_bytes()[1..65]);
+    let mut unsigned = UnverifiedTransaction {
+        unsigned:  UnsignedTransaction::Eip1559(Eip1559Transaction {
+            nonce:                    7.into(),
+            gas_limit:                100_000.into(),
+            gas_price:                1.into(),
+            max_priority_fee_per_gas: 1.into(),
+            action:                   TransactionAction::Call(H160::from_low_u64_be(99)),
+            value:                    U256::zero(),
+            data:                     vec![0; 256].into(),
+            access_list:              vec![],
+        }),
+        signature: None,
+        chain_id:  Some(1),
+        hash:      H256::zero(),
+    };
+    unsigned.signature = Some(
+        Secp256k1Recoverable::sign_message(
+            unsigned.signature_hash(true).as_bytes(),
+            &key.to_bytes(),
+        )
+        .unwrap()
+        .to_bytes()
+        .into(),
+    );
+    let tx = SignedTransaction {
+        transaction: unsigned.calc_hash(),
+        sender:      public_to_address(&public),
+        public:      Some(public),
+    };
+    let storage = Arc::new(ImplStorage::new(Arc::new(MemoryAdapter::new()), 20));
+    let trie = Arc::new(MemoryDB::new(false));
+    let mut backend =
+        AxonExecutorApplyAdapter::new(Arc::clone(&trie), Arc::clone(&storage), Default::default())
+            .unwrap();
+    backend.save_account(&tx.sender, &Account {
+        nonce:        7.into(),
+        balance:      U256::MAX,
+        storage_root: RLP_NULL,
+        code_hash:    NIL_DATA,
+    });
+    let block = Block {
+        header:    Header {
+            state_root: backend.commit(),
+            chain_id: 1,
+            ..Default::default()
+        },
+        tx_hashes: vec![],
+    };
+    storage
+        .insert_block(Context::new(), block.clone())
+        .await
+        .unwrap();
+    let network_config = crate::NetworkConfig {
+        enable_save_restore: false,
+        ..Default::default()
+    };
+    let key_pair = network_config.secio_keypair.clone();
+    let network = crate::NetworkService::new(network_config, key_pair);
+    let config = common_config_parser::types::ConfigMempool {
+        pool_size:              2,
+        timeout_gap:            20,
+        broadcast_txs_size:     10,
+        broadcast_txs_interval: 100,
+    };
+    let size = tx.transaction.encode().unwrap().len();
+    assert!(size > config.pool_size as usize);
+    let restored = crate::init_mempool(
+        &config,
+        size,
+        &block.header,
+        &storage,
+        &trie,
+        &network.handle(),
+        &[tx.clone()],
+    )
+    .await;
+    assert_eq!(
+        restored
+            .package(Context::new(), 1_000_000.into(), 10)
+            .await
+            .unwrap()
+            .hashes,
+        vec![tx.transaction.hash]
+    );
+    let rejected = crate::init_mempool(
+        &config,
+        size - 1,
+        &block.header,
+        &storage,
+        &trie,
+        &network.handle(),
+        &[tx],
+    )
+    .await;
+    assert!(rejected.is_empty());
+}

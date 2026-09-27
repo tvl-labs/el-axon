@@ -104,7 +104,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
             let mut hardfork = self.node_info.hardfork_proposals.write().unwrap();
             match &*hardfork {
                 Some(v) => {
-                    // remove invalid proposal if the proposed block height is passed
+                    // remove invalid proposal if the proposed block height is
+                    // passed
                     if v.block_number <= next_number {
                         hardfork.take();
                         remove = true;
@@ -219,8 +220,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
 
         gauge_txs_len(&proposal);
 
-        // If the block is proposed by self, it does not need to check. Get full signed
-        // transactions directly.
+        // If the block is proposed by self, it does not need to check. Get full
+        // signed transactions directly.
         if !exemption {
             if let Err(e) = self.inner_check_block(ctx.clone(), &proposal).await {
                 let mut reason = self.last_check_block_fail_reason.write();
@@ -476,7 +477,8 @@ impl<Adapter: ConsensusAdapter + 'static> Engine<Proposal> for ConsensusEngine<A
                 .await?
         };
 
-        // The address field of Node struct should use the node's secp256k1 public key
+        // The address field of Node struct should use the node's secp256k1
+        // public key
         let mut old_validators = old_metadata
             .verifier_list
             .into_iter()
@@ -571,8 +573,8 @@ impl<Adapter: ConsensusAdapter + 'static> ConsensusEngine<Adapter> {
             })?;
 
         // verify the proof in the block for previous block
-        // skip to get previous proof to compare because the node may just comes from
-        // sync and waste a delay of read
+        // skip to get previous proof to compare because the node may just comes
+        // from sync and waste a delay of read
         let previous_block = self
             .adapter
             .get_block_by_number(ctx.clone(), proposal.number - 1)
@@ -816,7 +818,8 @@ pub fn generate_new_crypto_map(metadata: Metadata) -> ProtocolResult<HashMap<Byt
 }
 
 fn convert_to_overlord_authority(validators: &[ValidatorExtend]) -> Vec<Node> {
-    // The address field of Node struct should use the node's secp256k1 public key
+    // The address field of Node struct should use the node's secp256k1 public
+    // key
     let mut authority = validators
         .iter()
         .map(|v| Node {
