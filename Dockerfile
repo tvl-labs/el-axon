@@ -17,6 +17,9 @@ RUN cd /build && cargo build --release
 
 FROM debian:bookworm-20230612-slim
 
+# Limit allocator retention from RocksDB cache allocation and eviction across threads.
+ENV GLIBC_TUNABLES=glibc.malloc.arena_max=4
+
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl jq \
  && rm -rf /var/lib/apt/lists/*

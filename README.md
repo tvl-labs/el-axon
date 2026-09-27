@@ -71,6 +71,14 @@ target/release/axon run --config devtools/chain/config.toml
 ### Working with Docker
 While compiling from source can take about 20 minutes, if you want a quick start, a [docker-compose](devtools/chain/docker-compose.yml) file is provided, see [quick-start.md](devtools/chain/quick-start.md).
 
+Images built from this repository set `GLIBC_TUNABLES=glibc.malloc.arena_max=4`
+to reduce glibc memory retention during RocksDB cache allocation and eviction
+across threads. This keeps the configured cache capacity unchanged and does
+not impose a process memory limit. Recreate existing containers with the new
+image to apply the setting. If you override `GLIBC_TUNABLES` at deployment,
+include `glibc.malloc.arena_max=4` alongside any other tunables. Validate RSS
+and latency on one node before rolling out to the remaining nodes.
+
 ### Multiple nodes
 For running multiple nodes, first create toml files for each node and run different nodes in separate terminals or docker containers. The metadata in the genesis transactions should be updated to include all nodes' credentials. Here is [a simple Example](https://github.com/axonweb3/axon/blob/d835d64a7df7c10dcc5c2febcbc6c63bfa850810/.github/workflows/axon-start-with-short-genesis.yml#L85-L116).
 
