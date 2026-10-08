@@ -182,23 +182,9 @@ async fn start<K: KeyProvider>(
         Proposal::new_without_state_root(&current_block.header).into(),
     )?;
 
-    // The first two metadata has been inserted in the init process, only need to
-    // init the system contract DB here.
+    // The first two metadata has been inserted in the init process, only need
+    // to init the system contract DB here.
     system_contract::init_system_contract_db(inner_db, &mut backend);
-
-    // Init mempool and recover signed transactions with the current block number
-    let current_stxs = txs_wal.load_by_number(current_block.header.number + 1);
-    log::info!("Recover {} txs from wal", current_stxs.len());
-
-    let mempool = init_mempool(
-        &config.mempool,
-        &current_block.header,
-        &storage,
-        &trie_db,
-        &network_service.handle(),
-        &current_stxs,
-    )
-    .await;
 
     // Get the validator list from current metadata for consensus initialization
     let metadata_root = AxonExecutorReadOnlyAdapter::from_root(
@@ -215,6 +201,22 @@ async fn start<K: KeyProvider>(
     let metadata = metadata_handle.get_metadata_by_block_number(current_block.header.number)?;
     let validators: Vec<ConsensusValidator> =
         metadata.verifier_list.iter().map(Into::into).collect();
+
+    // Init mempool and recover signed transactions with the current block
+    // number
+    let current_stxs = txs_wal.load_by_number(current_block.header.number + 1);
+    log::info!("Recover {} txs from wal", current_stxs.len());
+
+    let mempool = init_mempool(
+        &config.mempool,
+        metadata.consensus_config.max_tx_size as usize,
+        &current_block.header,
+        &storage,
+        &trie_db,
+        &network_service.handle(),
+        &current_stxs,
+    )
+    .await;
 
     // Set args in mempool
     mempool.set_args(
@@ -331,6 +333,7 @@ fn init_network_service<K: KeyProvider>(
 
 async fn init_mempool<N, S, DB>(
     config: &ConfigMempool,
+    max_tx_size: usize,
     current_header: &Header,
     storage: &Arc<S>,
     trie_db: &Arc<DB>,
@@ -347,7 +350,7 @@ where
         Arc::clone(storage),
         Arc::clone(trie_db),
         current_header.chain_id,
-        config.pool_size as usize,
+        max_tx_size,
         config.broadcast_txs_size,
         config.broadcast_txs_interval,
     );

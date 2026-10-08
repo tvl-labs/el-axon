@@ -2,6 +2,10 @@
 name = "axon-protocol"
 version = "0.1.0"
 edition = "2021"
+
+[features]
+default = ["hex-serialize"]
+hex-serialize = []
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -49,7 +53,3 @@ serde_json = "1.0"
 toml = "0.8"
 
 common-merkle = { path = "../common/merkle" }
-
-[features]
-default = ["hex-serialize"]
-hex-serialize = []

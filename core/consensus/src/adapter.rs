@@ -451,7 +451,8 @@ where
 
     #[trace_span(kind = "consensus.adapter")]
     async fn verify_proof(&self, ctx: Context, block: Block, proof: Proof) -> ProtocolResult<()> {
-        // The block 0 has no proof, which is consensus by community, not by chain.
+        // The block 0 has no proof, which is consensus by community, not by
+        // chain.
         if block.header.number == 0 {
             return Ok(());
         };
@@ -488,7 +489,7 @@ where
             return Err(ConsensusError::VerifyProof(block.header.number, HashMismatch).into());
         }
 
-        if let Some(flag) = block.header.extra_data.get(0) {
+        if let Some(flag) = block.header.extra_data.first() {
             if flag.inner[0] == 1 {
                 return Ok(());
             }
@@ -508,7 +509,8 @@ where
             .into());
         }
 
-        // The address field of Node struct should use the node's secp256k1 public key
+        // The address field of Node struct should use the node's secp256k1
+        // public key
         let mut authority_list = metadata
             .verifier_list
             .iter()

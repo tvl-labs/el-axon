@@ -94,6 +94,7 @@ impl AxonNodeRpcServer for NodeRpcImpl {
                             let mut file = OpenOptions::new()
                                 .write(true)
                                 .create(true)
+                                .truncate(false)
                                 .append(false)
                                 .open(&tmp_file)
                                 .unwrap();

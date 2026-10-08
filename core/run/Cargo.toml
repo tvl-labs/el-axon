@@ -2,6 +2,9 @@
 name = "core-run"
 version = "0.1.0"
 edition = "2021"
+
+[features]
+jemalloc = ["dep:jemallocator", "dep:jemalloc-ctl", "dep:common-memory-tracker"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -40,6 +43,3 @@ jemallocator = { version = "0.5", features = ["profiling", "stats", "unprefixed_
 clap = "4.4"
 hasher = "0.1"
 tempfile = "3.6"
-
-[features]
-jemalloc = ["dep:jemallocator", "dep:jemalloc-ctl", "dep:common-memory-tracker"]

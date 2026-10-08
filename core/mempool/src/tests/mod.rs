@@ -34,20 +34,34 @@ const NATIVE_TOKEN_ISSUE_ADDRESS: H160 = system_contract_address(0x0);
 
 pub struct HashMemPoolAdapter {
     network_txs:               DashMap<Hash, SignedTransaction>,
+    stored_txs:                DashMap<Hash, SignedTransaction>,
     account_nonces:            DashMap<H160, U64>,
     account_nonce_queries:     DashMap<H160, usize>,
     account_nonce_batches:     AtomicUsize,
     fail_account_nonce_lookup: AtomicBool,
+    pause_validation:          AtomicBool,
+    validation_started:        tokio::sync::Notify,
+    pause_nonce_lookup:        AtomicBool,
+    nonce_lookup_started:      tokio::sync::Notify,
+    nonce_lookup_release:      tokio::sync::Notify,
+    validation_release:        tokio::sync::Notify,
 }
 
 impl HashMemPoolAdapter {
     fn new() -> HashMemPoolAdapter {
         HashMemPoolAdapter {
             network_txs:               DashMap::new(),
+            stored_txs:                DashMap::new(),
             account_nonces:            DashMap::new(),
             account_nonce_queries:     DashMap::new(),
             account_nonce_batches:     AtomicUsize::new(0),
             fail_account_nonce_lookup: AtomicBool::new(false),
+            pause_validation:          AtomicBool::new(false),
+            validation_started:        tokio::sync::Notify::new(),
+            pause_nonce_lookup:        AtomicBool::new(false),
+            nonce_lookup_started:      tokio::sync::Notify::new(),
+            nonce_lookup_release:      tokio::sync::Notify::new(),
+            validation_release:        tokio::sync::Notify::new(),
         }
     }
 
@@ -102,8 +116,22 @@ impl MemPoolAdapter for HashMemPoolAdapter {
     async fn check_authorization(
         &self,
         _ctx: Context,
-        _tx: &SignedTransaction,
+        tx: &SignedTransaction,
     ) -> ProtocolResult<U64> {
+        if core_executor::is_call_system_script(tx.transaction.unsigned.action())? {
+            return Ok(U64::zero());
+        }
+        if let Some(nonce) = self.account_nonces.get(&tx.sender) {
+            let tx_nonce = *tx.transaction.unsigned.nonce();
+            if tx_nonce < *nonce {
+                return Err(MemPoolError::InvalidNonce {
+                    current:  nonce.low_u64(),
+                    tx_nonce: tx_nonce.low_u64(),
+                }
+                .into());
+            }
+            return Ok(tx_nonce - *nonce);
+        }
         Ok(U64::zero())
     }
 
@@ -113,6 +141,10 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         addresses: &[H160],
     ) -> ProtocolResult<Vec<U64>> {
         self.account_nonce_batches.fetch_add(1, Ordering::AcqRel);
+        if self.pause_nonce_lookup.swap(false, Ordering::SeqCst) {
+            self.nonce_lookup_started.notify_one();
+            self.nonce_lookup_release.notified().await;
+        }
         if self.fail_account_nonce_lookup.load(Ordering::Acquire) {
             return Err(AdapterError::Internal.into());
         }
@@ -129,6 +161,10 @@ impl MemPoolAdapter for HashMemPoolAdapter {
     }
 
     async fn check_transaction(&self, _ctx: Context, tx: &SignedTransaction) -> ProtocolResult<()> {
+        if self.pause_validation.swap(false, Ordering::SeqCst) {
+            self.validation_started.notify_one();
+            self.validation_release.notified().await;
+        }
         check_hash(tx)?;
         check_sig(tx)
     }
@@ -145,9 +181,12 @@ impl MemPoolAdapter for HashMemPoolAdapter {
         &self,
         _ctx: Context,
         _height: Option<u64>,
-        _tx_hashes: &[Hash],
+        tx_hashes: &[Hash],
     ) -> ProtocolResult<Vec<Option<SignedTransaction>>> {
-        Ok(vec![])
+        Ok(tx_hashes
+            .iter()
+            .map(|hash| self.stored_txs.get(hash).map(|tx| tx.clone()))
+            .collect())
     }
 
     fn clear_nonce_cache(&self) {}

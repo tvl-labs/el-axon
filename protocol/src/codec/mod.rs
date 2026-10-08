@@ -171,7 +171,8 @@ fn to_hex_raw<'a>(v: &'a mut [u8], bytes: &[u8], skip_leading_zero: bool) -> &'a
         idx += 2;
     }
 
-    // SAFETY: all characters come either from CHARS or "0x", therefore valid UTF8
+    // SAFETY: all characters come either from CHARS or "0x", therefore valid
+    // UTF8
     unsafe { std::str::from_utf8_unchecked(&v[0..idx]) }
 }
 

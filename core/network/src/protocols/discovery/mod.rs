@@ -24,7 +24,7 @@ use protocol::rand::{self, seq::SliceRandom};
 use crate::peer_manager::PeerManager;
 
 pub use self::{
-    addr::{AddrKnown, AddressManager, MisbehaveResult, Misbehavior},
+    addr::{AddressManager, MisbehaveResult, Misbehavior},
     proto::{DiscoveryMessage, Node, Nodes},
     state::SessionState,
 };
@@ -120,11 +120,13 @@ impl<M: AddressManager + Send + Sync> ServiceProtocol for DiscoveryProtocol<M> {
                             }
 
                             state.received_get_nodes = true;
-                            // must get the item first, otherwise it is possible to load
-                            // the address of peer listen.
+                            // must get the item first, otherwise it is possible
+                            // to load the address
+                            // of peer listen.
                             let mut items = self.addr_mgr.get_random(2500);
 
-                            // change client random outbound port to client listen port
+                            // change client random outbound port to client
+                            // listen port
                             debug!("listen port: {:?}", listen_port);
                             if let Some(port) = listen_port.and_then(|a| a.listen_port()) {
                                 state.remote_addr.update_port(port);
@@ -194,9 +196,12 @@ impl<M: AddressManager + Send + Sync> ServiceProtocol for DiscoveryProtocol<M> {
 
                                 state.addr_known.extend(addrs.iter());
                                 // Non-announce nodes can only receive once
-                                // Due to the uncertainty of the other party’s state,
-                                // the announce node may be sent out first, and it must be
-                                // determined to be Non-announce before the state can be changed
+                                // Due to the uncertainty of the other party’s
+                                // state,
+                                // the announce node may be sent out first, and
+                                // it must be
+                                // determined to be Non-announce before the
+                                // state can be changed
                                 if !nodes.announce {
                                     state.received_nodes = true;
                                 }

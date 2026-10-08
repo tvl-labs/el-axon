@@ -6,18 +6,6 @@ edition = "2021"
 repository = "https://github.com/axonweb3/axon"
 build = "build.rs"
 
-[dependencies]
-clap = { version = "4.4", features = ["cargo"] }
-
-# byzantine = { path = "./byzantine" }
-common-version = { path = "./common/version" }
-core-api = { path = "./core/api" }
-core-cli = { path = "./core/cli" }
-core-consensus = { path = "./core/consensus" }
-core-executor = { path = "./core/executor" }
-core-run = { path = "./core/run" }
-protocol = { path = "./protocol", package = "axon-protocol" }
-
 [workspace]
 members = [
     "common/apm",
@@ -46,11 +34,30 @@ members = [
     "protocol",
 ]
 
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "axon"
+path = "src/main.rs"
+
 [features]
 default = []
 jemalloc = ["core-run/jemalloc"]
 pprof = ["core-api/pprof"]
 random_leader = ["core-consensus/random_leader"]
+
+[dependencies]
+clap = { version = "4.4", features = ["cargo"] }
+
+# byzantine = { path = "./byzantine" }
+common-version = { path = "./common/version" }
+core-api = { path = "./core/api" }
+core-cli = { path = "./core/cli" }
+core-consensus = { path = "./core/consensus" }
+core-executor = { path = "./core/executor" }
+core-run = { path = "./core/run" }
+protocol = { path = "./protocol", package = "axon-protocol" }
 # tentacle_metrics = ["core-network/tentacle_metrics"]
 
 [profile.release]
@@ -62,13 +69,6 @@ inherits = "release"
 debug = true
 overflow-checks = true
 opt-level = 3
-
-[lib]
-path = "src/lib.rs"
-
-[[bin]]
-name = "axon"
-path = "src/main.rs"
 
 [[example]]
 name = "custom_chain"

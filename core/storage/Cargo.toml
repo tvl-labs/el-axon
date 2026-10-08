@@ -14,7 +14,7 @@ parking_lot = "0.12"
 
 common-apm = { path = "../../common/apm" }
 common-apm-derive = { path = "../../common/apm-derive" }
-core-db ={ path = "../../core/db" }
+core-db = { path = "../../core/db" }
 protocol = { path = "../../protocol", package = "axon-protocol" }
 
 [dev-dependencies]

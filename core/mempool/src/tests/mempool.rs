@@ -352,7 +352,7 @@ async fn test_flush_rebuilds_cursor_for_normal_tx_with_same_sender_system_tx() {
     let sender = committed_tx.sender;
 
     let adapter = HashMemPoolAdapter::new();
-    adapter.set_account_nonce(sender, 6.into());
+    adapter.set_account_nonce(sender, 5.into());
     let mempool = MemPoolImpl::new(1024, 20, adapter, vec![
         system_tx.clone(),
         committed_tx.clone(),
@@ -360,6 +360,7 @@ async fn test_flush_rebuilds_cursor_for_normal_tx_with_same_sender_system_tx() {
     .await;
     let pool = mempool.get_tx_cache();
     pool.insert(pending_tx.clone(), false, 1.into()).unwrap();
+    mempool.get_adapter().set_account_nonce(sender, 6.into());
 
     mempool
         .flush(
@@ -540,6 +541,97 @@ async fn test_ensure_order_txs() {
 }
 
 #[tokio::test]
+async fn test_get_full_txs_preserves_requested_order() {
+    let priv_key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
+    let pub_key = priv_key.pub_key();
+    let txs: Vec<_> = (0..4)
+        .map(|nonce| mock_signed_tx(&priv_key, &pub_key, TIMEOUT, nonce, true))
+        .collect();
+    let hashes: Vec<_> = txs.iter().map(|tx| tx.transaction.hash).collect();
+
+    for height in [None, Some(CURRENT_HEIGHT)] {
+        for in_memory in [
+            [true, true, true, true],
+            [false, false, false, false],
+            [true, true, false, false],
+            [false, false, true, true],
+            [false, true, false, true],
+        ] {
+            let mempool = new_mempool(16, 0, 0, 0).await;
+            for (nonce, (tx, in_pool)) in txs.iter().zip(in_memory).enumerate() {
+                if in_pool {
+                    mempool
+                        .get_tx_cache()
+                        .insert(tx.clone(), true, nonce.into())
+                        .unwrap();
+                } else {
+                    mempool
+                        .get_adapter()
+                        .stored_txs
+                        .insert(tx.transaction.hash, tx.clone());
+                }
+            }
+
+            let fetched = mempool
+                .get_full_txs(Context::new(), height, &hashes)
+                .await
+                .unwrap();
+            assert_eq!(
+                fetched
+                    .iter()
+                    .map(|tx| tx.transaction.hash)
+                    .collect::<Vec<_>>(),
+                hashes,
+                "transaction order changed for in_memory={in_memory:?}, height={height:?}"
+            );
+            assert_eq!(
+                fetched
+                    .iter()
+                    .map(|tx| tx.transaction.unsigned.nonce().low_u64())
+                    .collect::<Vec<_>>(),
+                vec![0, 1, 2, 3]
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_get_full_txs_rejects_missing_transaction() {
+    let txs = default_mock_txs(3);
+    let hashes: Vec<_> = txs.iter().map(|tx| tx.transaction.hash).collect();
+    let mempool = new_mempool(16, 0, 0, 0).await;
+    mempool
+        .get_tx_cache()
+        .insert(txs[2].clone(), true, 0.into())
+        .unwrap();
+    mempool
+        .get_adapter()
+        .stored_txs
+        .insert(hashes[1], txs[1].clone());
+
+    assert!(mempool
+        .get_full_txs(Context::new(), None, &hashes)
+        .await
+        .is_err());
+}
+
+#[tokio::test]
+async fn test_get_full_txs_rejects_mismatched_storage_hash() {
+    let txs = default_mock_txs(2);
+    let mempool = new_mempool(16, 0, 0, 0).await;
+    let requested = txs[0].transaction.hash;
+    mempool
+        .get_adapter()
+        .stored_txs
+        .insert(requested, txs[1].clone());
+
+    assert!(mempool
+        .get_full_txs(Context::new(), None, &[requested])
+        .await
+        .is_err());
+}
+
+#[tokio::test]
 async fn bench_sign_with_spawn_list() {
     let adapter = Arc::new(HashMemPoolAdapter::new());
     let txs = default_mock_txs(30000);
@@ -581,4 +673,246 @@ async fn bench_sign() {
     }
 
     println!("bench_sign size {:?} cost {:?}", txs.len(), now.elapsed());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_wal_recovery_keeps_future_nonce_waiting_across_empty_flush() {
+    let key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
+    let public = key.pub_key();
+    let head = mock_signed_tx(&key, &public, 0, 697, true);
+    let future = mock_signed_tx(&key, &public, 0, 698, true);
+    let adapter = HashMemPoolAdapter::new();
+    adapter.set_account_nonce(head.sender, 697.into());
+    let mempool = MemPoolImpl::new(1024, 20, adapter, vec![future.clone()]).await;
+    let pool = mempool.get_tx_cache();
+    assert!(pool.package(1000.into(), 10).hashes.is_empty());
+    mempool.flush(Context::new(), &[], 1).await.unwrap();
+    assert!(pool.package(1000.into(), 10).hashes.is_empty());
+    mempool.insert(Context::new(), head.clone()).await.unwrap();
+    assert_eq!(pool.package(1000.into(), 10).hashes, vec![
+        head.transaction.hash,
+        future.transaction.hash
+    ]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_wal_recovery_revalidates_stale_and_invalid_transactions() {
+    let key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
+    let public = key.pub_key();
+    let stale = mock_signed_tx(&key, &public, 0, 696, true);
+    let valid = mock_signed_tx(&key, &public, 0, 697, true);
+    let invalid = mock_signed_tx(&key, &public, 0, 698, false);
+    let adapter = HashMemPoolAdapter::new();
+    adapter.set_account_nonce(valid.sender, 697.into());
+    let mempool = MemPoolImpl::new(1024, 20, adapter, vec![stale, invalid, valid.clone()]).await;
+    assert_eq!(mempool.len(), 1);
+    assert_eq!(
+        mempool.get_tx_cache().package(1000.into(), 10).hashes,
+        vec![valid.transaction.hash]
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_wal_recovery_preserves_system_transaction_bucket() {
+    let tx = mock_sys_txs(1).pop().unwrap();
+    let mempool = MemPoolImpl::new(1024, 20, HashMemPoolAdapter::new(), vec![tx.clone()]).await;
+    let packed = mempool.get_tx_cache().package(1000.into(), 10);
+    assert_eq!(packed.call_system_script_count, 1);
+    assert_eq!(packed.hashes, vec![tx.transaction.hash]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_package_mixed_fees_preserves_every_sender_prefix_at_all_limits() {
+    let keys: Vec<_> = (0..4)
+        .map(|_| Secp256k1RecoverablePrivateKey::generate(&mut OsRng))
+        .collect();
+    let fixture = [
+        (2, 0, 26),
+        (3, 0, 12),
+        (2, 1, 56),
+        (3, 1, 81),
+        (0, 0, 5),
+        (1, 0, 91),
+        (3, 2, 54),
+        (0, 1, 5),
+        (2, 2, 86),
+        (2, 3, 77),
+        (0, 2, 29),
+        (3, 3, 88),
+        (1, 1, 67),
+        (2, 4, 60),
+        (1, 2, 13),
+        (0, 3, 93),
+        (0, 4, 79),
+        (1, 3, 4),
+        (1, 4, 86),
+        (1, 5, 52),
+        (0, 5, 72),
+        (0, 6, 19),
+        (3, 4, 95),
+        (0, 7, 66),
+        (0, 8, 95),
+        (0, 9, 81),
+        (3, 5, 42),
+        (1, 6, 90),
+        (2, 5, 13),
+        (3, 6, 93),
+    ];
+    for limit in 1..=fixture.len() {
+        let mempool = new_mempool(1024, 20, 0, 0).await;
+        let pool = mempool.get_tx_cache();
+        for (sender, nonce, fee) in fixture {
+            let key = &keys[sender];
+            let mut tx = mock_signed_tx(key, &key.pub_key(), 0, nonce, true);
+            if let UnsignedTransaction::Eip1559(ref mut unsigned) = tx.transaction.unsigned {
+                unsigned.gas_price = fee.into();
+            }
+            tx.transaction = tx.transaction.calc_hash();
+            pool.insert(tx, false, nonce.into()).unwrap();
+        }
+        let selected = pool.package(1000.into(), limit);
+        assert_eq!(selected.hashes.len(), limit);
+        let mut next = HashMap::<H160, u64>::new();
+        for hash in selected.hashes {
+            let tx = pool.get_by_hash(&hash).unwrap();
+            let expected = next.entry(tx.sender).or_default();
+            assert_eq!(
+                tx.transaction.unsigned.nonce().low_u64(),
+                *expected,
+                "sender prefix at limit {limit}"
+            );
+            *expected += 1;
+        }
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_system_nonce_target_is_deferred_then_refreshed_on_flush() {
+    let key = Secp256k1RecoverablePrivateKey::generate(&mut OsRng);
+    let public = key.pub_key();
+    let first = mock_signed_tx(&key, &public, 0, 0, true);
+    let next = mock_signed_tx(&key, &public, 0, 1, true);
+    let mut system = mock_sys_txs(1).pop().unwrap();
+    if let UnsignedTransaction::Eip1559(ref mut unsigned) = system.transaction.unsigned {
+        let mut data = vec![0];
+        data.extend_from_slice(first.sender.as_bytes());
+        unsigned.data = data.into();
+    }
+    system.transaction = system.transaction.calc_hash();
+    let mempool = new_mempool(1024, 20, 0, 0).await;
+    let pool = mempool.get_tx_cache();
+    pool.insert(first.clone(), false, 0.into()).unwrap();
+    pool.insert(next.clone(), false, 1.into()).unwrap();
+    pool.insert_system_script_tx(system.clone()).unwrap();
+    let selected = pool.package(1000.into(), 10);
+    assert_eq!(selected.hashes, vec![system.transaction.hash]);
+    mempool
+        .get_adapter()
+        .set_account_nonce(first.sender, 1.into());
+    mempool
+        .flush(Context::new(), &selected.hashes, 1)
+        .await
+        .unwrap();
+    assert_eq!(pool.package(1000.into(), 10).hashes, vec![
+        next.transaction.hash
+    ]);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_flush_cannot_overtake_first_inflight_admission() {
+    let tx = default_mock_txs(1).pop().unwrap();
+    let mut system = mock_sys_txs(1).pop().unwrap();
+    if let UnsignedTransaction::Eip1559(ref mut unsigned) = system.transaction.unsigned {
+        let mut data = vec![0];
+        data.extend_from_slice(tx.sender.as_bytes());
+        unsigned.data = data.into();
+    }
+    system.transaction = system.transaction.calc_hash();
+    let mempool = Arc::new(new_mempool(1024, 20, 0, 0).await);
+    mempool
+        .get_tx_cache()
+        .insert_system_script_tx(system.clone())
+        .unwrap();
+    mempool.get_adapter().set_account_nonce(tx.sender, 0.into());
+    mempool
+        .get_adapter()
+        .pause_validation
+        .store(true, Ordering::SeqCst);
+    let pool = Arc::clone(&mempool);
+    let sender = tx.sender;
+    let insertion = tokio::spawn(async move { pool.insert(Context::new(), tx).await });
+    mempool.get_adapter().validation_started.notified().await;
+    mempool.get_adapter().set_account_nonce(sender, 1.into());
+    let pool = Arc::clone(&mempool);
+    let mut flushing = tokio::spawn(async move {
+        pool.flush(Context::new(), &[system.transaction.hash], 1)
+            .await
+    });
+    let early = tokio::time::timeout(std::time::Duration::from_millis(50), &mut flushing).await;
+    mempool.get_adapter().validation_release.notify_one();
+    insertion.await.unwrap().unwrap();
+    assert!(
+        early.is_err(),
+        "flush overtook an admission validated against the old state"
+    );
+    flushing.await.unwrap().unwrap();
+    assert!(mempool
+        .get_tx_cache()
+        .package(1000.into(), 10)
+        .hashes
+        .is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_cancelled_batch_keeps_flush_behind_validation_workers() {
+    let tx = default_mock_txs(1).pop().unwrap();
+    let hash = tx.transaction.hash;
+    let mempool = Arc::new(new_mempool(1024, 20, 0, 0).await);
+    mempool.get_adapter().network_txs.insert(hash, tx);
+    mempool
+        .get_adapter()
+        .pause_validation
+        .store(true, Ordering::SeqCst);
+    let pool = Arc::clone(&mempool);
+    let caller = tokio::spawn(async move {
+        pool.ensure_order_txs(Context::new(), Some(1), &[hash])
+            .await
+    });
+    mempool.get_adapter().validation_started.notified().await;
+    caller.abort();
+    assert!(caller.await.unwrap_err().is_cancelled());
+    let pool = Arc::clone(&mempool);
+    let mut flushing = tokio::spawn(async move { pool.flush(Context::new(), &[], 1).await });
+    let early = tokio::time::timeout(std::time::Duration::from_millis(50), &mut flushing).await;
+    mempool.get_adapter().validation_release.notify_one();
+    assert!(
+        early.is_err(),
+        "flush overtook a detached validation worker"
+    );
+    flushing.await.unwrap().unwrap();
+    assert!(mempool.is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_package_waits_for_flush_account_refresh() {
+    let tx = default_mock_txs(1).pop().unwrap();
+    let hash = tx.transaction.hash;
+    let mempool = Arc::new(new_mempool(1024, 20, 0, 0).await);
+    mempool.insert(Context::new(), tx.clone()).await.unwrap();
+    mempool.get_adapter().set_account_nonce(tx.sender, 1.into());
+    mempool
+        .get_adapter()
+        .pause_nonce_lookup
+        .store(true, Ordering::SeqCst);
+    let pool = Arc::clone(&mempool);
+    let flushing = tokio::spawn(async move { pool.flush(Context::new(), &[hash], 1).await });
+    mempool.get_adapter().nonce_lookup_started.notified().await;
+    let pool = Arc::clone(&mempool);
+    let mut packaging =
+        tokio::spawn(async move { pool.package(Context::new(), 1000.into(), 10).await });
+    let early = tokio::time::timeout(std::time::Duration::from_millis(50), &mut packaging).await;
+    mempool.get_adapter().nonce_lookup_release.notify_one();
+    flushing.await.unwrap().unwrap();
+    assert!(early.is_err(), "package read the old queue during flush");
+    assert!(packaging.await.unwrap().unwrap().hashes.is_empty());
 }

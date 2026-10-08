@@ -1,4 +1,5 @@
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet, VecDeque};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
     Arc,
@@ -9,7 +10,7 @@ use crossbeam_queue::ArrayQueue;
 use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 
-use core_executor::is_call_system_script;
+use core_executor::system_contract::nonce_affected_address;
 use protocol::tokio::{self, time::sleep};
 use protocol::types::{
     BlockNumber, Bytes, Hash, PackedTxHashes, SignedTransaction, H160, U256, U64,
@@ -128,12 +129,12 @@ impl PriorityPool {
             return Err(MemPoolError::ReachLimit(n).into());
         }
 
-        // This lock is necessary to avoid mismatch error triggered by the concurrent
-        // operation of tx insertion and flush.
+        // This lock is necessary to avoid mismatch error triggered by the
+        // concurrent operation of tx insertion and flush.
         let _flushing = self.flush_lock.read();
 
-        // Must flush co_queue here when it's full, otherwise, this tx may can't package
-        // by self, because it will never insert to real_queue
+        // Must flush co_queue here when it's full, otherwise, this tx may can't
+        // package by self, because it will never insert to real_queue
         if !check_limit && self.co_queue.is_full() {
             self.flush_to_pending_queue()
         }
@@ -162,21 +163,41 @@ impl PriorityPool {
         if !self.co_queue.is_empty() {
             self.flush_to_pending_queue()
         }
-        let mut q = self.real_queue.lock();
-
-        q.sort_unstable();
-
-        hashes.extend(
-            q.iter()
-                .filter_map(|ptr| {
-                    if ptr.is_dropped() {
-                        None
-                    } else {
-                        Some(ptr.hash())
-                    }
-                })
-                .take(limit),
-        );
+        // Serialize the snapshot with promotion into pending queues.
+        let _queue = self.real_queue.lock();
+        let affected: HashSet<_> = hashes
+            .iter()
+            .filter_map(|hash| {
+                let tx = self.sys_tx_bucket.get_tx_by_hash(hash)?;
+                nonce_affected_address(&tx).expect("invalid system transaction in pool")
+            })
+            .collect();
+        let mut queues: HashMap<H160, VecDeque<TxPtr>> = self
+            .pending_queue
+            .iter()
+            .filter(|entry| !affected.contains(entry.key()))
+            .map(|entry| (*entry.key(), entry.value().package_transactions()))
+            .collect();
+        let mut heads = BinaryHeap::new();
+        for (sender, queue) in &queues {
+            if let Some(tx) = queue.front() {
+                heads.push((tx.gas_price(), Reverse(*sender)));
+            }
+        }
+        // Only a sender's current head competes by fee. Never expose its
+        // successor until that head has been selected, including at the
+        // block limit.
+        for _ in 0..limit {
+            let Some((_, Reverse(sender))) = heads.pop() else {
+                break;
+            };
+            let queue = queues.get_mut(&sender).unwrap();
+            let tx = queue.pop_front().unwrap();
+            hashes.push(tx.hash());
+            if let Some(next) = queue.front() {
+                heads.push((next.gas_price(), Reverse(sender)));
+            }
+        }
 
         PackedTxHashes {
             hashes,
@@ -242,11 +263,16 @@ impl PriorityPool {
         let mut missing_hashes = Vec::new();
 
         for hash in hashes {
-            if let Some(tx) = self.tx_map.get(hash) {
-                if !is_call_system_script(tx.action())? {
-                    senders.push(tx.sender());
+            let tx = self
+                .tx_map
+                .get(hash)
+                .map(|tx| tx.raw_tx())
+                .or_else(|| self.sys_tx_bucket.get_tx_by_hash(hash));
+            if let Some(tx) = tx {
+                if let Some(address) = nonce_affected_address(&tx)? {
+                    senders.push(address);
                 }
-            } else if !self.sys_tx_bucket.contains(hash) {
+            } else {
                 missing_hashes.push(*hash);
             }
         }

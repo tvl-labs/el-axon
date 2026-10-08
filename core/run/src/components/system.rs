@@ -40,7 +40,8 @@ fn panic_log(info: &PanicInfo) {
     let backtrace = Backtrace::new();
     let thread = std::thread::current();
     let name = thread.name().unwrap_or("unnamed");
-    let location = info.location().unwrap(); // The current implementation always returns Some
+    let location = info.location().unwrap(); // The current implementation
+                                             // always returns Some
     let msg = match info.payload().downcast_ref::<&'static str>() {
         Some(s) => *s,
         None => match info.payload().downcast_ref::<String>() {

@@ -49,7 +49,8 @@ impl SessionState {
                 .iter()
                 .flat_map(|address| {
                     // Verify self is a public node first
-                    // if not, try to make public network nodes broadcast hole punching information
+                    // if not, try to make public network nodes broadcast hole
+                    // punching information
                     if addr_manager.is_valid_addr(address) {
                         multiaddr_to_socketaddr(address).map(|socket_addr| socket_addr.port())
                     } else {

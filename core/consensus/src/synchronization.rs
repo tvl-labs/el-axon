@@ -370,8 +370,8 @@ impl<Adapter: SynchronizationAdapter> OverlordSynchronization<Adapter> {
 
         status_agent.swap(new_status);
 
-        // If there are transactions in the transaction pool that have been on chain
-        // after this execution, make sure they are cleaned up.
+        // If there are transactions in the transaction pool that have been on
+        // chain after this execution, make sure they are cleaned up.
         self.adapter
             .flush_mempool(
                 ctx,
