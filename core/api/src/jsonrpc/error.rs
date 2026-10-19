@@ -58,6 +58,17 @@ pub enum RpcError {
     #[display(fmt = "Cannot trace transaction {}", _0)]
     CannotTraceTransaction(H256),
 
+    #[display(fmt = "Historical RPC capacity exhausted; retry with backoff")]
+    HistoryBusy,
+    #[display(fmt = "Historical RPC deadline exceeded; reduce the block range")]
+    HistoryTimeout,
+    #[display(fmt = "Historical RPC cancelled")]
+    HistoryCancelled,
+    #[display(
+        fmt = "Historical RPC result limit exceeded; reduce the block range or narrow the filter"
+    )]
+    HistoryResultTooLarge,
+
     #[display(fmt = "EVM error {}", "decode_revert_msg(&_0.ret)")]
     Evm(TxResp),
     #[display(fmt = "Internal error: {}", _0)]
@@ -98,6 +109,10 @@ impl RpcError {
             RpcError::CannotFindTransaction(_) => -40024,
             RpcError::CannotTraceTransaction(_) => -40025,
 
+            RpcError::HistoryBusy => -40027,
+            RpcError::HistoryTimeout => -40028,
+            RpcError::HistoryCancelled => -40029,
+            RpcError::HistoryResultTooLarge => -40030,
             RpcError::Evm(_) => -49998,
             RpcError::Internal(_) => -49999,
         }
@@ -141,6 +156,10 @@ impl From<RpcError> for ErrorObjectOwned {
             RpcError::CallSystemContract => ErrorObject::owned(err_code, err, none_data),
             RpcError::CannotFindTransaction(_) => ErrorObject::owned(err_code, err, none_data),
             RpcError::CannotTraceTransaction(_) => ErrorObject::owned(err_code, err, none_data),
+            RpcError::HistoryBusy
+            | RpcError::HistoryTimeout
+            | RpcError::HistoryCancelled
+            | RpcError::HistoryResultTooLarge => ErrorObject::owned(err_code, err, none_data),
             RpcError::Evm(resp) => {
                 ErrorObject::owned(err_code, err.clone(), Some(vm_err(resp.clone())))
             }

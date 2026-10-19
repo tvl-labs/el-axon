@@ -32,3 +32,5 @@ protocol = { path = "../../protocol", package = "axon-protocol" }
 
 [dev-dependencies]
 json = "0.12"
+jsonrpsee = { version = "0.20", features = ["http-client", "ws-client"] }
+tokio = { version = "1.25", features = ["test-util"] }

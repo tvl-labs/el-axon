@@ -187,6 +187,10 @@ pub struct ConfigApi {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ConfigWeb3 {
+    #[serde(default = "default_history_query_concurrency")]
+    pub history_query_concurrency:  usize,
+    #[serde(default = "default_history_query_timeout_ms")]
+    pub history_query_timeout_ms:   u64,
     #[serde(default = "default_log_filter_max_block_range")]
     pub log_filter_max_block_range: u64,
     #[serde(default = "default_max_gas_cap")]
@@ -321,5 +325,12 @@ fn default_max_gas_cap() -> u64 {
 }
 
 fn default_log_filter_max_block_range() -> u64 {
+    10_000
+}
+
+fn default_history_query_concurrency() -> usize {
+    2
+}
+fn default_history_query_timeout_ms() -> u64 {
     10_000
 }
