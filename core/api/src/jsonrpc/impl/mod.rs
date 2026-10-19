@@ -15,6 +15,3 @@ pub use web3::{from_receipt_to_web3_log, Web3RpcImpl};
 mod history_tests;
 #[cfg(test)]
 mod test_adapter;
-
-#[cfg(test)]
-mod history_benchmark;

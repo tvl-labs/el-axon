@@ -1778,6 +1778,7 @@ dependencies = [
  "core-consensus",
  "core-executor",
  "core-interoperation",
+ "criterion",
  "either",
  "hyper",
  "json",

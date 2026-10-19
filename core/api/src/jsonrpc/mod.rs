@@ -3,6 +3,11 @@ mod r#impl;
 pub mod web3_types;
 mod ws_subscription;
 
+// Expose the real handler only for the standalone Criterion harness.
+#[cfg(feature = "bench")]
+#[doc(hidden)]
+pub use r#impl::Web3RpcImpl;
+
 use std::{collections::HashMap, sync::Arc};
 
 use ckb_jsonrpc_types::{CellInfo, HeaderView as CkbHeaderView, OutPoint};
