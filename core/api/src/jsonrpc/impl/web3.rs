@@ -25,9 +25,10 @@ use crate::jsonrpc::web3_types::{
 use crate::jsonrpc::{error::RpcError, Web3RpcServer};
 use crate::APIError;
 
-pub(crate) const MAX_LOG_NUM: usize = 10000;
+use super::history::{scan_logs, HistoryExecutor};
 
 pub struct Web3RpcImpl<Adapter> {
+    history:                    HistoryExecutor,
     adapter:                    Arc<Adapter>,
     max_gas_cap:                U64,
     log_filter_max_block_range: u64,
@@ -36,10 +37,16 @@ pub struct Web3RpcImpl<Adapter> {
 impl<Adapter: APIAdapter> Web3RpcImpl<Adapter> {
     pub fn new(adapter: Arc<Adapter>, max_gas_cap: u64, log_filter_max_block_range: u64) -> Self {
         Self {
+            history: HistoryExecutor::default(),
             adapter,
             max_gas_cap: max_gas_cap.into(),
             log_filter_max_block_range,
         }
+    }
+
+    pub(crate) fn with_history_executor(mut self, history: HistoryExecutor) -> Self {
+        self.history = history;
+        self
     }
 
     async fn get_block_number_by_id(
@@ -557,195 +564,18 @@ impl<Adapter: APIAdapter + 'static> Web3RpcServer for Web3RpcImpl<Adapter> {
 
     #[metrics_rpc("eth_getLogs")]
     async fn get_logs(&self, filter: Web3Filter) -> RpcResult<Vec<Web3Log>> {
-        let topics: Vec<Option<Vec<Option<H256>>>> = filter
-            .topics
-            .map(|s| {
-                s.into_iter()
-                    .take(4)
-                    .map(Into::<Option<Vec<Option<H256>>>>::into)
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        enum BlockPosition {
-            Hash(H256),
-            Num(BlockNumber),
-            Block(Block),
-        }
-
-        async fn get_logs<T: APIAdapter>(
-            adapter: &T,
-            position: BlockPosition,
-            topics: &[Option<Vec<Option<H256>>>],
-            logs: &mut Vec<Web3Log>,
-            address: Option<&Vec<H160>>,
-            early_return: &mut bool,
-        ) -> RpcResult<()> {
-            let extend_logs = |logs: &mut Vec<Web3Log>,
-                               receipts: Vec<Option<Receipt>>,
-                               early_return: &mut bool| {
-                for (index, receipt) in receipts.into_iter().flatten().enumerate() {
-                    from_receipt_to_web3_log(
-                        index,
-                        topics,
-                        address.as_ref().unwrap_or(&&Vec::new()),
-                        &receipt,
-                        logs,
-                    );
-
-                    if logs.len() > MAX_LOG_NUM {
-                        *early_return = true;
-                        return;
-                    }
-                }
-            };
-
-            match position {
-                BlockPosition::Hash(hash) => {
-                    match adapter
-                        .get_block_by_hash(Context::new(), hash)
-                        .await
-                        .map_err(|e| RpcError::Internal(e.to_string()))?
-                    {
-                        Some(block) => {
-                            let receipts = adapter
-                                .get_receipts_by_hashes(
-                                    Context::new(),
-                                    block.header.number,
-                                    &block.tx_hashes,
-                                )
-                                .await
-                                .map_err(|e| RpcError::Internal(e.to_string()))?;
-                            extend_logs(logs, receipts, early_return);
-                            Ok(())
-                        }
-                        None => Err(RpcError::InvalidBlockHash.into()),
-                    }
-                }
-                BlockPosition::Num(n) => {
-                    let block = adapter
-                        .get_block_by_number(Context::new(), Some(n))
-                        .await
-                        .map_err(|e| RpcError::Internal(e.to_string()))?
-                        .unwrap();
-                    let receipts = adapter
-                        .get_receipts_by_hashes(
-                            Context::new(),
-                            block.header.number,
-                            &block.tx_hashes,
-                        )
-                        .await
-                        .map_err(|e| RpcError::Internal(e.to_string()))?;
-
-                    extend_logs(logs, receipts, early_return);
-                    Ok(())
-                }
-                BlockPosition::Block(block) => {
-                    let receipts = adapter
-                        .get_receipts_by_hashes(
-                            Context::new(),
-                            block.header.number,
-                            &block.tx_hashes,
-                        )
-                        .await
-                        .map_err(|e| RpcError::Internal(e.to_string()))?;
-
-                    extend_logs(logs, receipts, early_return);
-                    Ok(())
-                }
-            }
-        }
-
-        let address_filter: Option<Vec<H160>> = filter.address.into();
-        let mut all_logs = Vec::new();
-        let mut early_return = false;
-        match filter.block_hash {
-            Some(hash) => {
-                get_logs(
-                    &*self.adapter,
-                    BlockPosition::Hash(hash),
-                    &topics,
-                    &mut all_logs,
-                    address_filter.as_ref(),
-                    &mut early_return,
+        let adapter = Arc::clone(&self.adapter);
+        let max_range = self.log_filter_max_block_range;
+        self.history
+            .start(move |budget| async move {
+                Ok(
+                    scan_logs(&*adapter, filter.into(), max_range, false, &budget)
+                        .await?
+                        .0,
                 )
-                .await?;
-            }
-            None => {
-                let latest_block = self
-                    .adapter
-                    .get_block_by_number(Context::new(), None)
-                    .await
-                    .map_err(|e| RpcError::Internal(e.to_string()))?
-                    .unwrap();
-                let latest_number = latest_block.header.number;
-                let (start, end) = {
-                    let convert = |id: BlockId| -> BlockNumber {
-                        match id {
-                            BlockId::Num(n) => n.low_u64(),
-                            BlockId::Earliest => 0,
-                            _ => latest_number,
-                        }
-                    };
-
-                    (
-                        filter.from_block.map(convert).unwrap_or(latest_number),
-                        filter.to_block.map(convert).unwrap_or(latest_number),
-                    )
-                };
-
-                if start > latest_number {
-                    return Err(RpcError::InvalidFromBlockNumber(start).into());
-                }
-
-                if end > latest_number {
-                    return Err(RpcError::InvalidToBlockNumber(end).into());
-                }
-
-                if end.saturating_sub(start) > self.log_filter_max_block_range {
-                    return Err(RpcError::InvalidBlockRange(
-                        start,
-                        end,
-                        self.log_filter_max_block_range,
-                    )
-                    .into());
-                }
-
-                let mut visiter_last_block = false;
-                for n in start..=end {
-                    if n == latest_number {
-                        visiter_last_block = true;
-                    } else {
-                        get_logs(
-                            &*self.adapter,
-                            BlockPosition::Num(n),
-                            &topics,
-                            &mut all_logs,
-                            address_filter.as_ref(),
-                            &mut early_return,
-                        )
-                        .await?;
-
-                        if early_return {
-                            return Ok(all_logs);
-                        }
-                    }
-                }
-
-                if visiter_last_block {
-                    get_logs(
-                        &*self.adapter,
-                        BlockPosition::Block(latest_block),
-                        &topics,
-                        &mut all_logs,
-                        address_filter.as_ref(),
-                        &mut early_return,
-                    )
-                    .await?;
-                }
-            }
-        }
-        Ok(all_logs)
+            })?
+            .wait()
+            .await
     }
 
     #[metrics_rpc("eth_feeHistory")]
@@ -1150,6 +980,29 @@ pub fn from_receipt_to_web3_log(
     receipt: &Receipt,
     logs: &mut Vec<Web3Log>,
 ) {
+    for (log_idex, log) in receipt.logs.iter().enumerate() {
+        if log_matches(log, topics, address) {
+            let web3_log = Web3Log {
+                address:           log.address,
+                topics:            log.topics.clone(),
+                data:              Hex::encode(&log.data),
+                block_hash:        Some(receipt.block_hash),
+                block_number:      Some(receipt.block_number.into()),
+                transaction_hash:  Some(receipt.tx_hash),
+                transaction_index: Some(index.into()),
+                log_index:         Some(log_idex.into()),
+                removed:           false,
+            };
+            logs.push(web3_log);
+        }
+    }
+}
+
+pub(super) fn log_matches(
+    log: &protocol::types::Log,
+    topics: &[Option<Vec<Option<Hash>>>],
+    address: &[H160],
+) -> bool {
     macro_rules! contains_topic {
         ($topics: expr, $log: expr) => {{
             $topics.is_empty()
@@ -1169,20 +1022,5 @@ pub fn from_receipt_to_web3_log(
         }};
     }
 
-    for (log_idex, log) in receipt.logs.iter().enumerate() {
-        if (address.is_empty() || address.contains(&log.address)) && contains_topic!(topics, log) {
-            let web3_log = Web3Log {
-                address:           log.address,
-                topics:            log.topics.clone(),
-                data:              Hex::encode(&log.data),
-                block_hash:        Some(receipt.block_hash),
-                block_number:      Some(receipt.block_number.into()),
-                transaction_hash:  Some(receipt.tx_hash),
-                transaction_index: Some(index.into()),
-                log_index:         Some(log_idex.into()),
-                removed:           false,
-            };
-            logs.push(web3_log);
-        }
-    }
+    (address.is_empty() || address.contains(&log.address)) && contains_topic!(topics, log)
 }

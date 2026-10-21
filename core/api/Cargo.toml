@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+bench = []
+
 [dependencies]
 # async-graphql = { version = "3.0", features = ["tracing"] }
 beef = "0.5"
@@ -31,4 +34,12 @@ either = { version = "1.8", features = ["serde"] }
 protocol = { path = "../../protocol", package = "axon-protocol" }
 
 [dev-dependencies]
+criterion = "0.5"
 json = "0.12"
+jsonrpsee = { version = "0.20", features = ["http-client", "ws-client"] }
+tokio = { version = "1.25", features = ["test-util"] }
+
+[[bench]]
+name = "history_rpc"
+harness = false
+required-features = ["bench"]

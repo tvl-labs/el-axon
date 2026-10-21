@@ -3,6 +3,11 @@ mod r#impl;
 pub mod web3_types;
 mod ws_subscription;
 
+// Expose the real handler only for the standalone Criterion harness.
+#[cfg(feature = "bench")]
+#[doc(hidden)]
+pub use r#impl::Web3RpcImpl;
+
 use std::{collections::HashMap, sync::Arc};
 
 use ckb_jsonrpc_types::{CellInfo, HeaderView as CkbHeaderView, OutPoint};
@@ -259,19 +264,29 @@ pub async fn run_jsonrpc_server<Adapter: APIAdapter + 'static>(
     adapter: Arc<Adapter>,
 ) -> ProtocolResult<(Option<ServerHandle>, Option<ServerHandle>)> {
     let mut ret = (None, None);
+    let history = r#impl::history::HistoryExecutor::new(
+        config.web3.history_query_concurrency,
+        std::time::Duration::from_millis(config.web3.history_query_timeout_ms),
+        config.rpc.max_payload_size as usize,
+    )
+    .map_err(APIError::RequestPayload)?;
 
     let mut rpc = r#impl::Web3RpcImpl::new(
         Arc::clone(&adapter),
         config.web3.max_gas_cap,
         config.web3.log_filter_max_block_range,
     )
+    .with_history_executor(history.clone())
     .into_rpc();
 
     let node_rpc = r#impl::NodeRpcImpl::new(version, config.data_path).into_rpc();
     let axon_rpc = r#impl::AxonRpcImpl::new(Arc::clone(&adapter)).into_rpc();
-    let filter =
-        r#impl::filter_module(Arc::clone(&adapter), config.web3.log_filter_max_block_range)
-            .into_rpc();
+    let filter = r#impl::filter_module(
+        Arc::clone(&adapter),
+        config.web3.log_filter_max_block_range,
+        history,
+    )
+    .into_rpc();
     let ckb_light_client_rpc = r#impl::CkbLightClientRpcImpl::new(Arc::clone(&adapter)).into_rpc();
 
     rpc.merge(node_rpc).unwrap();
