@@ -573,7 +573,8 @@ impl<Adapter: APIAdapter + 'static> Web3RpcServer for Web3RpcImpl<Adapter> {
                         .await?
                         .0,
                 )
-            })?
+            })
+            .await?
             .wait()
             .await
     }

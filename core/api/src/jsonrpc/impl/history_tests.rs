@@ -57,7 +57,7 @@ async fn reads_started(adapter: &MockAdapter, count: usize) {
 async fn capacity_recovers(history: &HistoryExecutor) {
     tokio::time::timeout(Duration::from_secs(2), async {
         loop {
-            if let Ok(job) = history.start(|budget| async move { budget.check() }) {
+            if let Ok(job) = history.start(|budget| async move { budget.check() }).await {
                 if job.wait().await.is_ok() {
                     break;
                 }
@@ -167,6 +167,48 @@ async fn exact_log_limit_is_complete_and_block_ranges_remain_compatible() {
         -40016
     );
     assert!(rpc.get_logs(filter(30_000, 30_000)).await.is_ok());
+}
+
+#[tokio::test]
+async fn rejected_and_dropped_filter_admission_preserve_the_cursor_and_release_the_lease() {
+    let adapter = MockAdapter::new(1, 0);
+    adapter.logs_per_block.store(1, Ordering::SeqCst);
+    let history = executor(1, 5_000);
+    let filters = filter_module(Arc::clone(&adapter), 25_000, history.clone());
+    let id = filters.new_filter(raw_filter()).await.unwrap();
+    adapter.head.store(4, Ordering::SeqCst);
+    let (release, blocked) = tokio::sync::oneshot::channel();
+    let occupied = history
+        .start(|_| async move {
+            blocked.await.unwrap();
+            Ok(())
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        filters.get_filter_changes(id).await.unwrap_err().code(),
+        -40027
+    );
+    let mut waiting = Box::pin(filters.get_filter_changes(id));
+    tokio::select! {
+        biased;
+        result = &mut waiting => panic!("filter should wait for capacity: {result:?}"),
+        _ = tokio::task::yield_now() => {}
+    }
+    drop(waiting);
+    assert_eq!(adapter.reads.load(Ordering::SeqCst), 0);
+    // The next poll must be able to acquire the filter lease while still
+    // waiting for global capacity, then scan the original cursor in full.
+    let (result, _) = tokio::join!(filters.get_filter_changes(id), async {
+        tokio::task::yield_now().await;
+        release.send(()).unwrap();
+        occupied.wait().await.unwrap();
+    });
+    let FilterChanges::Logs(logs) = result.unwrap() else {
+        panic!("expected logs")
+    };
+    assert_eq!(logs.len(), 3);
+    assert_eq!(logs[0].block_number.unwrap().low_u64(), 2);
 }
 
 #[tokio::test]
@@ -393,6 +435,7 @@ async fn worker_panic_returns_error_and_releases_capacity() {
     let history = executor(1, 1_000);
     let failed = history
         .start::<(), _, _>(|_| async { panic!("simulated storage failure") })
+        .await
         .unwrap()
         .wait()
         .await;
