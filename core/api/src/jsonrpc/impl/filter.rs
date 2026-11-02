@@ -142,7 +142,8 @@ impl<Adapter: APIAdapter + 'static> AxonWeb3RpcFilter<Adapter> {
         self.history
             .start(move |budget| async move {
                 Ok(latest_block(&*adapter, &budget).await?.header.number)
-            })?
+            })
+            .await?
             .wait()
             .await
     }
@@ -194,7 +195,8 @@ impl<Adapter: APIAdapter + 'static> AxonWeb3RpcFilter<Adapter> {
                         Ok((FilterChanges::Blocks(hashes), FilterKind::Blocks(next)))
                     }
                 }
-            })?
+            })
+            .await?
             .wait()
             .await?;
         // No await between validating membership and publishing the cursor.

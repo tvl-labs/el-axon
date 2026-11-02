@@ -16,6 +16,7 @@ use crate::jsonrpc::{
 };
 
 const MAX_LOGS: usize = 10_000;
+const ADMISSION_WAIT: Duration = Duration::from_millis(500);
 
 /// One admission budget shared by all historical RPC transports and filter
 /// instances.
@@ -54,18 +55,23 @@ impl HistoryExecutor {
         })
     }
 
-    pub(crate) fn start<T, F, Fut>(&self, work: F) -> RpcResult<HistoryJob<T>>
+    pub(crate) async fn start<T, F, Fut>(&self, work: F) -> RpcResult<HistoryJob<T>>
     where
         T: Send + 'static,
         F: FnOnce(QueryBudget) -> Fut + Send + 'static,
         Fut: Future<Output = RpcResult<T>> + Send + 'static,
     {
-        // Acquire before spawning: neither the blocking pool nor callers queue
-        // for a permit.
-        let permit = Arc::clone(&self.permits)
-            .try_acquire_owned()
-            .map_err(|_| RpcError::HistoryBusy)?;
-        let deadline = Instant::now() + self.timeout;
+        let started = Instant::now();
+        let deadline = started + self.timeout;
+        // Absorb short bursts without queuing blocking workers. Admission uses
+        // the same request deadline as execution and never waits over 500 ms.
+        let permit = tokio::time::timeout_at(
+            (started + ADMISSION_WAIT.min(self.timeout)).into(),
+            Arc::clone(&self.permits).acquire_owned(),
+        )
+        .await
+        .map_err(|_| RpcError::HistoryBusy)?
+        .map_err(|_| RpcError::HistoryBusy)?;
         let cancelled = Arc::new(AtomicBool::new(false));
         let budget = QueryBudget {
             deadline,
@@ -73,6 +79,7 @@ impl HistoryExecutor {
             removed: None,
             max_bytes: self.max_bytes,
         };
+        budget.check()?;
         let worker = tokio::task::spawn_blocking(move || {
             // A timed-out or dropped caller cannot release capacity while
             // storage is still running.
@@ -357,4 +364,97 @@ pub(crate) async fn scan_blocks<A: APIAdapter>(
     hashes.push(latest.hash());
     budget.check()?;
     Ok((hashes, end))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{future::poll_fn, pin::Pin, task::Poll};
+
+    async fn assert_pending<F: Future>(mut future: Pin<&mut F>) {
+        poll_fn(|cx| {
+            assert!(future.as_mut().poll(cx).is_pending());
+            Poll::Ready(())
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn admission_waits_for_capacity_without_restarting_the_deadline() {
+        let history = HistoryExecutor::default();
+        let occupied = history.permits.acquire_many(2).await.unwrap();
+        let ran = Arc::new(AtomicBool::new(false));
+        let worker_ran = Arc::clone(&ran);
+        let before = Instant::now();
+        let mut waiting = Box::pin(history.start(move |budget| async move {
+            worker_ran.store(true, Ordering::SeqCst);
+            budget.check()?;
+            Ok(budget.deadline)
+        }));
+        assert_pending(waiting.as_mut()).await;
+        let after = Instant::now();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(!ran.load(Ordering::SeqCst));
+        drop(occupied);
+        let job = waiting.await.unwrap();
+        // Both the handler and worker retain the deadline set before waiting.
+        assert!(job.deadline >= before + history.timeout);
+        assert!(job.deadline <= after + history.timeout);
+        let deadline = job.deadline;
+        assert_eq!(job.wait().await.unwrap(), deadline);
+        assert!(ran.load(Ordering::SeqCst));
+        assert_eq!(history.permits.available_permits(), 2);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn saturated_admission_is_bounded_and_never_starts_work() {
+        let history = HistoryExecutor::default();
+        let _occupied = history.permits.acquire_many(2).await.unwrap();
+        let started = tokio::time::Instant::now();
+        let result = history
+            .start::<(), _, _>(|_| async { panic!("unadmitted work must not start") })
+            .await;
+        assert_eq!(result.err().unwrap().code(), -40027);
+        assert!(started.elapsed() >= ADMISSION_WAIT);
+        assert!(started.elapsed() < ADMISSION_WAIT + Duration::from_millis(50));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn admission_does_not_wait_past_a_shorter_query_deadline() {
+        let timeout = Duration::from_millis(100);
+        let history = HistoryExecutor::new(1, timeout, 1024).unwrap();
+        let _occupied = history.permits.acquire().await.unwrap();
+        let started = tokio::time::Instant::now();
+        let result = history
+            .start::<(), _, _>(|_| async { panic!("unadmitted work must not start") })
+            .await;
+        assert_eq!(result.err().unwrap().code(), -40027);
+        assert!(started.elapsed() >= timeout);
+        assert!(started.elapsed() < timeout + Duration::from_millis(50));
+    }
+
+    #[tokio::test]
+    async fn dropped_admission_does_not_start_work_or_leak_capacity() {
+        let history = HistoryExecutor::default();
+        let occupied = history.permits.acquire_many(2).await.unwrap();
+        let ran = Arc::new(AtomicBool::new(false));
+        let worker_ran = Arc::clone(&ran);
+        let mut waiting = Box::pin(history.start(move |_| async move {
+            worker_ran.store(true, Ordering::SeqCst);
+            Ok(())
+        }));
+        assert_pending(waiting.as_mut()).await;
+        drop(waiting);
+        drop(occupied);
+        assert_eq!(history.permits.available_permits(), 2);
+        history
+            .start(|budget| async move { budget.check() })
+            .await
+            .unwrap()
+            .wait()
+            .await
+            .unwrap();
+        assert!(!ran.load(Ordering::SeqCst));
+        assert_eq!(history.permits.available_permits(), 2);
+    }
 }

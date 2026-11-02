@@ -19,7 +19,13 @@ log_filter_max_block_range = 25000
 
 Omitting the new settings uses two concurrent queries and a ten-second deadline.
 Zero concurrency or timeout is rejected when starting the RPC server. Requests
-that cannot obtain a permit fail immediately; there is no admission wait queue.
+wait asynchronously for global capacity for up to 500 ms, capped by the query
+deadline. Admission waiting counts toward `history_query_timeout_ms`; acquiring
+a permit does not restart that deadline. No blocking worker is spawned until a
+permit is acquired. Requests still waiting when the admission window expires
+receive `-40027`. Dropping a waiting request removes it from the admission queue
+without starting storage work. Concurrent polls of the same filter continue to
+receive `-40027` immediately.
 The existing log range check remains `to - from <= log_filter_max_block_range`,
 so a 5,000-block client batch remains within the limit. Block filters also enforce
 a maximum span from their last successfully returned block to the current head.
